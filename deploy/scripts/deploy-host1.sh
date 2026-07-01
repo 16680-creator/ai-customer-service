@@ -8,7 +8,6 @@
 set -e
 
 HOST1_IP="${HOST1_IP:-127.0.0.1}"
-REGISTRY="${REGISTRY:-aics}"
 VERSION="${VERSION:-latest}"
 MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD:-root}"
 MINIO_USER="${MINIO_USER:-minioadmin}"
@@ -27,25 +26,25 @@ mkdir -p /opt/aics/{mysql,redis,config,logs}
 # 假设这些文件已经在 /opt/aics/ 目录下
 cd /opt/aics
 
-# ---------- 拉取/加载镜像 ----------
+# ---------- 加载镜像 ----------
 echo ""
-echo "[1/3] 准备镜像..."
-if [ -n "$REGISTRY_USER" ]; then
-    echo "$REGISTRY_PASSWORD" | docker login "$REGISTRY" -u "$REGISTRY_USER" --password-stdin 2>/dev/null || true
-fi
+echo "[1/3] 加载业务镜像..."
 
-# 拉取业务镜像
+# 从 tar 文件加载镜像（由 Jenkins 构建并分发）
 for svc in ai-cs-gateway ai-cs-user; do
-    echo "  拉取 $REGISTRY/$svc:$VERSION ..."
-    docker pull "$REGISTRY/$svc:$VERSION" 2>/dev/null || {
-        echo "  WARN: 无法拉取 $svc，尝试使用本地镜像..."
-    }
+    tar_file="/opt/aics/images/${svc}-${VERSION}.tar"
+    if [ -f "$tar_file" ]; then
+        echo "  加载 ${svc}:${VERSION} ..."
+        docker load -i "$tar_file"
+    else
+        echo "  WARN: 镜像文件不存在: $tar_file"
+    fi
 done
 
 # ---------- 启动服务 ----------
 echo ""
 echo "[2/3] 启动 Host1 服务..."
-export HOST1_IP REGISTRY VERSION MYSQL_ROOT_PASSWORD MINIO_USER MINIO_PASSWORD
+export HOST1_IP VERSION MYSQL_ROOT_PASSWORD MINIO_USER MINIO_PASSWORD
 
 # 先启动基础设施
 docker compose -f /opt/aics/docker-compose-host1.yml up -d mysql-master redis-node1 nacos minio seata-server

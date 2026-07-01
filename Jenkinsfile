@@ -30,14 +30,12 @@ pipeline {
         // 高级选项
         booleanParam(name: 'SKIP_TESTS',      defaultValue: true,  description: '跳过测试')
         booleanParam(name: 'INIT_HOSTS',      defaultValue: false, description: '首次部署：初始化主机环境（安装 Docker 等）')
-        booleanParam(name: 'PUSH_IMAGE',      defaultValue: true,  description: '推送镜像到仓库')
         booleanParam(name: 'VERIFY_DEPLOY',   defaultValue: true,  description: '部署后自动验证')
     }
 
     environment {
         // 项目配置
         PROJECT_DIR = 'ai-customer-service'
-        REGISTRY = 'aics'   // 修改为你的镜像仓库地址
 
         // 服务列表
         SERVICES = 'ai-cs-gateway ai-cs-user ai-cs-knowledge ai-cs-chat ai-cs-search ai-cs-message ai-cs-notify'
@@ -100,8 +98,8 @@ pipeline {
                                 cd ${PROJECT_DIR}
                                 docker build \
                                     -f ${svc}/Dockerfile \
-                                    -t ${REGISTRY}/${svc}:${IMAGE_VERSION} \
-                                    -t ${REGISTRY}/${svc}:latest \
+                                    -t ${svc}:${IMAGE_VERSION} \
+                                    -t ${svc}:latest \
                                     .
                             """
                         }]
@@ -111,18 +109,57 @@ pipeline {
         }
 
         // ============================================================
-        // Stage 4: 推送镜像到仓库
+        // Stage 4: 导出镜像 + 分发到三台主机
         // ============================================================
-        stage('推送镜像') {
-            when { expression { params.PUSH_IMAGE && params.DEPLOY_MODE != 'deploy-only' && params.DEPLOY_MODE != 'infra-only' } }
+        stage('导出并分发镜像') {
+            when { expression { params.DEPLOY_MODE != 'deploy-only' && params.DEPLOY_MODE != 'infra-only' } }
             steps {
                 script {
-                    def services = SERVICES.split(' ')
-                    parallel services.collectEntries { svc ->
-                        [("推送-${svc}") : {
+                    // 4.1 导出所有业务镜像为 tar 文件
+                    echo "导出所有业务镜像为 tar 文件..."
+                    sh """
+                        cd ${PROJECT_DIR}
+                        mkdir -p images-export
+
+                        for svc in ${SERVICES}; do
+                            echo "  导出 \${svc}:${IMAGE_VERSION} ..."
+                            docker save -o images-export/\${svc}-${IMAGE_VERSION}.tar \${svc}:${IMAGE_VERSION}
+                        done
+
+                        echo "镜像导出完成:"
+                        ls -lh images-export/
+                    """
+
+                    // 4.2 并行分发镜像到三台主机
+                    def hosts = [
+                        [name: 'Host1', ip: params.HOST1_IP, pwd: params.HOST1_PASSWORD, services: 'ai-cs-gateway ai-cs-user'],
+                        [name: 'Host2', ip: params.HOST2_IP, pwd: params.HOST2_PASSWORD, services: 'ai-cs-knowledge ai-cs-chat ai-cs-search'],
+                        [name: 'Host3', ip: params.HOST3_IP, pwd: params.HOST3_PASSWORD, services: 'ai-cs-message ai-cs-notify']
+                    ]
+
+                    parallel hosts.collectEntries { host ->
+                        [("分发镜像-${host.name}") : {
                             sh """
-                                docker push ${REGISTRY}/${svc}:${IMAGE_VERSION}
-                                docker push ${REGISTRY}/${svc}:latest
+                                cd ${PROJECT_DIR}
+
+                                # 确保 sshpass 可用
+                                if ! command -v sshpass &> /dev/null; then
+                                    apt-get update -qq && apt-get install -y -qq sshpass 2>/dev/null || \
+                                    yum install -y sshpass 2>/dev/null || true
+                                fi
+
+                                # 创建远程镜像目录
+                                sshpass -p '${host.pwd}' ssh -o StrictHostKeyChecking=no root@${host.ip} "mkdir -p /opt/aics/images"
+
+                                # 分发该主机需要的镜像
+                                for svc in ${host.services}; do
+                                    echo "  分发 \${svc}-${IMAGE_VERSION}.tar 到 ${host.name} ..."
+                                    sshpass -p '${host.pwd}' scp -o StrictHostKeyChecking=no \
+                                        images-export/\${svc}-${IMAGE_VERSION}.tar \
+                                        root@${host.ip}:/opt/aics/images/
+                                done
+
+                                echo "  ${host.name} 镜像分发完成"
                             """
                         }]
                     }
@@ -203,7 +240,6 @@ export HOST2_PASSWORD="${params.HOST2_PASSWORD}"
 export HOST3_IP="${params.HOST3_IP}"
 export HOST3_PASSWORD="${params.HOST3_PASSWORD}"
 export MYSQL_ROOT_PASSWORD="${params.MYSQL_ROOT_PASSWORD}"
-export REGISTRY="${REGISTRY}"
 export VERSION="${IMAGE_VERSION}"
 EOF
 
@@ -285,7 +321,6 @@ def deployToHost(String name, String ip, String password, String deployScript, S
                 export HOST1_IP='${params.HOST1_IP}'
                 export HOST2_IP='${params.HOST2_IP}'
                 export HOST3_IP='${params.HOST3_IP}'
-                export REGISTRY='${REGISTRY}'
                 export VERSION='${IMAGE_VERSION}'
                 export MYSQL_ROOT_PASSWORD='${params.MYSQL_ROOT_PASSWORD}'
                 export MINIO_USER='${params.MINIO_USER}'

@@ -10,7 +10,6 @@ set -e
 HOST1_IP="${HOST1_IP:-127.0.0.1}"
 HOST2_IP="${HOST2_IP:-127.0.0.1}"
 HOST3_IP="${HOST3_IP:-127.0.0.1}"
-REGISTRY="${REGISTRY:-aics}"
 VERSION="${VERSION:-latest}"
 MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD:-root}"
 OPENAI_API_KEY="${OPENAI_API_KEY:-demo-key}"
@@ -29,24 +28,25 @@ mkdir -p /opt/aics/{mysql,redis,config,logs}
 
 cd /opt/aics
 
-# ---------- 拉取镜像 ----------
+# ---------- 加载镜像 ----------
 echo ""
-echo "[1/3] 准备镜像..."
-if [ -n "$REGISTRY_USER" ]; then
-    echo "$REGISTRY_PASSWORD" | docker login "$REGISTRY" -u "$REGISTRY_USER" --password-stdin 2>/dev/null || true
-fi
+echo "[1/3] 加载业务镜像..."
 
+# 从 tar 文件加载镜像（由 Jenkins 构建并分发）
 for svc in ai-cs-knowledge ai-cs-chat ai-cs-search; do
-    echo "  拉取 $REGISTRY/$svc:$VERSION ..."
-    docker pull "$REGISTRY/$svc:$VERSION" 2>/dev/null || {
-        echo "  WARN: 无法拉取 $svc，尝试使用本地镜像..."
-    }
+    tar_file="/opt/aics/images/${svc}-${VERSION}.tar"
+    if [ -f "$tar_file" ]; then
+        echo "  加载 ${svc}:${VERSION} ..."
+        docker load -i "$tar_file"
+    else
+        echo "  WARN: 镜像文件不存在: $tar_file"
+    fi
 done
 
 # ---------- 启动服务 ----------
 echo ""
 echo "[2/3] 启动 Host2 服务..."
-export HOST1_IP HOST2_IP HOST3_IP REGISTRY VERSION MYSQL_ROOT_PASSWORD
+export HOST1_IP HOST2_IP HOST3_IP VERSION MYSQL_ROOT_PASSWORD
 export OPENAI_API_KEY OPENAI_BASE_URL OPENAI_MODEL
 
 # 先启动基础设施

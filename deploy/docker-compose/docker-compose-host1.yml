@@ -135,7 +135,7 @@ services:
 
   # ==================== API 网关 ====================
   api-gateway:
-    image: ${REGISTRY:-aics}/ai-cs-gateway:${VERSION:-latest}
+    image: ai-cs-gateway:${VERSION:-latest}
     container_name: aics-api-gateway
     restart: always
     ports:
@@ -152,7 +152,7 @@ services:
 
   # ==================== 用户服务 ====================
   user-service:
-    image: ${REGISTRY:-aics}/ai-cs-user:${VERSION:-latest}
+    image: ai-cs-user:${VERSION:-latest}
     container_name: aics-user-service
     restart: always
     ports:

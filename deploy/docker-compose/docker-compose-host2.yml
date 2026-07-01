@@ -55,7 +55,7 @@ services:
 
   # ==================== 知识库服务 ====================
   knowledge-service:
-    image: ${REGISTRY:-aics}/ai-cs-knowledge:${VERSION:-latest}
+    image: ai-cs-knowledge:${VERSION:-latest}
     container_name: aics-knowledge-service
     restart: always
     ports:
@@ -71,7 +71,7 @@ services:
 
   # ==================== AI 对话服务 ====================
   ai-chat-service:
-    image: ${REGISTRY:-aics}/ai-cs-chat:${VERSION:-latest}
+    image: ai-cs-chat:${VERSION:-latest}
     container_name: aics-chat-service
     restart: always
     ports:
@@ -88,7 +88,7 @@ services:
 
   # ==================== 搜索服务 ====================
   search-service:
-    image: ${REGISTRY:-aics}/ai-cs-search:${VERSION:-latest}
+    image: ai-cs-search:${VERSION:-latest}
     container_name: aics-search-service
     restart: always
     ports:

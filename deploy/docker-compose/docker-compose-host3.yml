@@ -118,7 +118,7 @@ services:
 
   # ==================== 消息服务 ====================
   message-service:
-    image: ${REGISTRY:-aics}/ai-cs-message:${VERSION:-latest}
+    image: ai-cs-message:${VERSION:-latest}
     container_name: aics-message-service
     restart: always
     ports:
@@ -137,7 +137,7 @@ services:
 
   # ==================== 通知服务 ====================
   notify-service:
-    image: ${REGISTRY:-aics}/ai-cs-notify:${VERSION:-latest}
+    image: ai-cs-notify:${VERSION:-latest}
     container_name: aics-notify-service
     restart: always
     ports:

@@ -24,11 +24,8 @@ export MYSQL_ROOT_PASSWORD="root"
 export MINIO_USER="minioadmin"
 export MINIO_PASSWORD="minioadmin"
 
-# ---------- 镜像仓库配置 ----------
-# 如果使用私有镜像仓库，填写以下信息
-export REGISTRY="aics"                    # 镜像仓库地址，如 harbor.example.com/aics
-export REGISTRY_USER=""                   # 仓库用户名（可选）
-export REGISTRY_PASSWORD=""               # 仓库密码（可选）
+# ---------- 镜像版本配置 ----------
+# 镜像由 Jenkins 构建并分发为 tar 文件，无需镜像仓库
 export VERSION="latest"                   # 镜像版本号
 
 # ---------- AI 模型配置 ----------
