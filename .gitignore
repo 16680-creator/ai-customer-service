@@ -1,0 +1,34 @@
+# Maven
+target/
+*.jar
+*.war
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
+.factorypath
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Docker volumes
+docker-volumes/
+
+# Environment
+.env
+*.env.local
+
+# Temp
+*.tmp
+*.bak
+*.swp
+*~

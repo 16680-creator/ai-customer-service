@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ai-customer-service
+  labels:
+    name: ai-customer-service
+    environment: production

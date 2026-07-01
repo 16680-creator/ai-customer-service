@@ -1,0 +1,296 @@
+version: '3.8'
+
+# AI客服系统 - 基础设施编排
+# 包含: MySQL主从、Redis集群、Nacos、Elasticsearch、RocketMQ、MinIO、Seata
+
+services:
+  # ==================== MySQL 主从复制 ====================
+  mysql-master:
+    image: mysql:8.0
+    container_name: aics-mysql-master
+    restart: always
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASES: "user_db,knowledge_db,chat_db"
+      TZ: Asia/Shanghai
+    volumes:
+      - mysql-master-data:/var/lib/mysql
+      - ./deploy/mysql/master.cnf:/etc/mysql/conf.d/master.cnf
+      - ./deploy/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    command: --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - aics-network
+
+  mysql-slave1:
+    image: mysql:8.0
+    container_name: aics-mysql-slave1
+    restart: always
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      TZ: Asia/Shanghai
+    volumes:
+      - mysql-slave1-data:/var/lib/mysql
+      - ./deploy/mysql/slave.cnf:/etc/mysql/conf.d/slave.cnf
+    command: --default-authentication-plugin=mysql_native_password
+    depends_on:
+      mysql-master:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - aics-network
+
+  mysql-slave2:
+    image: mysql:8.0
+    container_name: aics-mysql-slave2
+    restart: always
+    ports:
+      - "3308:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      TZ: Asia/Shanghai
+    volumes:
+      - mysql-slave2-data:/var/lib/mysql
+      - ./deploy/mysql/slave2.cnf:/etc/mysql/conf.d/slave.cnf
+    command: --default-authentication-plugin=mysql_native_password
+    depends_on:
+      mysql-master:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - aics-network
+
+  # ==================== Redis 集群 ====================
+  redis-node1:
+    image: redis:7
+    container_name: aics-redis-node1
+    restart: always
+    ports:
+      - "6379:6379"
+      - "16379:16379"
+    volumes:
+      - redis-node1-data:/data
+      - ./deploy/redis/redis.conf:/usr/local/etc/redis/redis.conf
+    command: redis-server /usr/local/etc/redis/redis.conf
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aics-network
+
+  redis-node2:
+    image: redis:7
+    container_name: aics-redis-node2
+    restart: always
+    ports:
+      - "6380:6379"
+      - "16380:16379"
+    volumes:
+      - redis-node2-data:/data
+      - ./deploy/redis/redis.conf:/usr/local/etc/redis/redis.conf
+    command: redis-server /usr/local/etc/redis/redis.conf
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aics-network
+
+  redis-node3:
+    image: redis:7
+    container_name: aics-redis-node3
+    restart: always
+    ports:
+      - "6381:6379"
+      - "16381:16379"
+    volumes:
+      - redis-node3-data:/data
+      - ./deploy/redis/redis.conf:/usr/local/etc/redis/redis.conf
+    command: redis-server /usr/local/etc/redis/redis.conf
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aics-network
+
+  # ==================== Nacos 注册中心/配置中心 ====================
+  nacos:
+    image: nacos/nacos-server:v2.3.2
+    container_name: aics-nacos
+    restart: always
+    ports:
+      - "8848:8848"
+      - "9848:9848"
+    environment:
+      MODE: standalone
+      SPRING_DATASOURCE_PLATFORM: mysql
+      MYSQL_SERVICE_HOST: mysql-master
+      MYSQL_SERVICE_PORT: 3306
+      MYSQL_SERVICE_DB_NAME: nacos_config
+      MYSQL_SERVICE_USER: root
+      MYSQL_SERVICE_PASSWORD: root
+      JVM_XMS: 256m
+      JVM_XMX: 512m
+    depends_on:
+      mysql-master:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8848/nacos/v1/console/health/readiness"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    networks:
+      - aics-network
+
+  # ==================== Elasticsearch 搜索引擎 ====================
+  elasticsearch:
+    image: elasticsearch:8.12.0
+    container_name: aics-elasticsearch
+    restart: always
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - xpack.security.http.ssl.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 40s
+    networks:
+      - aics-network
+
+  # ==================== RocketMQ 消息队列 ====================
+  rocketmq-namesrv:
+    image: apache/rocketmq:5.1.4
+    container_name: aics-rocketmq-namesrv
+    restart: always
+    ports:
+      - "9876:9876"
+    command: sh mqnamesrv
+    environment:
+      JAVA_OPT_EXT: "-server -Xms256m -Xmx256m"
+    healthcheck:
+      test: ["CMD-SHELL", "echo 'health check' | nc -w 2 localhost 9876 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - aics-network
+
+  rocketmq-broker:
+    image: apache/rocketmq:5.1.4
+    container_name: aics-rocketmq-broker
+    restart: always
+    ports:
+      - "10911:10911"
+      - "10909:10909"
+    command: sh mqbroker -n rocketmq-namesrv:9876 -c /home/rocketmq/rocketmq-5.1.4/conf/broker.conf
+    environment:
+      JAVA_OPT_EXT: "-server -Xms512m -Xmx512m"
+    depends_on:
+      rocketmq-namesrv:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "echo 'health check' | nc -w 2 localhost 10911 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - aics-network
+
+  # ==================== MinIO 对象存储 ====================
+  minio:
+    image: minio/minio:latest
+    container_name: aics-minio
+    restart: always
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - aics-network
+
+  # ==================== Seata 分布式事务 ====================
+  seata-server:
+    image: seataio/seata-server:1.7.1
+    container_name: aics-seata-server
+    restart: always
+    ports:
+      - "8091:8091"
+      - "7091:7091"
+    environment:
+      SEATA_IP: seata-server
+      SEATA_PORT: 8091
+    depends_on:
+      nacos:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:7091/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - aics-network
+
+# ==================== 数据卷 ====================
+volumes:
+  mysql-master-data:
+  mysql-slave1-data:
+  mysql-slave2-data:
+  redis-node1-data:
+  redis-node2-data:
+  redis-node3-data:
+  es-data:
+  minio-data:
+
+# ==================== 网络 ====================
+networks:
+  aics-network:
+    driver: bridge
+    name: aics-network

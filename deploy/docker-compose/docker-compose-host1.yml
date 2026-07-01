@@ -1,0 +1,182 @@
+version: '3.8'
+
+# ============================================================
+# Host 1 部署清单
+# - MySQL Master (3306)
+# - Redis Node1 (6379)
+# - Nacos (8848)
+# - Seata (8091/7091)
+# - MinIO (9000/9001)
+# - API Gateway (8080)
+# - User Service (8081)
+# ============================================================
+
+services:
+  # ==================== MySQL 主库 ====================
+  mysql-master:
+    image: mysql:8.0
+    container_name: aics-mysql-master
+    restart: always
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      TZ: Asia/Shanghai
+    volumes:
+      - mysql-master-data:/var/lib/mysql
+      - ./mysql/master.cnf:/etc/mysql/conf.d/master.cnf
+      - ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    command: --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-root}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - aics-network
+
+  # ==================== Redis 节点1 ====================
+  redis-node1:
+    image: redis:7
+    container_name: aics-redis-node1
+    restart: always
+    ports:
+      - "6379:6379"
+      - "16379:16379"
+    volumes:
+      - redis-node1-data:/data
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf
+    command: redis-server /usr/local/etc/redis/redis.conf
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aics-network
+
+  # ==================== Nacos 注册/配置中心 ====================
+  nacos:
+    image: nacos/nacos-server:v2.3.2
+    container_name: aics-nacos
+    restart: always
+    ports:
+      - "8848:8848"
+      - "9848:9848"
+    environment:
+      MODE: standalone
+      PREFER_HOST_MODE: hostname
+      SPRING_DATASOURCE_PLATFORM: mysql
+      MYSQL_SERVICE_HOST: mysql-master
+      MYSQL_SERVICE_PORT: 3306
+      MYSQL_SERVICE_DB_NAME: nacos_config
+      MYSQL_SERVICE_USER: root
+      MYSQL_SERVICE_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      NACOS_AUTH_ENABLE: "true"
+      NACOS_AUTH_TOKEN: SecretKey012345678901234567890123456789012345678901234567890123456789
+      NACOS_AUTH_IDENTITY_KEY: aics
+      NACOS_AUTH_IDENTITY_VALUE: aics-platform
+    depends_on:
+      mysql-master:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:8848/nacos/v1/console/health/readiness"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    networks:
+      - aics-network
+
+  # ==================== Seata 分布式事务 ====================
+  seata-server:
+    image: seataio/seata-server:1.7.1
+    container_name: aics-seata-server
+    restart: always
+    ports:
+      - "8091:8091"
+      - "7091:7091"
+    environment:
+      SEATA_PORT: 8091
+      STORE_MODE: db
+      STORE_DB_URL: jdbc:mysql://mysql-master:3306/seata?useUnicode=true
+      STORE_DB_USERNAME: root
+      STORE_DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      SEATA_IP: ${HOST1_IP}
+    depends_on:
+      mysql-master:
+        condition: service_healthy
+      nacos:
+        condition: service_healthy
+    networks:
+      - aics-network
+
+  # ==================== MinIO 对象存储 ====================
+  minio:
+    image: minio/minio:latest
+    container_name: aics-minio
+    restart: always
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:-minioadmin}
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aics-network
+
+  # ==================== API 网关 ====================
+  api-gateway:
+    image: ${REGISTRY:-aics}/ai-cs-gateway:${VERSION:-latest}
+    container_name: aics-api-gateway
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      NACOS_SERVER: nacos:8848
+      JAVA_OPTS: "-Xms256m -Xmx512m"
+    depends_on:
+      nacos:
+        condition: service_healthy
+    networks:
+      - aics-network
+
+  # ==================== 用户服务 ====================
+  user-service:
+    image: ${REGISTRY:-aics}/ai-cs-user:${VERSION:-latest}
+    container_name: aics-user-service
+    restart: always
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      NACOS_SERVER: nacos:8848
+      DB_HOST: mysql-master
+      JAVA_OPTS: "-Xms256m -Xmx512m"
+    depends_on:
+      mysql-master:
+        condition: service_healthy
+      nacos:
+        condition: service_healthy
+      redis-node1:
+        condition: service_healthy
+    networks:
+      - aics-network
+
+networks:
+  aics-network:
+    driver: bridge
+
+volumes:
+  mysql-master-data:
+  redis-node1-data:
+  minio-data:

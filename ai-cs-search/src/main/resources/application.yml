@@ -1,0 +1,23 @@
+server:
+  port: 8084
+
+spring:
+  application:
+    name: ai-cs-search
+  elasticsearch:
+    uris: http://localhost:9200
+  cloud:
+    nacos:
+      discovery:
+        server-addr: localhost:8848
+        namespace: aics
+        group: DEFAULT_GROUP
+      config:
+        server-addr: localhost:8848
+        namespace: aics
+        group: DEFAULT_GROUP
+        file-extension: yml
+
+logging:
+  level:
+    com.aics.search: debug

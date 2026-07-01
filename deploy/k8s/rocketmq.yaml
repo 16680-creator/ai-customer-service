@@ -1,0 +1,131 @@
+# RocketMQ 部署 - NameServer + Broker
+# NameServer Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: rocketmq-namesrv
+  namespace: ai-customer-service
+  labels:
+    app: rocketmq-namesrv
+spec:
+  type: ClusterIP
+  ports:
+    - port: 9876
+      targetPort: 9876
+      name: namesrv
+  selector:
+    app: rocketmq-namesrv
+---
+# NameServer Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rocketmq-namesrv
+  namespace: ai-customer-service
+  labels:
+    app: rocketmq-namesrv
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rocketmq-namesrv
+  template:
+    metadata:
+      labels:
+        app: rocketmq-namesrv
+    spec:
+      containers:
+        - name: namesrv
+          image: apache/rocketmq:5.1.4
+          ports:
+            - containerPort: 9876
+              name: namesrv
+          command: ["sh", "mqnamesrv"]
+          env:
+            - name: JAVA_OPT_EXT
+              value: "-server -Xms256m -Xmx256m"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          livenessProbe:
+            tcpSocket:
+              port: 9876
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          readinessProbe:
+            tcpSocket:
+              port: 9876
+            initialDelaySeconds: 10
+            periodSeconds: 5
+---
+# Broker Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: rocketmq-broker
+  namespace: ai-customer-service
+  labels:
+    app: rocketmq-broker
+spec:
+  type: ClusterIP
+  ports:
+    - port: 10911
+      targetPort: 10911
+      name: broker
+    - port: 10909
+      targetPort: 10909
+      name: broker-fast
+  selector:
+    app: rocketmq-broker
+---
+# Broker Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rocketmq-broker
+  namespace: ai-customer-service
+  labels:
+    app: rocketmq-broker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rocketmq-broker
+  template:
+    metadata:
+      labels:
+        app: rocketmq-broker
+    spec:
+      containers:
+        - name: broker
+          image: apache/rocketmq:5.1.4
+          ports:
+            - containerPort: 10911
+              name: broker
+            - containerPort: 10909
+              name: broker-fast
+          command: ["sh", "mqbroker", "-n", "rocketmq-namesrv:9876"]
+          env:
+            - name: JAVA_OPT_EXT
+              value: "-server -Xms512m -Xmx512m"
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+          livenessProbe:
+            tcpSocket:
+              port: 10911
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            tcpSocket:
+              port: 10911
+            initialDelaySeconds: 15
+            periodSeconds: 5
