@@ -1,336 +1,171 @@
 pipeline {
     agent any
 
-    // ============================================================
-    // 构建参数 - 在 Jenkins 页面点击"Build with Parameters"填写
-    // ============================================================
+    options {
+        timestamps()
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '20'))
+    }
+
     parameters {
-        // 主机信息
-        string(name: 'HOST1_IP',         defaultValue: '192.168.1.101',  description: '主机1 IP（部署 Gateway/User/Nacos/MySQL Master/Redis1）')
-        string(name: 'HOST1_PASSWORD',   defaultValue: '',               description: '主机1 root 密码')
-        string(name: 'HOST2_IP',         defaultValue: '192.168.1.102',  description: '主机2 IP（部署 Knowledge/Chat/Search/MySQL Slave1/Redis2）')
-        string(name: 'HOST2_PASSWORD',   defaultValue: '',               description: '主机2 root 密码')
-        string(name: 'HOST3_IP',         defaultValue: '192.168.1.103',  description: '主机3 IP（部署 Message/Notify/ES/RocketMQ/MySQL Slave2/Redis3）')
-        string(name: 'HOST3_PASSWORD',   defaultValue: '',               description: '主机3 root 密码')
+        string(name: 'REGISTRY', defaultValue: '192.168.56.12:5000', description: '本地 Docker Registry 地址，默认部署在 k8s-worker02')
+        string(name: 'NAMESPACE', defaultValue: 'ai-customer-service', description: 'Kubernetes 命名空间')
+        string(name: 'VERSION', defaultValue: '', description: '镜像版本。留空则使用 Jenkins BUILD_NUMBER')
+        choice(name: 'DEPLOY_MODE', choices: ['full', 'build-only', 'deploy-only', 'infra-only'], description: 'full=构建并部署，build-only=只构建推送，deploy-only=只部署业务，infra-only=只部署基础设施')
+        string(name: 'SERVICES', defaultValue: 'ai-cs-gateway ai-cs-user ai-cs-knowledge ai-cs-chat ai-cs-search ai-cs-message ai-cs-notify', description: '需要处理的服务模块，空格分隔')
 
-        // 构建选项
-        choice(name: 'DEPLOY_MODE',      choices: ['full', 'build-only', 'deploy-only', 'infra-only'], description: '部署模式')
-        string(name: 'VERSION',          defaultValue: '',               description: '镜像版本号（留空则使用 Jenkins BUILD_NUMBER）')
+        booleanParam(name: 'SKIP_TESTS', defaultValue: true, description: '跳过 Maven 测试')
+        booleanParam(name: 'DEPLOY_INFRA', defaultValue: false, description: '部署或更新 MySQL、Nacos、Redis、Elasticsearch、RocketMQ、MinIO')
+        booleanParam(name: 'INIT_DATABASE', defaultValue: false, description: '初始化 MySQL 数据库。首次部署勾选，重复执行会覆盖部分初始化逻辑')
+        booleanParam(name: 'VERIFY_DEPLOY', defaultValue: true, description: '部署后查看 Pod、Service 和 rollout 状态')
 
-        // 中间件密码
-        string(name: 'MYSQL_ROOT_PASSWORD', defaultValue: 'root',       description: 'MySQL root 密码')
-        string(name: 'MINIO_USER',           defaultValue: 'minioadmin', description: 'MinIO 用户名')
-        string(name: 'MINIO_PASSWORD',       defaultValue: 'minioadmin', description: 'MinIO 密码')
-
-        // AI 配置
-        string(name: 'OPENAI_API_KEY',   defaultValue: 'demo-key',      description: 'OpenAI API Key（使用 Ollama 填 demo-key）')
-        string(name: 'OPENAI_BASE_URL',  defaultValue: 'http://host.docker.internal:11434/v1', description: 'OpenAI/Ollama 地址')
-        string(name: 'OPENAI_MODEL',     defaultValue: 'qwen2.5:7b',    description: '模型名称')
-
-        // 高级选项
-        booleanParam(name: 'SKIP_TESTS',      defaultValue: true,  description: '跳过测试')
-        booleanParam(name: 'INIT_HOSTS',      defaultValue: false, description: '首次部署：初始化主机环境（安装 Docker 等）')
-        booleanParam(name: 'VERIFY_DEPLOY',   defaultValue: true,  description: '部署后自动验证')
+        string(name: 'OPENAI_API_KEY', defaultValue: 'demo-key', description: 'AI 服务 API Key。本地 Ollama 可填 demo-key')
+        string(name: 'OPENAI_BASE_URL', defaultValue: 'http://host.docker.internal:11434/v1', description: 'OpenAI 兼容接口地址')
+        string(name: 'OPENAI_MODEL', defaultValue: 'qwen2.5:7b', description: '模型名称')
     }
 
     environment {
-        // 项目配置
-        PROJECT_DIR = 'ai-customer-service'
-
-        // 服务列表
-        SERVICES = 'ai-cs-gateway ai-cs-user ai-cs-knowledge ai-cs-chat ai-cs-search ai-cs-message ai-cs-notify'
-
-        // 版本号（优先使用参数，否则用 BUILD_NUMBER）
         IMAGE_VERSION = "${params.VERSION ?: env.BUILD_NUMBER}"
     }
 
     stages {
-
-        // ============================================================
-        // Stage 1: 初始化主机环境（首次部署）
-        // ============================================================
-        stage('初始化主机') {
-            when { expression { params.INIT_HOSTS } }
+        stage('拉取代码') {
             steps {
-                script {
-                    def hosts = [
-                        [name: 'Host1', ip: params.HOST1_IP, pwd: params.HOST1_PASSWORD],
-                        [name: 'Host2', ip: params.HOST2_IP, pwd: params.HOST2_PASSWORD],
-                        [name: 'Host3', ip: params.HOST3_IP, pwd: params.HOST3_PASSWORD]
-                    ]
-                    parallel hosts.collectEntries { host ->
-                        [("初始化-${host.name}") : {
-                            sh """
-                                echo "初始化 ${host.name} (${host.ip}) ..."
-                                sshpass -p '${host.pwd}' ssh -o StrictHostKeyChecking=no root@${host.ip} 'bash -s' < deploy/scripts/init-host.sh
-                            """
-                        }]
-                    }
+                checkout scm
+                sh 'git rev-parse --short HEAD'
+            }
+        }
+
+        stage('环境检查') {
+            steps {
+                sh '''
+                    set -e
+                    docker version
+                    kubectl version --client
+                    kubectl cluster-info
+                '''
+            }
+        }
+
+        stage('Maven 测试') {
+            when {
+                expression {
+                    return !params.SKIP_TESTS && params.DEPLOY_MODE != 'deploy-only' && params.DEPLOY_MODE != 'infra-only'
                 }
             }
-        }
-
-        // ============================================================
-        // Stage 2: Maven 编译 + 单元测试
-        // ============================================================
-        stage('Maven 编译') {
-            when { expression { params.DEPLOY_MODE != 'deploy-only' && params.DEPLOY_MODE != 'infra-only' } }
             steps {
-                echo "版本号: ${IMAGE_VERSION}"
-                sh """
-                    cd ${PROJECT_DIR}
-                    mvn clean package ${params.SKIP_TESTS ? '-DskipTests' : ''} -B
-                """
+                sh '''
+                    set -e
+                    docker run --rm \
+                      -v "$PWD":/workspace \
+                      -v "$HOME/.m2":/root/.m2 \
+                      -w /workspace \
+                      maven:3.9-eclipse-temurin-17 \
+                      mvn test -B
+                '''
             }
         }
 
-        // ============================================================
-        // Stage 3: 构建 Docker 镜像
-        // ============================================================
-        stage('构建镜像') {
-            when { expression { params.DEPLOY_MODE != 'deploy-only' && params.DEPLOY_MODE != 'infra-only' } }
-            steps {
-                script {
-                    def services = SERVICES.split(' ')
-                    parallel services.collectEntries { svc ->
-                        [("构建-${svc}") : {
-                            sh """
-                                cd ${PROJECT_DIR}
-                                docker build \
-                                    -f ${svc}/Dockerfile \
-                                    -t ${svc}:${IMAGE_VERSION} \
-                                    -t ${svc}:latest \
-                                    .
-                            """
-                        }]
-                    }
+        stage('写入 Kubernetes Secret') {
+            when {
+                expression {
+                    return params.DEPLOY_MODE != 'build-only'
                 }
             }
-        }
-
-        // ============================================================
-        // Stage 4: 导出镜像 + 分发到三台主机
-        // ============================================================
-        stage('导出并分发镜像') {
-            when { expression { params.DEPLOY_MODE != 'deploy-only' && params.DEPLOY_MODE != 'infra-only' } }
             steps {
-                script {
-                    // 4.1 导出所有业务镜像为 tar 文件
-                    echo "导出所有业务镜像为 tar 文件..."
-                    sh """
-                        cd ${PROJECT_DIR}
-                        mkdir -p images-export
-
-                        for svc in ${SERVICES}; do
-                            echo "  导出 \${svc}:${IMAGE_VERSION} ..."
-                            docker save -o images-export/\${svc}-${IMAGE_VERSION}.tar \${svc}:${IMAGE_VERSION}
-                        done
-
-                        echo "镜像导出完成:"
-                        ls -lh images-export/
-                    """
-
-                    // 4.2 并行分发镜像到三台主机
-                    def hosts = [
-                        [name: 'Host1', ip: params.HOST1_IP, pwd: params.HOST1_PASSWORD, services: 'ai-cs-gateway ai-cs-user'],
-                        [name: 'Host2', ip: params.HOST2_IP, pwd: params.HOST2_PASSWORD, services: 'ai-cs-knowledge ai-cs-chat ai-cs-search'],
-                        [name: 'Host3', ip: params.HOST3_IP, pwd: params.HOST3_PASSWORD, services: 'ai-cs-message ai-cs-notify']
-                    ]
-
-                    parallel hosts.collectEntries { host ->
-                        [("分发镜像-${host.name}") : {
-                            sh """
-                                cd ${PROJECT_DIR}
-
-                                # 确保 sshpass 可用
-                                if ! command -v sshpass &> /dev/null; then
-                                    apt-get update -qq && apt-get install -y -qq sshpass 2>/dev/null || \
-                                    yum install -y sshpass 2>/dev/null || true
-                                fi
-
-                                # 创建远程镜像目录
-                                sshpass -p '${host.pwd}' ssh -o StrictHostKeyChecking=no root@${host.ip} "mkdir -p /opt/aics/images"
-
-                                # 分发该主机需要的镜像
-                                for svc in ${host.services}; do
-                                    echo "  分发 \${svc}-${IMAGE_VERSION}.tar 到 ${host.name} ..."
-                                    sshpass -p '${host.pwd}' scp -o StrictHostKeyChecking=no \
-                                        images-export/\${svc}-${IMAGE_VERSION}.tar \
-                                        root@${host.ip}:/opt/aics/images/
-                                done
-
-                                echo "  ${host.name} 镜像分发完成"
-                            """
-                        }]
-                    }
-                }
+                sh '''
+                    set -e
+                    kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+                    kubectl create secret generic aics-secrets \
+                      -n "$NAMESPACE" \
+                      --from-literal=openai-api-key="$OPENAI_API_KEY" \
+                      --from-literal=openai-base-url="$OPENAI_BASE_URL" \
+                      --from-literal=openai-model="$OPENAI_MODEL" \
+                      --dry-run=client -o yaml | kubectl apply -f -
+                '''
             }
         }
 
-        // ============================================================
-        // Stage 5: 部署到三台主机
-        // ============================================================
-        stage('部署到主机') {
-            when { expression { params.DEPLOY_MODE != 'build-only' } }
-            steps {
-                script {
-                    // 准备部署文件
-                    sh """
-                        cd ${PROJECT_DIR}
-
-                        # 创建部署包
-                        mkdir -p deploy-package
-
-                        # 复制 docker-compose 文件
-                        cp deploy/docker-compose/docker-compose-host1.yml deploy-package/
-                        cp deploy/docker-compose/docker-compose-host2.yml deploy-package/
-                        cp deploy/docker-compose/docker-compose-host3.yml deploy-package/
-
-                        # 复制配置文件
-                        cp -r deploy/mysql deploy-package/
-                        cp -r deploy/redis deploy-package/
-                    """
-
-                    // 并行部署到三台主机
-                    parallel(
-                        '部署-Host1': {
-                            deployToHost(
-                                'Host1', params.HOST1_IP, params.HOST1_PASSWORD,
-                                'deploy/scripts/deploy-host1.sh',
-                                'docker-compose-host1.yml'
-                            )
-                        },
-                        '部署-Host2': {
-                            deployToHost(
-                                'Host2', params.HOST2_IP, params.HOST2_PASSWORD,
-                                'deploy/scripts/deploy-host2.sh',
-                                'docker-compose-host2.yml'
-                            )
-                        },
-                        '部署-Host3': {
-                            deployToHost(
-                                'Host3', params.HOST3_IP, params.HOST3_PASSWORD,
-                                'deploy/scripts/deploy-host3.sh',
-                                'docker-compose-host3.yml'
-                            )
-                        }
-                    )
+        stage('部署基础设施') {
+            when {
+                expression {
+                    return params.DEPLOY_INFRA || params.DEPLOY_MODE == 'infra-only'
                 }
+            }
+            steps {
+                sh '''
+                    set -e
+                    chmod +x deploy/scripts/k8s-apply-infra.sh deploy/scripts/k8s-init-mysql.sh
+                    NAMESPACE="$NAMESPACE" INIT_DATABASE="$INIT_DATABASE" bash deploy/scripts/k8s-apply-infra.sh
+                '''
             }
         }
 
-        // ============================================================
-        // Stage 6: 部署后验证
-        // ============================================================
+        stage('构建并推送镜像') {
+            when {
+                expression {
+                    return params.DEPLOY_MODE != 'deploy-only' && params.DEPLOY_MODE != 'infra-only'
+                }
+            }
+            steps {
+                sh '''
+                    set -e
+                    chmod +x deploy/scripts/k8s-build-push.sh
+                    REGISTRY="$REGISTRY" VERSION="$IMAGE_VERSION" SERVICES="$SERVICES" bash deploy/scripts/k8s-build-push.sh
+                '''
+            }
+        }
+
+        stage('部署业务服务') {
+            when {
+                expression {
+                    return params.DEPLOY_MODE != 'build-only' && params.DEPLOY_MODE != 'infra-only'
+                }
+            }
+            steps {
+                sh '''
+                    set -e
+                    chmod +x deploy/scripts/k8s-deploy-services.sh
+                    REGISTRY="$REGISTRY" VERSION="$IMAGE_VERSION" NAMESPACE="$NAMESPACE" SERVICES="$SERVICES" bash deploy/scripts/k8s-deploy-services.sh
+                '''
+            }
+        }
+
         stage('部署验证') {
-            when { expression { params.VERIFY_DEPLOY && params.DEPLOY_MODE != 'build-only' } }
+            when {
+                expression {
+                    return params.VERIFY_DEPLOY && params.DEPLOY_MODE != 'build-only'
+                }
+            }
             steps {
-                echo "等待 30 秒让所有服务完成启动..."
-                sleep 30
-
-                sh """
-                    cd ${PROJECT_DIR}
-
-                    # 生成验证用的变量文件
-                    cat > deploy/scripts/deploy-vars.sh << EOF
-export HOST1_IP="${params.HOST1_IP}"
-export HOST1_PASSWORD="${params.HOST1_PASSWORD}"
-export HOST2_IP="${params.HOST2_IP}"
-export HOST2_PASSWORD="${params.HOST2_PASSWORD}"
-export HOST3_IP="${params.HOST3_IP}"
-export HOST3_PASSWORD="${params.HOST3_PASSWORD}"
-export MYSQL_ROOT_PASSWORD="${params.MYSQL_ROOT_PASSWORD}"
-export VERSION="${IMAGE_VERSION}"
-EOF
-
-                    bash deploy/scripts/verify-deploy.sh
-                """
+                sh '''
+                    set -e
+                    kubectl get nodes -o wide
+                    kubectl get pods -n "$NAMESPACE" -o wide
+                    kubectl get svc -n "$NAMESPACE" -o wide
+                '''
             }
         }
     }
 
-    // ============================================================
-    // 构建后操作
-    // ============================================================
     post {
         success {
             echo """
-                ==========================================
-                 部署成功！
-                 版本: ${IMAGE_VERSION}
-                 访问地址: http://${params.HOST1_IP}:8080
-                 Nacos 控制台: http://${params.HOST1_IP}:8848/nacos
-                 MinIO 控制台: http://${params.HOST1_IP}:9001
-                ==========================================
-            """
+部署完成
+镜像版本: ${IMAGE_VERSION}
+命名空间: ${params.NAMESPACE}
+网关访问: http://任意K8s节点IP:30080
+本地示例: http://192.168.56.10:30080
+"""
         }
         failure {
             echo """
-                ==========================================
-                 部署失败！请检查上方日志排查问题。
-                 常见问题:
-                 1. 主机 SSH 连通性
-                 2. Docker 是否已安装
-                 3. 端口是否被占用
-                 4. 磁盘空间是否充足
-                ==========================================
-            """
+部署失败。优先检查：
+1. Jenkins 机器是否能执行 docker 和 kubectl
+2. ${params.REGISTRY} 是否可访问
+3. 三台 Kubernetes 节点是否已配置 containerd 拉取 HTTP 私有仓库
+4. kubectl get pods -n ${params.NAMESPACE} 的具体错误
+"""
         }
-        always {
-            cleanWs()
-        }
-    }
-}
-
-// ============================================================
-// 部署函数：将文件传输到目标主机并执行部署脚本
-// ============================================================
-def deployToHost(String name, String ip, String password, String deployScript, String composeFile) {
-    script {
-        echo "=========================================="
-        echo " 部署到 ${name} (${ip})"
-        echo "=========================================="
-
-        sh """
-            cd ${PROJECT_DIR}
-
-            # 安装 sshpass（如果未安装）
-            if ! command -v sshpass &> /dev/null; then
-                apt-get update -qq && apt-get install -y -qq sshpass 2>/dev/null || \
-                yum install -y sshpass 2>/dev/null || true
-            fi
-
-            # 创建远程目录
-            sshpass -p '${password}' ssh -o StrictHostKeyChecking=no root@${ip} "mkdir -p /opt/aics/{mysql,redis,config,logs}"
-
-            # 传输配置文件
-            sshpass -p '${password}' scp -o StrictHostKeyChecking=no -r \
-                deploy-package/mysql/* root@${ip}:/opt/aics/mysql/
-
-            sshpass -p '${password}' scp -o StrictHostKeyChecking=no -r \
-                deploy-package/redis/* root@${ip}:/opt/aics/redis/
-
-            sshpass -p '${password}' scp -o StrictHostKeyChecking=no \
-                deploy-package/${composeFile} root@${ip}:/opt/aics/docker-compose.yml
-
-            # 传输并执行部署脚本
-            sshpass -p '${password}' scp -o StrictHostKeyChecking=no \
-                ${deployScript} root@${ip}:/opt/aics/deploy.sh
-
-            sshpass -p '${password}' ssh -o StrictHostKeyChecking=no root@${ip} "
-                export HOST1_IP='${params.HOST1_IP}'
-                export HOST2_IP='${params.HOST2_IP}'
-                export HOST3_IP='${params.HOST3_IP}'
-                export VERSION='${IMAGE_VERSION}'
-                export MYSQL_ROOT_PASSWORD='${params.MYSQL_ROOT_PASSWORD}'
-                export MINIO_USER='${params.MINIO_USER}'
-                export MINIO_PASSWORD='${params.MINIO_PASSWORD}'
-                export OPENAI_API_KEY='${params.OPENAI_API_KEY}'
-                export OPENAI_BASE_URL='${params.OPENAI_BASE_URL}'
-                export OPENAI_MODEL='${params.OPENAI_MODEL}'
-                chmod +x /opt/aics/deploy.sh
-                bash /opt/aics/deploy.sh
-            "
-        """
     }
 }

@@ -23,7 +23,7 @@ metadata:
   labels:
     app: message-service
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: message-service
@@ -34,7 +34,8 @@ spec:
     spec:
       containers:
         - name: message-service
-          image: aics/message-service:1.0.0
+          image: 192.168.56.12:5000/aics/message-service:latest
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8085
               name: http
@@ -42,7 +43,17 @@ spec:
             - name: NACOS_ADDR
               value: "nacos:8848"
             - name: NACOS_NAMESPACE
-              value: "aics"
+              value: ""
+            - name: MYSQL_HOST
+              value: "mysql-master"
+            - name: MYSQL_PORT
+              value: "3306"
+            - name: MYSQL_DB
+              value: "chat_db"
+            - name: MYSQL_USER
+              value: "root"
+            - name: MYSQL_PASSWORD
+              value: "root"
             - name: ROCKETMQ_NAMESRV
               value: "rocketmq-namesrv:9876"
             - name: REDIS_HOST
@@ -59,15 +70,13 @@ spec:
               cpu: "500m"
               memory: "512Mi"
           livenessProbe:
-            httpGet:
-              path: /actuator/health/liveness
+            tcpSocket:
               port: 8085
             initialDelaySeconds: 60
             periodSeconds: 15
             timeoutSeconds: 5
           readinessProbe:
-            httpGet:
-              path: /actuator/health/readiness
+            tcpSocket:
               port: 8085
             initialDelaySeconds: 30
             periodSeconds: 10

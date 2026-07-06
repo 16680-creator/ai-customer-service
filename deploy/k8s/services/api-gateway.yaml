@@ -7,10 +7,11 @@ metadata:
   labels:
     app: api-gateway
 spec:
-  type: ClusterIP
+  type: NodePort
   ports:
     - port: 8080
       targetPort: 8080
+      nodePort: 30080
       name: http
   selector:
     app: api-gateway
@@ -23,7 +24,7 @@ metadata:
   labels:
     app: api-gateway
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: api-gateway
@@ -34,7 +35,8 @@ spec:
     spec:
       containers:
         - name: api-gateway
-          image: aics/api-gateway:1.0.0
+          image: 192.168.56.12:5000/aics/api-gateway:latest
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
               name: http
@@ -42,7 +44,7 @@ spec:
             - name: NACOS_ADDR
               value: "nacos:8848"
             - name: NACOS_NAMESPACE
-              value: "aics"
+              value: ""
             - name: JAVA_OPTS
               value: "-Xms256m -Xmx256m"
           resources:
@@ -53,15 +55,13 @@ spec:
               cpu: "500m"
               memory: "512Mi"
           livenessProbe:
-            httpGet:
-              path: /actuator/health/liveness
+            tcpSocket:
               port: 8080
             initialDelaySeconds: 60
             periodSeconds: 15
             timeoutSeconds: 5
           readinessProbe:
-            httpGet:
-              path: /actuator/health/readiness
+            tcpSocket:
               port: 8080
             initialDelaySeconds: 30
             periodSeconds: 10

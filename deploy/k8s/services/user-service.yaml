@@ -23,7 +23,7 @@ metadata:
   labels:
     app: user-service
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: user-service
@@ -34,7 +34,8 @@ spec:
     spec:
       containers:
         - name: user-service
-          image: aics/user-service:1.0.0
+          image: 192.168.56.12:5000/aics/user-service:latest
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8081
               name: http
@@ -42,7 +43,7 @@ spec:
             - name: NACOS_ADDR
               value: "nacos:8848"
             - name: NACOS_NAMESPACE
-              value: "aics"
+              value: ""
             - name: MYSQL_HOST
               value: "mysql-master"
             - name: MYSQL_PORT
@@ -63,15 +64,13 @@ spec:
               cpu: "500m"
               memory: "512Mi"
           livenessProbe:
-            httpGet:
-              path: /actuator/health/liveness
+            tcpSocket:
               port: 8081
             initialDelaySeconds: 60
             periodSeconds: 15
             timeoutSeconds: 5
           readinessProbe:
-            httpGet:
-              path: /actuator/health/readiness
+            tcpSocket:
               port: 8081
             initialDelaySeconds: 30
             periodSeconds: 10
