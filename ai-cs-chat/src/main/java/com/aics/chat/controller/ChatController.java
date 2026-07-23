@@ -25,23 +25,23 @@ public class ChatController {
 
     @Operation(summary = "发送对话消息")
     @PostMapping("/send")
-    public Result<String> chat(@RequestParam @NotBlank(message = "会话ID不能为空") String sessionId,
-                               @RequestParam @NotBlank(message = "消息内容不能为空") String message) {
+    public Result<String> chat(@RequestParam("sessionId") @NotBlank(message = "会话ID不能为空") String sessionId,
+                               @RequestParam("message") @NotBlank(message = "消息内容不能为空") String message) {
         return chatService.chat(sessionId, message);
     }
 
     @Operation(summary = "RAG对话")
     @PostMapping("/rag")
-    public Result<String> chatWithRag(@RequestParam @NotBlank(message = "会话ID不能为空") String sessionId,
-                                      @RequestParam @NotBlank(message = "消息内容不能为空") String message,
-                                      @RequestParam @NotBlank(message = "知识库标识不能为空") String knowledgeBase) {
+    public Result<String> chatWithRag(@RequestParam("sessionId") @NotBlank(message = "会话ID不能为空") String sessionId,
+                                      @RequestParam("message") @NotBlank(message = "消息内容不能为空") String message,
+                                      @RequestParam("knowledgeBase") @NotBlank(message = "知识库标识不能为空") String knowledgeBase) {
         return chatService.chatWithRag(sessionId, message, knowledgeBase);
     }
 
     @Operation(summary = "流式对话")
     @PostMapping("/stream")
-    public Result<Map<String, Object>> chatStream(@RequestParam @NotBlank(message = "会话ID不能为空") String sessionId,
-                                                   @RequestParam @NotBlank(message = "消息内容不能为空") String message) {
+    public Result<Map<String, Object>> chatStream(@RequestParam("sessionId") @NotBlank(message = "会话ID不能为空") String sessionId,
+                                                   @RequestParam("message") @NotBlank(message = "消息内容不能为空") String message) {
         return chatService.chatStream(sessionId, message);
     }
 }

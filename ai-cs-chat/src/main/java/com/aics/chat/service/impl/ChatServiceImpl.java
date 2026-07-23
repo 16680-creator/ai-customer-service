@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 
 /**
  * AI 对话服务实现
@@ -36,6 +37,17 @@ public class ChatServiceImpl implements ChatService {
     /** 最大历史消息数 */
     private static final int MAX_HISTORY_SIZE = 20;
 
+    /** 过滤模型思考过程标签 */
+    private static final Pattern THINK_PATTERN = Pattern.compile("<think>.*?</think>", Pattern.DOTALL);
+
+    /**
+     * 清除 AI 回复中的思考过程标签
+     */
+    private String cleanResponse(String response) {
+        if (response == null) return "";
+        return THINK_PATTERN.matcher(response).replaceAll("").trim();
+    }
+
     @Override
     public Result<String> chat(String sessionId, String message) {
         log.info("对话请求: sessionId={}, message={}", sessionId, message);
@@ -51,11 +63,14 @@ public class ChatServiceImpl implements ChatService {
                 sessionHistory.put(sessionId, history);
             }
 
-            // 调用 AI 模型
+            // 调用 AI 模型（工具已通过 defaultToolCallbacks 全局注册）
             String response = chatClient.prompt()
                     .user(message)
                     .call()
                     .content();
+
+            // 过滤思考过程
+            response = cleanResponse(response);
 
             // 记录 AI 回复到历史
             history.add(new AssistantMessage(response));
@@ -83,6 +98,9 @@ public class ChatServiceImpl implements ChatService {
                     .user(ragPrompt)
                     .call()
                     .content();
+
+            // 过滤思考过程
+            response = cleanResponse(response);
 
             log.info("RAG对话完成: sessionId={}", sessionId);
             return Result.success(response);

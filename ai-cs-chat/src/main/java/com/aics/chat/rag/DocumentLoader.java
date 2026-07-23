@@ -35,8 +35,6 @@ public class DocumentLoader {
                     PdfDocumentReaderConfig.builder()
                             .withPageTopMargin(0)
                             .withPageBottomMargin(0)
-                            .withPageExtractedTextFormatter(extractedTextFormatter ->
-                                    extractedTextFormatter.withLeftAlignment(true))
                             .withPagesPerDocument(1)
                             .build()
             );
