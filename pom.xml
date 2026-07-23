@@ -40,9 +40,6 @@
         <shardingsphere.version>5.4.1</shardingsphere.version>
         <mysql-connector.version>8.0.33</mysql-connector.version>
 
-        <!-- Distributed -->
-        <seata.version>1.7.1</seata.version>
-
         <!-- Middleware -->
         <elasticsearch.version>8.12.2</elasticsearch.version>
         <rocketmq-spring.version>2.3.0</rocketmq-spring.version>
@@ -111,18 +108,6 @@
                 <groupId>org.apache.shardingsphere</groupId>
                 <artifactId>shardingsphere-jdbc-core</artifactId>
                 <version>${shardingsphere.version}</version>
-            </dependency>
-
-            <!-- Seata -->
-            <dependency>
-                <groupId>io.seata</groupId>
-                <artifactId>seata-spring-boot-starter</artifactId>
-                <version>${seata.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.alibaba.cloud</groupId>
-                <artifactId>spring-cloud-starter-alibaba-seata</artifactId>
-                <version>${spring-cloud-alibaba.version}</version>
             </dependency>
 
             <!-- MySQL -->

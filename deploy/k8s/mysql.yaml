@@ -1,52 +1,27 @@
-# MySQL 主从部署 - StatefulSet
-# 1主2从架构，通过ConfigMap区分主从配置
+# MySQL 单节点部署
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: mysql-master-config
+  name: mysql-config
   namespace: ai-customer-service
 data:
-  master.cnf: |
+  mysql.cnf: |
     [mysqld]
-    server-id=1
-    log-bin=mysql-bin
-    binlog-format=ROW
-    binlog-cache-size=1M
-    max-binlog-size=500M
-    expire-logs-days=7
+    innodb-buffer-pool-size=256M
+    innodb-log-file-size=64M
+    innodb-flush-log-at-trx-commit=1
     character-set-server=utf8mb4
     collation-server=utf8mb4_unicode_ci
     lower-case-table-names=1
+    max-connections=500
 ---
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: mysql-slave-config
-  namespace: ai-customer-service
-data:
-  slave.cnf: |
-    [mysqld]
-    server-id=2
-    relay-log=relay-bin
-    relay-log-index=relay-bin.index
-    read-only=1
-    super-read-only=0
-    replicate-do-db=user_db
-    replicate-do-db=knowledge_db
-    replicate-do-db=chat_db
-    replicate-do-db=nacos_config
-    character-set-server=utf8mb4
-    collation-server=utf8mb4_unicode_ci
-    lower-case-table-names=1
----
-# MySQL 主库 Service
 apiVersion: v1
 kind: Service
 metadata:
-  name: mysql-master
+  name: mysql
   namespace: ai-customer-service
   labels:
-    app: mysql-master
+    app: mysql
 spec:
   type: ClusterIP
   ports:
@@ -55,47 +30,24 @@ spec:
       name: mysql
   selector:
     app: mysql
-    role: master
 ---
-# MySQL 从库 Service
-apiVersion: v1
-kind: Service
-metadata:
-  name: mysql-slave
-  namespace: ai-customer-service
-  labels:
-    app: mysql-slave
-spec:
-  type: ClusterIP
-  ports:
-    - port: 3306
-      targetPort: 3306
-      name: mysql
-  selector:
-    app: mysql
-    role: slave
----
-# MySQL 主库 StatefulSet
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: mysql-master
+  name: mysql
   namespace: ai-customer-service
   labels:
     app: mysql
-    role: master
 spec:
-  serviceName: mysql-master
+  serviceName: mysql
   replicas: 1
   selector:
     matchLabels:
       app: mysql
-      role: master
   template:
     metadata:
       labels:
         app: mysql
-        role: master
     spec:
       containers:
         - name: mysql
@@ -109,11 +61,11 @@ spec:
             - name: TZ
               value: "Asia/Shanghai"
           volumeMounts:
-            - name: mysql-master-data
+            - name: mysql-data
               mountPath: /var/lib/mysql
-            - name: master-config
-              mountPath: /etc/mysql/conf.d/master.cnf
-              subPath: master.cnf
+            - name: mysql-config
+              mountPath: /etc/mysql/conf.d/mysql.cnf
+              subPath: mysql.cnf
           resources:
             requests:
               cpu: "250m"
@@ -146,95 +98,12 @@ spec:
             periodSeconds: 5
             timeoutSeconds: 3
       volumes:
-        - name: master-config
+        - name: mysql-config
           configMap:
-            name: mysql-master-config
+            name: mysql-config
   volumeClaimTemplates:
     - metadata:
-        name: mysql-master-data
-      spec:
-        accessModes: ["ReadWriteOnce"]
-        resources:
-          requests:
-            storage: 10Gi
----
-# MySQL 从库 StatefulSet
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: mysql-slave
-  namespace: ai-customer-service
-  labels:
-    app: mysql
-    role: slave
-spec:
-  serviceName: mysql-slave
-  replicas: 2
-  selector:
-    matchLabels:
-      app: mysql
-      role: slave
-  template:
-    metadata:
-      labels:
-        app: mysql
-        role: slave
-    spec:
-      containers:
-        - name: mysql
-          image: mysql:8.0
-          ports:
-            - containerPort: 3306
-              name: mysql
-          env:
-            - name: MYSQL_ROOT_PASSWORD
-              value: "root"
-            - name: TZ
-              value: "Asia/Shanghai"
-          volumeMounts:
-            - name: mysql-slave-data
-              mountPath: /var/lib/mysql
-            - name: slave-config
-              mountPath: /etc/mysql/conf.d/slave.cnf
-              subPath: slave.cnf
-          resources:
-            requests:
-              cpu: "250m"
-              memory: "512Mi"
-            limits:
-              cpu: "1000m"
-              memory: "1Gi"
-          livenessProbe:
-            exec:
-              command:
-                - mysqladmin
-                - ping
-                - -h
-                - localhost
-                - -uroot
-                - -proot
-            initialDelaySeconds: 30
-            periodSeconds: 10
-            timeoutSeconds: 5
-          readinessProbe:
-            exec:
-              command:
-                - mysqladmin
-                - ping
-                - -h
-                - localhost
-                - -uroot
-                - -proot
-            initialDelaySeconds: 10
-            periodSeconds: 5
-            timeoutSeconds: 3
-      volumes:
-        - name: slave-config
-          configMap:
-            name: mysql-slave-config
-  volumeClaimTemplates:
-    - metadata:
-        name: mysql-slave-data
+        name: mysql-data
       spec:
         accessModes: ["ReadWriteOnce"]
         resources:

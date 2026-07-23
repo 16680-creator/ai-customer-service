@@ -1,4 +1,4 @@
-# Redis 集群部署 - StatefulSet (3节点)
+# Redis 单节点部署
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -8,9 +8,6 @@ data:
   redis.conf: |
     bind 0.0.0.0
     port 6379
-    cluster-enabled yes
-    cluster-config-file nodes.conf
-    cluster-node-timeout 15000
     appendonly yes
     appendfilename "appendonly.aof"
     appendfsync everysec
@@ -37,29 +34,6 @@ spec:
     - port: 6379
       targetPort: 6379
       name: redis
-    - port: 16379
-      targetPort: 16379
-      name: redis-bus
-  selector:
-    app: redis
----
-# Redis 无头服务，用于StatefulSet网络标识
-apiVersion: v1
-kind: Service
-metadata:
-  name: redis-headless
-  namespace: ai-customer-service
-  labels:
-    app: redis
-spec:
-  clusterIP: None
-  ports:
-    - port: 6379
-      targetPort: 6379
-      name: redis
-    - port: 16379
-      targetPort: 16379
-      name: redis-bus
   selector:
     app: redis
 ---
@@ -71,8 +45,8 @@ metadata:
   labels:
     app: redis
 spec:
-  serviceName: redis-headless
-  replicas: 3
+  serviceName: redis
+  replicas: 1
   selector:
     matchLabels:
       app: redis
@@ -87,8 +61,6 @@ spec:
           ports:
             - containerPort: 6379
               name: redis
-            - containerPort: 16379
-              name: redis-bus
           command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
           volumeMounts:
             - name: redis-data

@@ -1,29 +1,14 @@
-# MySQL 从库2配置（server-id=3）
+# MySQL 单节点配置
 [mysqld]
-# 服务器唯一ID
-server-id=3
-
-# 中继日志配置
-relay-log=relay-bin
-relay-log-index=relay-bin.index
-
-# 只读模式
-read-only=1
-super-read-only=0
-
-# 从库复制配置
-replicate-do-db=user_db
-replicate-do-db=knowledge_db
-replicate-do-db=chat_db
-replicate-do-db=nacos_config
+# InnoDB配置
+innodb-buffer-pool-size=256M
+innodb-log-file-size=64M
+innodb-flush-log-at-trx-commit=1
+innodb-lock-wait-timeout=30
 
 # 字符集
 character-set-server=utf8mb4
 collation-server=utf8mb4_unicode_ci
-
-# InnoDB配置
-innodb-buffer-pool-size=256M
-innodb-log-file-size=64M
 
 # 连接配置
 max-connections=500

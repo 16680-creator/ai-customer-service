@@ -1,0 +1,309 @@
+version: '3.8'
+
+# ============================================================
+# AI客服系统 - 单机全量部署（基础设施 + 所有微服务）
+# ============================================================
+
+services:
+  # ==================== MySQL 单节点 ====================
+  mysql:
+    image: mysql:8.0
+    container_name: aics-mysql
+    restart: always
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      TZ: Asia/Shanghai
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ../mysql/mysql.cnf:/etc/mysql/conf.d/mysql.cnf
+      - ../mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    command: --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-root}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - aics-network
+
+  # ==================== Redis 单节点 ====================
+  redis:
+    image: redis:7
+    container_name: aics-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+      - ../redis/redis.conf:/usr/local/etc/redis/redis.conf
+    command: redis-server /usr/local/etc/redis/redis.conf
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aics-network
+
+  # ==================== Nacos 注册/配置中心 ====================
+  nacos:
+    image: nacos/nacos-server:v2.3.2
+    container_name: aics-nacos
+    restart: always
+    ports:
+      - "8848:8848"
+      - "9848:9848"
+    environment:
+      MODE: standalone
+      SPRING_DATASOURCE_PLATFORM: mysql
+      MYSQL_SERVICE_HOST: mysql
+      MYSQL_SERVICE_PORT: 3306
+      MYSQL_SERVICE_DB_NAME: nacos_config
+      MYSQL_SERVICE_USER: root
+      MYSQL_SERVICE_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      JVM_XMS: 256m
+      JVM_XMX: 512m
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8848/nacos/v1/console/health/readiness"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    networks:
+      - aics-network
+
+  # ==================== Elasticsearch ====================
+  elasticsearch:
+    image: elasticsearch:8.12.0
+    container_name: aics-elasticsearch
+    restart: always
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    environment:
+      discovery.type: single-node
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+      xpack.security.enabled: "false"
+      xpack.security.enrollment.enabled: "false"
+      network.host: 0.0.0.0
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 40s
+    networks:
+      - aics-network
+
+  # ==================== RocketMQ NameServer ====================
+  rocketmq-namesrv:
+    image: apache/rocketmq:5.1.4
+    container_name: aics-rocketmq-namesrv
+    restart: always
+    ports:
+      - "9876:9876"
+    environment:
+      JAVA_OPT_EXT: "-Xms256m -Xmx256m"
+    command: sh mqnamesrv
+    healthcheck:
+      test: ["CMD-SHELL", "echo 'health check' | nc -w 2 localhost 9876 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - aics-network
+
+  # ==================== RocketMQ Broker ====================
+  rocketmq-broker:
+    image: apache/rocketmq:5.1.4
+    container_name: aics-rocketmq-broker
+    restart: always
+    ports:
+      - "10909:10909"
+      - "10911:10911"
+    environment:
+      NAMESRV_ADDR: rocketmq-namesrv:9876
+      JAVA_OPT_EXT: "-Xms512m -Xmx512m"
+    command: sh mqbroker -n rocketmq-namesrv:9876
+    depends_on:
+      rocketmq-namesrv:
+        condition: service_healthy
+    networks:
+      - aics-network
+
+  # ==================== MinIO 对象存储 ====================
+  minio:
+    image: minio/minio:latest
+    container_name: aics-minio
+    restart: always
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:-minioadmin}
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aics-network
+
+  # ==================== API 网关 (8080) ====================
+  api-gateway:
+    image: ai-cs-gateway:${VERSION:-latest}
+    container_name: aics-api-gateway
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      NACOS_SERVER: nacos:8848
+      JAVA_OPTS: "-Xms256m -Xmx512m"
+    depends_on:
+      nacos:
+        condition: service_healthy
+    networks:
+      - aics-network
+
+  # ==================== 用户服务 (8081) ====================
+  user-service:
+    image: ai-cs-user:${VERSION:-latest}
+    container_name: aics-user-service
+    restart: always
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      NACOS_SERVER: nacos:8848
+      DB_HOST: mysql
+      JAVA_OPTS: "-Xms256m -Xmx512m"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      nacos:
+        condition: service_healthy
+    networks:
+      - aics-network
+
+  # ==================== 知识库服务 (8082) ====================
+  knowledge-service:
+    image: ai-cs-knowledge:${VERSION:-latest}
+    container_name: aics-knowledge-service
+    restart: always
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      NACOS_SERVER: nacos:8848
+      DB_HOST: mysql
+      MINIO_ENDPOINT: http://minio:9000
+      JAVA_OPTS: "-Xms256m -Xmx512m"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      nacos:
+        condition: service_healthy
+    networks:
+      - aics-network
+
+  # ==================== AI 对话服务 (8083) ====================
+  ai-chat-service:
+    image: ai-cs-chat:${VERSION:-latest}
+    container_name: aics-chat-service
+    restart: always
+    ports:
+      - "8083:8083"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      NACOS_SERVER: nacos:8848
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-demo-key}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.minimaxi.com}
+      OPENAI_MODEL: ${OPENAI_MODEL:-MiniMax-M3}
+      JAVA_OPTS: "-Xms256m -Xmx512m"
+    depends_on:
+      nacos:
+        condition: service_healthy
+    networks:
+      - aics-network
+
+  # ==================== 搜索服务 (8084) ====================
+  search-service:
+    image: ai-cs-search:${VERSION:-latest}
+    container_name: aics-search-service
+    restart: always
+    ports:
+      - "8084:8084"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      NACOS_SERVER: nacos:8848
+      ES_HOST: elasticsearch:9200
+      JAVA_OPTS: "-Xms256m -Xmx512m"
+    depends_on:
+      nacos:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - aics-network
+
+  # ==================== 消息服务 (8085) ====================
+  message-service:
+    image: ai-cs-message:${VERSION:-latest}
+    container_name: aics-message-service
+    restart: always
+    ports:
+      - "8085:8085"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      NACOS_SERVER: nacos:8848
+      DB_HOST: mysql
+      ROCKETMQ_NAMESRV: rocketmq-namesrv:9876
+      JAVA_OPTS: "-Xms256m -Xmx512m"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rocketmq-namesrv:
+        condition: service_healthy
+    networks:
+      - aics-network
+
+  # ==================== 通知服务 (8086) ====================
+  notify-service:
+    image: ai-cs-notify:${VERSION:-latest}
+    container_name: aics-notify-service
+    restart: always
+    ports:
+      - "8086:8086"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      NACOS_SERVER: nacos:8848
+      JAVA_OPTS: "-Xms256m -Xmx512m"
+    depends_on:
+      nacos:
+        condition: service_healthy
+    networks:
+      - aics-network
+
+networks:
+  aics-network:
+    driver: bridge
+
+volumes:
+  mysql-data:
+  redis-data:
+  es-data:
+  minio-data:

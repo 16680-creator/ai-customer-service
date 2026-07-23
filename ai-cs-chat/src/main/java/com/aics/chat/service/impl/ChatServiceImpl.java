@@ -9,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.openai.OpenAiChatModel;
@@ -34,8 +35,11 @@ public class ChatServiceImpl implements ChatService {
     /** 会话历史存储（生产环境应使用 Redis 或持久化存储） */
     private final Map<String, List<Message>> sessionHistory = new ConcurrentHashMap<>();
 
-    /** 最大历史消息数 */
+    /** 最大历史消息数，超过时触发压缩 */
     private static final int MAX_HISTORY_SIZE = 20;
+
+    /** 压缩后保留的最近消息数 */
+    private static final int KEEP_RECENT_SIZE = 10;
 
     /** 过滤模型思考过程标签 */
     private static final Pattern THINK_PATTERN = Pattern.compile("<think>.*?</think>", Pattern.DOTALL);
@@ -48,6 +52,43 @@ public class ChatServiceImpl implements ChatService {
         return THINK_PATTERN.matcher(response).replaceAll("").trim();
     }
 
+    /**
+     * 压缩会话历史：将旧消息交给 AI 生成摘要，替换为一条 SystemMessage
+     * 保留最近的 KEEP_RECENT_SIZE 条消息
+     */
+    private List<Message> compressHistory(List<Message> history) {
+        int splitIndex = history.size() - KEEP_RECENT_SIZE;
+        List<Message> oldMessages = history.subList(0, splitIndex);
+        List<Message> recentMessages = new ArrayList<>(history.subList(splitIndex, history.size()));
+
+        // 拼接旧消息为文本
+        StringBuilder conversation = new StringBuilder();
+        for (Message msg : oldMessages) {
+            String role = msg instanceof UserMessage ? "用户" : "助手";
+            conversation.append(role).append("：").append(msg.getText()).append("\n");
+        }
+
+        try {
+            // 调用 AI 生成摘要
+            String summary = chatModel.call(
+                    new Prompt("请将以下对话历史压缩为简洁的摘要，保留关键信息（用户名、订单号、重要决定等），"
+                            + "用1-3句话概括，作为后续对话的上下文参考：\n\n" + conversation)
+            ).getResult().getOutput().getText();
+
+            summary = cleanResponse(summary);
+            log.info("会话历史压缩完成: {}条消息 -> 摘要({}字)", oldMessages.size(), summary.length());
+
+            // 构建压缩后的历史：摘要 + 最近消息
+            List<Message> compressed = new ArrayList<>();
+            compressed.add(new SystemMessage("以下是之前对话的摘要，请参考：\n" + summary));
+            compressed.addAll(recentMessages);
+            return compressed;
+        } catch (Exception e) {
+            log.warn("会话压缩失败，回退为截断模式", e);
+            return recentMessages;
+        }
+    }
+
     @Override
     public Result<String> chat(String sessionId, String message) {
         log.info("对话请求: sessionId={}, message={}", sessionId, message);
@@ -57,15 +98,15 @@ public class ChatServiceImpl implements ChatService {
             List<Message> history = sessionHistory.computeIfAbsent(sessionId, k -> new ArrayList<>());
             history.add(new UserMessage(message));
 
-            // 限制历史长度
+            // 历史超过上限时，压缩旧消息为摘要
             if (history.size() > MAX_HISTORY_SIZE) {
-                history = history.subList(history.size() - MAX_HISTORY_SIZE, history.size());
+                history = compressHistory(history);
                 sessionHistory.put(sessionId, history);
             }
 
-            // 调用 AI 模型（工具已通过 defaultToolCallbacks 全局注册）
+            // 调用 AI 模型，携带完整会话历史（工具已通过 defaultToolCallbacks 全局注册）
             String response = chatClient.prompt()
-                    .user(message)
+                    .messages(history)
                     .call()
                     .content();
 

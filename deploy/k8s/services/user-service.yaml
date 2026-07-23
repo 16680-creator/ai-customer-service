@@ -23,7 +23,7 @@ metadata:
   labels:
     app: user-service
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: user-service
@@ -44,7 +44,7 @@ spec:
             - name: NACOS_NAMESPACE
               value: "aics"
             - name: MYSQL_HOST
-              value: "mysql-master"
+              value: "mysql"
             - name: MYSQL_PORT
               value: "3306"
             - name: MYSQL_DB
