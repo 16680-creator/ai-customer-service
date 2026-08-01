@@ -60,7 +60,14 @@ public enum ResultCode {
     ORDER_COUPON_UNAVAILABLE(7003, "优惠券不可用"),
     ORDER_NOT_FOUND(7004, "订单不存在或状态不允许操作"),
     ORDER_PAYMENT_METHOD_INVALID(7005, "支付方式无效"),
-    ORDER_CART_EMPTY(7006, "购物车为空或未选择商品");
+    ORDER_CART_EMPTY(7006, "购物车为空或未选择商品"),
+
+    // ==================== 商品模块 8xxx ====================
+    PRODUCT_NOT_FOUND(8001, "商品不存在"),
+    PRODUCT_OFF_SHELF(8002, "商品已下架"),
+    PRODUCT_STOCK_INSUFFICIENT(8003, "商品库存不足"),
+    PRODUCT_NAME_DUPLICATE(8004, "商品名称已存在"),
+    PRODUCT_CATEGORY_NOT_FOUND(8005, "商品分类不存在");
 
     private final int code;
     private final String message;

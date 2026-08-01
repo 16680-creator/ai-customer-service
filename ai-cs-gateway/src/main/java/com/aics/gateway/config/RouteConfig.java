@@ -53,6 +53,11 @@ public class RouteConfig {
                         .path("/api/order/**")
                         .filters(f -> f.stripPrefix(1))
                         .uri("lb://ai-cs-order"))
+                // 商品服务
+                .route("ai-cs-product", r -> r
+                        .path("/api/product/**")
+                        .filters(f -> f.stripPrefix(1))
+                        .uri("lb://ai-cs-product"))
                 .build();
     }
 }
