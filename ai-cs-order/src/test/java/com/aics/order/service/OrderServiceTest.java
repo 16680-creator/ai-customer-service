@@ -3,6 +3,7 @@ package com.aics.order.service;
 import com.aics.common.exception.BusinessException;
 import com.aics.order.entity.CartItem;
 import com.aics.order.entity.Order;
+import com.aics.order.entity.OrderItem;
 import com.aics.order.enums.OrderStatus;
 import com.aics.order.mapper.CartItemMapper;
 import com.aics.order.mapper.CouponMapper;
@@ -138,15 +139,21 @@ class OrderServiceTest {
         order.setOrderNo("20260801143022010001");
         order.setStatus(OrderStatus.PENDING_PAY.getCode());
         order.setUserId(100L);
-        order.setCouponId(101L);
+        order.setCouponId(null);
+
+        OrderItem item = new OrderItem();
+        item.setProductId(1001L);
+        item.setQuantity(2);
 
         when(orderMapper.selectOne(any())).thenReturn(order);
+        when(orderItemMapper.selectList(any())).thenReturn(List.of(item));
         when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
 
         orderService.cancelExpiredOrder("20260801143022010001");
 
         verify(orderMapper).updateById(argThat(o ->
                 OrderStatus.CANCELLED.getCode().equals(o.getStatus())));
+        verify(valueOperations).increment("stock:1001", 2);
     }
 
     private com.aics.order.bo.PriceCalcBO buildPriceCalcBO() {
