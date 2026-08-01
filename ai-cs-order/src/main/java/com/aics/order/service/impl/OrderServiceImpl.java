@@ -18,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.rocketmq.spring.core.RocketMQTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -118,7 +119,8 @@ public class OrderServiceImpl implements OrderService {
         }
 
         // 7. 发送延迟消息（超时取消）
-        rocketMQTemplate.syncSend("order-timeout-topic", orderNo,
+        rocketMQTemplate.syncSend("order-timeout-topic",
+                MessageBuilder.withPayload(orderNo).build(),
                 5000, 16); // delayLevel 16 ≈ 30min
 
         // 8. 创建支付

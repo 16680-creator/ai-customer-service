@@ -1,0 +1,19 @@
+# 测试全局配置 - 禁用 Nacos 和外部依赖
+spring:
+  cloud:
+    nacos:
+      discovery:
+        enabled: false
+      config:
+        enabled: false
+        import-check:
+          enabled: false
+    discovery:
+      enabled: false
+  config:
+    import: "optional:nacos:"
+  autoconfigure:
+    exclude:
+      - com.baomidou.mybatisplus.autoconfigure.MybatisPlusAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.apache.rocketmq.spring.autoconfigure.RocketMQAutoConfiguration
