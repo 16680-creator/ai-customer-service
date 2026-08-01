@@ -52,7 +52,15 @@ public enum ResultCode {
 
     // ==================== 通知模块 6xxx ====================
     NOTIFY_SEND_FAIL(6001, "通知发送失败"),
-    NOTIFY_WS_CONNECT_FAIL(6002, "WebSocket连接失败");
+    NOTIFY_WS_CONNECT_FAIL(6002, "WebSocket连接失败"),
+
+    // ==================== 订单模块 7xxx ====================
+    ORDER_STOCK_INSUFFICIENT(7001, "库存不足"),
+    ORDER_CREATE_FAIL(7002, "下单失败"),
+    ORDER_COUPON_UNAVAILABLE(7003, "优惠券不可用"),
+    ORDER_NOT_FOUND(7004, "订单不存在或状态不允许操作"),
+    ORDER_PAYMENT_METHOD_INVALID(7005, "支付方式无效"),
+    ORDER_CART_EMPTY(7006, "购物车为空或未选择商品");
 
     private final int code;
     private final String message;

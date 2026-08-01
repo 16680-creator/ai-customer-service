@@ -8,6 +8,7 @@ const SERVICES = {
   message: 'http://localhost:8084',
   notify: 'http://localhost:8085',
   search: 'http://localhost:8086',
+  order: 'http://localhost:8087',
 }
 
 function createClient(baseURL) {
@@ -20,5 +21,6 @@ export const knowledgeApi = createClient(SERVICES.knowledge)
 export const messageApi = createClient(SERVICES.message)
 export const notifyApi = createClient(SERVICES.notify)
 export const searchApi = createClient(SERVICES.search)
+export const orderApi = createClient(SERVICES.order)
 
 export default SERVICES

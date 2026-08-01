@@ -48,6 +48,11 @@ public class RouteConfig {
                         .path("/api/notify/**")
                         .filters(f -> f.stripPrefix(1))
                         .uri("lb://ai-cs-notify"))
+                // 订单服务
+                .route("ai-cs-order", r -> r
+                        .path("/api/order/**")
+                        .filters(f -> f.stripPrefix(1))
+                        .uri("lb://ai-cs-order"))
                 .build();
     }
 }
