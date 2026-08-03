@@ -1,0 +1,13 @@
+.git
+.agents
+.codex
+docs
+deploy/docker-compose
+deploy/scripts
+**/target
+**/.idea
+**/.vscode
+**/*.iml
+*.log
+images-export
+deploy-package
