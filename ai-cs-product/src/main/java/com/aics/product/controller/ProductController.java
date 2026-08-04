@@ -1,17 +1,25 @@
 package com.aics.product.controller;
 
+import com.aics.common.exception.BusinessException;
 import com.aics.common.result.Result;
+import com.aics.common.result.ResultCode;
+import com.aics.common.storage.FileStorageService;
 import com.aics.product.dto.ProductCreateDTO;
 import com.aics.product.dto.ProductUpdateDTO;
 import com.aics.product.entity.ProductCategory;
 import com.aics.product.service.ProductService;
+import com.aics.product.service.impl.ProductVectorService;
+import com.aics.product.vo.ProductSimilarVO;
 import com.aics.product.vo.ProductVO;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 
 /**
  * 商品控制器
@@ -21,7 +29,53 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ProductController {
 
+    /** 支持上传的图片格式 */
+    private static final Set<String> ALLOWED_IMAGE_EXT = Set.of("jpg", "jpeg", "png", "webp", "gif");
+
+    /** 图片大小上限 5MB */
+    private static final long MAX_IMAGE_SIZE = 5 * 1024 * 1024L;
+
     private final ProductService productService;
+    private final ProductVectorService productVectorService;
+    private final FileStorageService fileStorageService;
+
+    /**
+     * 上传商品图片（存 MinIO，返回图片 URL）
+     */
+    @PostMapping("/upload-image")
+    public Result<String> uploadImage(@RequestParam("file") MultipartFile file) {
+        String originalName = file.getOriginalFilename();
+        String ext = originalName == null ? "" :
+                originalName.substring(originalName.lastIndexOf('.') + 1).toLowerCase(Locale.ROOT);
+        if (!ALLOWED_IMAGE_EXT.contains(ext)) {
+            throw new BusinessException(ResultCode.PRODUCT_IMAGE_INVALID, "仅支持 jpg/png/webp/gif 格式");
+        }
+        if (file.getSize() > MAX_IMAGE_SIZE) {
+            throw new BusinessException(ResultCode.PRODUCT_IMAGE_TOO_LARGE, "图片大小不能超过 5MB");
+        }
+        String url = fileStorageService.upload(file, "product/images");
+        return Result.success("图片上传成功", url);
+    }
+
+    /**
+     * 按文本检索相似商品（以文搜图）
+     */
+    @GetMapping("/similar")
+    public Result<List<ProductSimilarVO>> searchSimilar(
+            @RequestParam String text,
+            @RequestParam(defaultValue = "5") int topK) {
+        return Result.success(productVectorService.searchByText(text, topK));
+    }
+
+    /**
+     * 按商品查找相似商品
+     */
+    @GetMapping("/{id}/similar")
+    public Result<List<ProductSimilarVO>> findSimilar(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "5") int topK) {
+        return Result.success(productVectorService.searchByProduct(id, topK));
+    }
 
     /**
      * 创建商品

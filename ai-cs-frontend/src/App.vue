@@ -41,6 +41,10 @@
           <el-icon><Search /></el-icon>
           <span>全文搜索</span>
         </el-menu-item>
+        <el-menu-item index="/product">
+          <el-icon><Goods /></el-icon>
+          <span>商品图片检索</span>
+        </el-menu-item>
       </el-menu>
     </el-aside>
     <el-container>
@@ -62,6 +66,7 @@
 <script setup>
 import { useRoute } from 'vue-router'
 import { computed } from 'vue'
+import { Goods } from '@element-plus/icons-vue'
 
 const route = useRoute()
 
@@ -73,6 +78,7 @@ const titleMap = {
   '/message': '消息管理',
   '/notify': '通知中心',
   '/search': '全文搜索',
+  '/product': '商品图片检索',
 }
 
 const currentPageTitle = computed(() => titleMap[route.path] || 'AI 客服平台')

@@ -8,6 +8,7 @@ import com.aics.product.entity.ProductCategory;
 import com.aics.product.mapper.ProductCategoryMapper;
 import com.aics.product.mapper.ProductMapper;
 import com.aics.product.service.impl.ProductServiceImpl;
+import com.aics.product.service.impl.ProductVectorService;
 import com.aics.product.vo.ProductVO;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -49,6 +50,9 @@ class ProductServiceTest {
 
     @Mock
     private ValueOperations<String, String> valueOperations;
+
+    @Mock
+    private ProductVectorService productVectorService;
 
     @InjectMocks
     private ProductServiceImpl productService;

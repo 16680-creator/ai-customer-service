@@ -56,6 +56,18 @@
             <artifactId>hutool-all</artifactId>
         </dependency>
 
+        <!-- MinIO 对象存储 -->
+        <dependency>
+            <groupId>io.minio</groupId>
+            <artifactId>minio</artifactId>
+        </dependency>
+
+        <!-- Spring AI 向量存储（EmbeddingModel/VectorStore 抽象） -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-vector-store</artifactId>
+        </dependency>
+
         <!-- Jackson (for JSON processing) -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
@@ -67,6 +79,13 @@
             <groupId>jakarta.servlet</groupId>
             <artifactId>jakarta.servlet-api</artifactId>
             <scope>provided</scope>
+        </dependency>
+
+        <!-- Test -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 </project>

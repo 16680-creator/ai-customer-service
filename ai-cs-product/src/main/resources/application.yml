@@ -14,6 +14,10 @@ spring:
       host: 127.0.0.1
       port: 6379
       database: 0
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 10MB
   cloud:
     nacos:
       discovery:
@@ -25,6 +29,27 @@ spring:
         namespace: aics
         group: DEFAULT_GROUP
         file-extension: yml
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY:}
+      base-url: ${OPENAI_BASE_URL:https://api.openai.com}
+      embedding:
+        options:
+          model: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
+
+# AI 能力配置
+aics:
+  ai:
+    embedding:
+      # local=本地哈希向量（默认，无需外部依赖）；openai=OpenAI 兼容中转站
+      provider: ${AI_EMBEDDING_PROVIDER:local}
+  # MinIO 对象存储
+  minio:
+    endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+    access-key: ${MINIO_ACCESS_KEY:minioadmin}
+    secret-key: ${MINIO_SECRET_KEY:minioadmin}
+    bucket: ${MINIO_BUCKET:aics-files}
+    public-endpoint: ${MINIO_PUBLIC_ENDPOINT:}
 
 # MyBatis-Plus
 mybatis-plus:

@@ -32,6 +32,7 @@ public class ProductServiceImpl implements ProductService {
     private final ProductMapper productMapper;
     private final ProductCategoryMapper categoryMapper;
     private final StringRedisTemplate stringRedisTemplate;
+    private final ProductVectorService productVectorService;
 
     @Override
     public ProductVO createProduct(ProductCreateDTO dto) {
@@ -61,6 +62,9 @@ public class ProductServiceImpl implements ProductService {
 
         // 初始化 Redis 库存
         stringRedisTemplate.opsForValue().set("stock:" + product.getId(), String.valueOf(dto.getStock()));
+
+        // 建立商品向量索引
+        productVectorService.indexProduct(product);
 
         log.info("商品创建成功: id={}, name={}", product.getId(), product.getName());
         return toVO(product, category.getName());
@@ -132,6 +136,8 @@ public class ProductServiceImpl implements ProductService {
         }
 
         productMapper.updateById(product);
+        // 更新商品向量索引
+        productVectorService.indexProduct(product);
         log.info("商品更新成功: id={}", id);
         return toVO(product, getCategoryName(product.getCategoryId()));
     }
@@ -144,6 +150,8 @@ public class ProductServiceImpl implements ProductService {
         }
         productMapper.deleteById(id);
         stringRedisTemplate.delete("stock:" + id);
+        // 删除商品向量索引
+        productVectorService.removeProduct(id);
         log.info("商品删除成功: id={}", id);
     }
 

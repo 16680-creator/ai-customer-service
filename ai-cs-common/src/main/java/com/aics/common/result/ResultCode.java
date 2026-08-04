@@ -67,7 +67,15 @@ public enum ResultCode {
     PRODUCT_OFF_SHELF(8002, "商品已下架"),
     PRODUCT_STOCK_INSUFFICIENT(8003, "商品库存不足"),
     PRODUCT_NAME_DUPLICATE(8004, "商品名称已存在"),
-    PRODUCT_CATEGORY_NOT_FOUND(8005, "商品分类不存在");
+    PRODUCT_CATEGORY_NOT_FOUND(8005, "商品分类不存在"),
+    PRODUCT_IMAGE_INVALID(8006, "商品图片格式不支持"),
+    PRODUCT_IMAGE_TOO_LARGE(8007, "商品图片大小超过限制"),
+    PRODUCT_INDEX_FAIL(8008, "商品向量索引失败"),
+    PRODUCT_SIMILAR_SEARCH_FAIL(8009, "相似商品检索失败"),
+
+    // ==================== 文件存储 9xxx ====================
+    FILE_UPLOAD_FAIL(9001, "文件上传失败"),
+    FILE_DELETE_FAIL(9002, "文件删除失败");
 
     private final int code;
     private final String message;
