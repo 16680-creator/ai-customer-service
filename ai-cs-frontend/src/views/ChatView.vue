@@ -86,7 +86,7 @@ async function sendMessage() {
   await scrollToBottom()
 
   try {
-    const res = await chatApi.post(`/chat/send`, null, {
+    const res = await chatApi.post(`/send`, null, {
       params: { sessionId: currentSession.value, message: text }
     })
     const reply = res.data?.data || res.data?.message || '未获取到回复'

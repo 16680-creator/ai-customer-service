@@ -1,6 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { isAuthenticated } from '../utils/auth'
 
 const routes = [
+  { path: '/login', name: 'Login', component: () => import('../views/LoginView.vue'), meta: { public: true } },
   { path: '/', name: 'Dashboard', component: () => import('../views/Dashboard.vue') },
   { path: '/chat', name: 'Chat', component: () => import('../views/ChatView.vue') },
   { path: '/user', name: 'User', component: () => import('../views/UserView.vue') },
@@ -14,6 +16,19 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(),
   routes,
+})
+
+// 全局路由守卫：未登录用户只能访问公开页面（登录页），其余一律跳转登录页
+router.beforeEach((to) => {
+  const isPublic = to.meta?.public === true
+  if (!isPublic && !isAuthenticated()) {
+    return { path: '/login', query: { redirect: to.fullPath } }
+  }
+  // 已登录访问登录页，直接进首页
+  if (to.path === '/login' && isAuthenticated()) {
+    return { path: '/' }
+  }
+  return true
 })
 
 export default router

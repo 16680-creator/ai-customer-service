@@ -38,19 +38,27 @@ public class RouteConfig {
                         .path("/api/search/**")
                         .filters(f -> f.stripPrefix(1))
                         .uri("lb://ai-cs-search"))
-                // 消息服务
+                // 消息服务（Controller 前缀为 /api/message，无需去前缀）
                 .route("ai-cs-message", r -> r
                         .path("/api/message/**")
-                        .filters(f -> f.stripPrefix(1))
                         .uri("lb://ai-cs-message"))
-                // 通知服务
+                // 通知服务（Controller 前缀为 /api/notify，无需去前缀）
                 .route("ai-cs-notify", r -> r
                         .path("/api/notify/**")
-                        .filters(f -> f.stripPrefix(1))
                         .uri("lb://ai-cs-notify"))
                 // 订单服务
                 .route("ai-cs-order", r -> r
                         .path("/api/order/**")
+                        .filters(f -> f.stripPrefix(1))
+                        .uri("lb://ai-cs-order"))
+                // 购物车服务（订单模块）
+                .route("ai-cs-cart", r -> r
+                        .path("/api/cart/**")
+                        .filters(f -> f.stripPrefix(1))
+                        .uri("lb://ai-cs-order"))
+                // 支付回调（订单模块）
+                .route("ai-cs-pay", r -> r
+                        .path("/api/pay/**")
                         .filters(f -> f.stripPrefix(1))
                         .uri("lb://ai-cs-order"))
                 // 商品服务

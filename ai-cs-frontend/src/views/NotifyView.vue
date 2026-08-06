@@ -82,7 +82,7 @@ let ws = null
 
 async function sendNotify() {
   try {
-    await notifyApi.post('/api/notify/send', null, { params: notifyForm.value })
+    await notifyApi.post('/send', null, { params: notifyForm.value })
     ElMessage.success('通知发送成功')
     notifyForm.value.message = ''
   } catch (e) {
@@ -92,7 +92,7 @@ async function sendNotify() {
 
 async function broadcast() {
   try {
-    await notifyApi.post('/api/notify/broadcast', null, { params: { message: broadcastMsg.value } })
+    await notifyApi.post('/broadcast', null, { params: { message: broadcastMsg.value } })
     ElMessage.success('广播发送成功')
     broadcastMsg.value = ''
   } catch (e) {
@@ -102,7 +102,7 @@ async function broadcast() {
 
 async function fetchOnlineCount() {
   try {
-    const res = await notifyApi.get('/api/notify/online')
+    const res = await notifyApi.get('/online')
     onlineCount.value = res.data?.data ?? 0
   } catch (e) {
     ElMessage.error('获取在线用户数失败')

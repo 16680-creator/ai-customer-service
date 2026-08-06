@@ -82,7 +82,7 @@ const msgForm = ref({ sessionId: '', content: '', role: 'user' })
 
 async function createSession() {
   try {
-    const res = await messageApi.post('/api/message/session', null, { params: { userId: userId.value, title: sessionTitle.value } })
+    const res = await messageApi.post('/session', null, { params: { userId: userId.value, title: sessionTitle.value } })
     ElMessage.success('会话创建成功')
     fetchSessions()
   } catch (e) {
@@ -92,7 +92,7 @@ async function createSession() {
 
 async function sendMessage() {
   try {
-    await messageApi.post('/api/message/send', msgForm.value)
+    await messageApi.post('/send', msgForm.value)
     ElMessage.success('消息已发送')
     msgForm.value.content = ''
   } catch (e) {
@@ -102,7 +102,7 @@ async function sendMessage() {
 
 async function fetchSessions() {
   try {
-    const res = await messageApi.get('/api/message/sessions', { params: { userId: userId.value } })
+    const res = await messageApi.get('/sessions', { params: { userId: userId.value } })
     sessions.value = res.data?.data || []
   } catch (e) {
     ElMessage.error('加载会话列表失败: ' + (e.response?.data?.message || e.message))
@@ -111,7 +111,7 @@ async function fetchSessions() {
 
 async function viewMessages(sessionId) {
   try {
-    const res = await messageApi.get(`/api/message/session/${sessionId}/messages`)
+    const res = await messageApi.get(`/session/${sessionId}/messages`)
     selectedSessionMessages.value = res.data?.data || []
   } catch (e) {
     ElMessage.error('加载消息失败: ' + (e.response?.data?.message || e.message))

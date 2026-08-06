@@ -85,7 +85,7 @@ async function doSearch() {
   searching.value = true
   searched.value = true
   try {
-    const res = await searchApi.get(`/search/${indexName.value}`, {
+    const res = await searchApi.get(`/${indexName.value}`, {
       params: { query: searchQuery.value, page: page.value, size: 20 }
     })
     results.value = res.data?.data || []
@@ -101,7 +101,7 @@ async function doSearch() {
 async function createIndex() {
   if (!indexMgmt.value.name) return ElMessage.warning('请输入索引名称')
   try {
-    await searchApi.post(`/search/index/${indexMgmt.value.name}`, {})
+    await searchApi.post(`/index/${indexMgmt.value.name}`, {})
     ElMessage.success('索引创建成功')
   } catch (e) {
     ElMessage.error('创建失败: ' + (e.response?.data?.message || e.message))
@@ -111,7 +111,7 @@ async function createIndex() {
 async function deleteIndex() {
   if (!indexMgmt.value.name) return ElMessage.warning('请输入索引名称')
   try {
-    await searchApi.delete(`/search/index/${indexMgmt.value.name}`)
+    await searchApi.delete(`/index/${indexMgmt.value.name}`)
     ElMessage.success('索引删除成功')
   } catch (e) {
     ElMessage.error('删除失败: ' + (e.response?.data?.message || e.message))
@@ -122,7 +122,7 @@ async function indexDoc() {
   if (!docIndex.value.name || !docIndex.value.content) return ElMessage.warning('请填写完整')
   try {
     const doc = JSON.parse(docIndex.value.content)
-    await searchApi.post(`/search/document/${docIndex.value.name}`, doc)
+    await searchApi.post(`/document/${docIndex.value.name}`, doc)
     ElMessage.success('文档索引成功')
     docIndex.value.content = ''
   } catch (e) {

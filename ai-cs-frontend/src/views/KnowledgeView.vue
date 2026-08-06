@@ -102,7 +102,7 @@ onMounted(fetchList)
 
 async function fetchList() {
   try {
-    const res = await knowledgeApi.get('/knowledge/list', { params: { page: page.value, pageSize: pageSize.value, keyword: keyword.value || undefined } })
+    const res = await knowledgeApi.get('/list', { params: { page: page.value, pageSize: pageSize.value, keyword: keyword.value || undefined } })
     const data = res.data?.data
     documents.value = data?.records || data || []
     total.value = data?.total || documents.value.length
@@ -131,9 +131,9 @@ function viewDoc(row) {
 async function saveDoc() {
   try {
     if (editingDoc.value) {
-      await knowledgeApi.put('/knowledge', docForm.value)
+      await knowledgeApi.put('', docForm.value)
     } else {
-      await knowledgeApi.post('/knowledge', docForm.value)
+      await knowledgeApi.post('', docForm.value)
     }
     ElMessage.success('保存成功')
     dialogVisible.value = false
@@ -145,7 +145,7 @@ async function saveDoc() {
 
 async function deleteDoc(id) {
   try {
-    await knowledgeApi.delete(`/knowledge/${id}`)
+    await knowledgeApi.delete(`/${id}`)
     ElMessage.success('删除成功')
     fetchList()
   } catch (e) {

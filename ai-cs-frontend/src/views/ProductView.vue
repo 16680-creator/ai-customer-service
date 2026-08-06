@@ -169,7 +169,7 @@ async function createProduct() {
   creating.value = true
   try {
     const payload = { ...productForm.value }
-    await productApi.post('/product', payload)
+    await productApi.post('', payload)
     ElMessage.success('商品创建成功，已建立向量索引')
     productForm.value = { name: '', description: '', price: 99, stock: 100, categoryId: 1, image: '' }
     loadProducts()
@@ -185,7 +185,7 @@ async function searchByText() {
   searching.value = true
   searched.value = true
   try {
-    const res = await productApi.get('/product/similar', {
+    const res = await productApi.get('/similar', {
       params: { text: searchText.value.trim(), topK: 10 },
     })
     similarResults.value = res.data?.data || []
@@ -200,7 +200,7 @@ async function searchByText() {
 
 async function findSimilar(id) {
   try {
-    const res = await productApi.get(`/product/${id}/similar`, { params: { topK: 10 } })
+    const res = await productApi.get(`/${id}/similar`, { params: { topK: 10 } })
     similarResults.value = res.data?.data || []
     searched.value = true
     ElMessage.success(`找到 ${similarResults.value.length} 个相似商品`)
@@ -212,7 +212,7 @@ async function findSimilar(id) {
 async function loadProducts() {
   loadingProducts.value = true
   try {
-    const res = await productApi.get('/product/list', { params: { page: 1, size: 20 } })
+    const res = await productApi.get('/list', { params: { page: 1, size: 20 } })
     products.value = res.data?.data?.records || []
   } catch {
     ElMessage.warning('商品列表加载失败（商品服务未启动？）')

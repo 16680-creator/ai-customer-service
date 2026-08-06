@@ -1,5 +1,8 @@
 <template>
-  <el-container class="app-container">
+  <!-- 登录页：全屏展示，不带侧边栏 -->
+  <router-view v-if="isLoginPage" />
+
+  <el-container v-else class="app-container">
     <el-aside width="220px" class="app-aside">
       <div class="logo-area">
         <el-icon :size="28" color="#409eff"><ChatDotRound /></el-icon>
@@ -53,7 +56,19 @@
           <span class="page-title">{{ currentPageTitle }}</span>
         </div>
         <div class="header-right">
-          <el-tag type="success" effect="dark" round>在线</el-tag>
+          <el-dropdown @command="handleCommand">
+            <span class="user-info">
+              <el-avatar :size="30" class="user-avatar">{{ avatarText }}</el-avatar>
+              <span class="user-name">{{ displayName }}</span>
+              <el-icon><ArrowDown /></el-icon>
+            </span>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item disabled>角色：{{ userRole }}</el-dropdown-item>
+                <el-dropdown-item command="logout" divided>退出登录</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
         </div>
       </el-header>
       <el-main class="app-main">
@@ -64,11 +79,41 @@
 </template>
 
 <script setup>
-import { useRoute } from 'vue-router'
-import { computed } from 'vue'
-import { Goods } from '@element-plus/icons-vue'
+import { useRoute, useRouter } from 'vue-router'
+import { computed, ref, watch } from 'vue'
+import { ElMessageBox, ElMessage } from 'element-plus'
+import { Goods, ArrowDown } from '@element-plus/icons-vue'
+import { getUser, logout } from './utils/auth'
 
 const route = useRoute()
+const router = useRouter()
+
+const isLoginPage = computed(() => route.path === '/login')
+
+const currentUser = ref(getUser() || {})
+// 路由变化时重新读取登录信息（登录/退出后 localStorage 已更新）
+watch(
+  () => route.path,
+  () => {
+    currentUser.value = getUser() || {}
+  }
+)
+const displayName = computed(() => currentUser.value.nickname || currentUser.value.username || '未登录')
+const userRole = computed(() => currentUser.value.role || '-')
+const avatarText = computed(() => (displayName.value || '?').charAt(0).toUpperCase())
+
+async function handleCommand(command) {
+  if (command === 'logout') {
+    try {
+      await ElMessageBox.confirm('确定退出登录吗？', '提示', { type: 'warning' })
+      logout()
+      ElMessage.success('已退出登录')
+      router.push('/login')
+    } catch {
+      // 用户取消
+    }
+  }
+}
 
 const titleMap = {
   '/': '首页总览',
@@ -144,6 +189,25 @@ html, body, #app { height: 100%; width: 100%; font-family: 'Inter', 'PingFang SC
 .page-title {
   font-size: 20px;
   font-weight: 600;
+  color: #1d1e2c;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  outline: none;
+}
+
+.user-avatar {
+  background-color: #409eff;
+  color: #fff;
+  font-size: 14px;
+}
+
+.user-name {
+  font-size: 14px;
   color: #1d1e2c;
 }
 

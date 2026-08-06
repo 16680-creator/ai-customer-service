@@ -5,6 +5,8 @@ import com.aics.common.exception.BusinessException;
 import com.aics.common.result.Result;
 import com.aics.common.result.ResultCode;
 import com.aics.common.util.JwtUtil;
+import com.aics.user.dto.LoginRequest;
+import com.aics.user.dto.LoginVO;
 import com.aics.user.entity.User;
 import com.aics.user.mapper.UserMapper;
 import com.aics.user.service.UserService;
@@ -48,7 +50,8 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public Result<String> login(String username, String password) {
+    public Result<LoginVO> login(LoginRequest request) {
+        String username = request.getUsername();
         log.info("用户登录: username={}", username);
 
         // 查询用户
@@ -59,7 +62,7 @@ public class UserServiceImpl implements UserService {
         }
 
         // 校验密码
-        if (!BCrypt.checkpw(password, user.getPassword())) {
+        if (!BCrypt.checkpw(request.getPassword(), user.getPassword())) {
             throw new BusinessException(ResultCode.USER_PASSWORD_ERROR);
         }
 
@@ -74,8 +77,16 @@ public class UserServiceImpl implements UserService {
         claims.put("role", user.getRole());
         String token = JwtUtil.generateToken(String.valueOf(user.getId()), claims);
 
+        // 组装登录返回信息
+        LoginVO vo = new LoginVO();
+        vo.setToken(token);
+        vo.setUserId(user.getId());
+        vo.setUsername(user.getUsername());
+        vo.setNickname(user.getNickname() != null ? user.getNickname() : user.getUsername());
+        vo.setRole(user.getRole());
+
         log.info("用户登录成功: username={}", username);
-        return Result.success(token);
+        return Result.success(vo);
     }
 
     @Override

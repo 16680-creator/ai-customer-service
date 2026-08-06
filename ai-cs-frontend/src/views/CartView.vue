@@ -45,7 +45,8 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { orderApi } from '@/api'
+import { cartApi } from '../api'
+import { getUser } from '../utils/auth'
 
 const router = useRouter()
 const cartItems = ref([])
@@ -53,7 +54,7 @@ const totalAmount = ref(0)
 const selectedCount = ref(0)
 const selectedIds = ref([])
 
-const userId = ref(localStorage.getItem('userId') || '100')
+const userId = ref(getUser()?.userId || localStorage.getItem('userId') || '')
 
 onMounted(() => {
   fetchCartList()
@@ -61,7 +62,7 @@ onMounted(() => {
 
 async function fetchCartList() {
   try {
-    const { data } = await orderApi.get('/cart/list', {
+    const { data } = await cartApi.get('/list', {
       headers: { 'X-User-Id': userId.value }
     })
     if (data.code === 200) {
@@ -76,7 +77,7 @@ async function fetchCartList() {
 
 async function handleQuantityChange(row, val) {
   try {
-    const { data } = await orderApi.put('/cart/quantity', {
+    const { data } = await cartApi.put('/quantity', {
       cartItemId: row.id,
       quantity: val
     }, {
@@ -99,7 +100,7 @@ async function handleQuantityChange(row, val) {
 async function handleDelete(row) {
   try {
     await ElMessageBox.confirm('确定删除该商品？', '提示', { type: 'warning' })
-    const { data } = await orderApi.delete(`/cart/${row.id}`, {
+    const { data } = await cartApi.delete(`/${row.id}`, {
       headers: { 'X-User-Id': userId.value }
     })
     if (data.code === 200) {

@@ -39,6 +39,7 @@
             </el-form-item>
           </el-form>
           <el-alert v-if="token" :title="'登录成功，Token: ' + token.substring(0, 30) + '...'" type="success" show-icon :closable="false" style="margin-top: 10px; word-break: break-all" />
+          <el-alert title="提示：全站登录请使用右上角用户菜单；此处仅作接口调试" type="info" show-icon :closable="false" style="margin-top: 10px" />
         </el-card>
       </el-col>
 
@@ -79,8 +80,12 @@ const userInfo = ref(null)
 
 async function register() {
   try {
-    await userApi.post('/user/register', regForm.value)
-    ElMessage.success('注册成功')
+    const { data } = await userApi.post('/register', regForm.value)
+    if (data.code === 200) {
+      ElMessage.success('注册成功')
+    } else {
+      ElMessage.error(data.message || '注册失败')
+    }
   } catch (e) {
     ElMessage.error('注册失败: ' + (e.response?.data?.message || e.message))
   }
@@ -88,9 +93,16 @@ async function register() {
 
 async function login() {
   try {
-    const res = await userApi.post('/user/login', null, { params: { username: loginForm.value.username, password: loginForm.value.password } })
-    token.value = res.data?.data || res.data
-    ElMessage.success('登录成功')
+    const { data } = await userApi.post('/login', {
+      username: loginForm.value.username,
+      password: loginForm.value.password,
+    })
+    if (data.code === 200) {
+      token.value = data.data?.token || ''
+      ElMessage.success('登录成功')
+    } else {
+      ElMessage.error(data.message || '登录失败')
+    }
   } catch (e) {
     ElMessage.error('登录失败: ' + (e.response?.data?.message || e.message))
   }
@@ -98,7 +110,7 @@ async function login() {
 
 async function queryUser() {
   try {
-    const res = await userApi.get(`/user/${queryId.value}`)
+    const res = await userApi.get(`/${queryId.value}`)
     userInfo.value = res.data?.data || res.data
     ElMessage.success('查询成功')
   } catch (e) {

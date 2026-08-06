@@ -1,11 +1,13 @@
 package com.aics.user.controller;
 
 import com.aics.common.result.Result;
+import com.aics.user.dto.LoginRequest;
+import com.aics.user.dto.LoginVO;
 import com.aics.user.entity.User;
 import com.aics.user.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -30,9 +32,8 @@ public class UserController {
 
     @Operation(summary = "用户登录")
     @PostMapping("/login")
-    public Result<String> login(@RequestParam @NotBlank(message = "用户名不能为空") String username,
-                                @RequestParam @NotBlank(message = "密码不能为空") String password) {
-        return userService.login(username, password);
+    public Result<LoginVO> login(@Valid @RequestBody LoginRequest request) {
+        return userService.login(request);
     }
 
     @Operation(summary = "查询用户信息")
