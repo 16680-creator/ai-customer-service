@@ -60,14 +60,14 @@
 | 序号 | 文件夹 | 内容 | 对应项目代码 |
 |------|--------|------|-------------|
 | 1 | [01-Java基础](../01-Java基础/) | Java 17 核心特性、Maven 多模块 | `pom.xml`、`ai-cs-common` |
-| 2 | [02-Spring微服务](../02-Spring微服务/) | Spring Boot、Cloud、Nacos、Gateway | 各服务 `application.yml` |
+| 2 | [02-Spring微服务](../02-Spring微服务/) | Spring Boot、Cloud、Nacos、Gateway、SpringDoc 接口文档 | 各服务 `application.yml` |
 
 ### 第二阶段：核心能力（2-3 周）
 
 | 序号 | 文件夹 | 内容 | 对应项目代码 |
 |------|--------|------|-------------|
 | 3 | [03-数据库与ORM](../03-数据库与ORM/) | MySQL、MyBatis-Plus | `ai-cs-order`、`ai-cs-product` |
-| 4 | [04-中间件](../04-中间件/) | Redis、RocketMQ、ES、MinIO | `docker-compose.yml` |
+| 4 | [04-中间件](../04-中间件/) | Redis、RocketMQ、ES、MinIO、SSE、WebSocket | `docker-compose.yml`、`ai-cs-notify` |
 
 ### 第三阶段：AI 能力（1-2 周）
 
@@ -79,7 +79,7 @@
 
 | 序号 | 文件夹 | 内容 | 对应项目代码 |
 |------|--------|------|-------------|
-| 6 | [06-前端开发](../06-前端开发/) | Vue3、Element Plus、前后端联调 | `ai-cs-frontend` |
+| 6 | [06-前端开发](../06-前端开发/) | Vue3、Element Plus、路由守卫、Axios 封装、前后端联调 | `ai-cs-frontend` |
 
 ### 第五阶段：工程化（1-2 周）
 
@@ -92,7 +92,7 @@
 
 | 序号 | 文件夹 | 内容 | 对应项目代码 |
 |------|--------|------|-------------|
-| 9 | [09-安全与设计模式](../09-安全与设计模式/) | JWT 鉴权、异常处理、设计模式 | `ai-cs-common`、`ai-cs-gateway` |
+| 9 | [09-安全与设计模式](../09-安全与设计模式/) | JWT 鉴权、接口安全、限流、异常处理、设计模式 | `ai-cs-common`、`ai-cs-gateway` |
 
 ---
 
