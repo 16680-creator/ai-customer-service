@@ -1,0 +1,54 @@
+# 商品服务配置（Nacos dataId: ai-cs-product.yml）
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${aics.mysql.host:127.0.0.1}:${aics.mysql.port:3306}/product_db?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: ${aics.mysql.username:root}
+    password: ${aics.mysql.password:}
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+      database: 0
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 10MB
+  ai:
+    openai:
+      api-key: ${aics.openai.api-key:}
+      base-url: ${aics.openai.base-url:https://api.deepseek.com}
+      embedding:
+        options:
+          model: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
+
+# AI 能力配置
+aics:
+  ai:
+    embedding:
+      # local=本地哈希向量（默认，无需外部依赖）；openai=OpenAI 兼容中转站
+      provider: ${AI_EMBEDDING_PROVIDER:local}
+  # MinIO 对象存储
+  minio:
+    endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+    access-key: ${MINIO_ACCESS_KEY:minioadmin}
+    secret-key: ${MINIO_SECRET_KEY:minioadmin}
+    bucket: ${MINIO_BUCKET:aics-files}
+    public-endpoint: ${MINIO_PUBLIC_ENDPOINT:}
+
+# MyBatis-Plus
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: assign_id
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+logging:
+  level:
+    com.aics.product: debug

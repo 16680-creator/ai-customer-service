@@ -1,0 +1,19 @@
+# ============================================================
+# 全局共享配置（所有服务通过 spring.config.import 引入）
+# 敏感信息（数据库账号密码、密钥）只存在于 Nacos，不进 git
+# ============================================================
+aics:
+  mysql:
+    host: 123.60.31.79
+    port: 3306
+    username: root
+    password: Yxw172707
+  jwt:
+    # JWT 签名密钥（user 签发 / gateway 校验必须一致），至少 32 字符
+    secret: aics-platform-jwt-secret-key-must-be-at-least-256-bits-long-for-hs256
+    # Token 有效期（小时）
+    expire-hours: 24
+  openai:
+    api-key: sk-3d48160fc97c480bba9f66619637c195
+    base-url: https://api.deepseek.com
+    model: deepseek-chat
