@@ -7,6 +7,14 @@ spring:
   cloud:
     nacos:
       discovery:
-        server-addr: localhost:8848
+        server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+        namespace: aics
+        group: DEFAULT_GROUP
       config:
-        server-addr: localhost:8848
+        server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+        namespace: aics
+        group: DEFAULT_GROUP
+        file-extension: yml
+  config:
+    import:
+      - optional:nacos:aics-shared.yml

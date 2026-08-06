@@ -30,6 +30,9 @@ docker-volumes/
 .env
 *.env.local
 
+# Nacos 本地配置快照（含数据库账号密码/密钥等敏感信息，禁止入库）
+deploy/nacos/configs/
+
 # Temp
 *.tmp
 *.bak

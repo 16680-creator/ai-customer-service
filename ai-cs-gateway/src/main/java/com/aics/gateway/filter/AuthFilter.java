@@ -3,6 +3,7 @@ package com.aics.gateway.filter;
 import com.aics.common.util.JwtUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
@@ -24,6 +25,10 @@ import java.util.List;
 public class AuthFilter implements GlobalFilter, Ordered {
 
     private static final Logger log = LoggerFactory.getLogger(AuthFilter.class);
+
+    /** JWT 验签密钥（来自 Nacos 配置中心 aics-shared.yml，需与 user 服务签发密钥一致） */
+    @Value("${aics.jwt.secret:aics-platform-jwt-secret-key-must-be-at-least-256-bits-long-for-hs256}")
+    private String jwtSecret;
 
     /** 白名单路径（不需要认证） */
     private static final List<String> WHITE_LIST = List.of(
@@ -59,17 +64,17 @@ public class AuthFilter implements GlobalFilter, Ordered {
         }
 
         // 校验 Token
-        if (!JwtUtil.validateToken(token)) {
+        if (!JwtUtil.validateToken(token, jwtSecret)) {
             log.warn("Token无效或已过期: {}", path);
             return unauthorized(exchange.getResponse(), "Token无效或已过期");
         }
 
         // 解析用户信息并透传至下游
         try {
-            String userId = JwtUtil.getSubject(token);
+            String userId = JwtUtil.getSubject(token, jwtSecret);
             ServerHttpRequest mutatedRequest = request.mutate()
                     .header(USER_ID_HEADER, userId)
-                    .header(USER_NAME_HEADER, String.valueOf(JwtUtil.parseToken(token).get("username")))
+                    .header(USER_NAME_HEADER, String.valueOf(JwtUtil.parseToken(token, jwtSecret).get("username")))
                     .build();
             return chain.filter(exchange.mutate().request(mutatedRequest).build());
         } catch (Exception e) {

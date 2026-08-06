@@ -13,6 +13,7 @@ import com.aics.user.service.UserService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
@@ -27,6 +28,14 @@ import java.util.Map;
 public class UserServiceImpl implements UserService {
 
     private final UserMapper userMapper;
+
+    /** JWT 签名密钥（来自 Nacos 配置中心 aics-shared.yml） */
+    @Value("${aics.jwt.secret:aics-platform-jwt-secret-key-must-be-at-least-256-bits-long-for-hs256}")
+    private String jwtSecret;
+
+    /** Token 有效期（小时） */
+    @Value("${aics.jwt.expire-hours:24}")
+    private long jwtExpireHours;
 
     @Override
     public Result<Void> register(User user) {
@@ -75,7 +84,8 @@ public class UserServiceImpl implements UserService {
         Map<String, Object> claims = new HashMap<>(2);
         claims.put("username", user.getUsername());
         claims.put("role", user.getRole());
-        String token = JwtUtil.generateToken(String.valueOf(user.getId()), claims);
+        String token = JwtUtil.generateToken(String.valueOf(user.getId()), claims,
+                jwtSecret, jwtExpireHours * 60 * 60 * 1000L);
 
         // 组装登录返回信息
         LoginVO vo = new LoginVO();
