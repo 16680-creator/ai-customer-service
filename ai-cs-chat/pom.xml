@@ -46,6 +46,26 @@
             <artifactId>spring-ai-pdf-document-reader</artifactId>
         </dependency>
 
+        <!-- Spring AI 向量存储（VectorStore 抽象 + 内存版 SimpleVectorStore）
+             生产环境可切换为 ES/Milvus/Redis 等实现，见 VectorStoreConfig 注释 -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-vector-store</artifactId>
+        </dependency>
+
+        <!-- Spring AI Chroma 向量库（starter：自动装配 ChromaVectorStore）
+             切换为 Chroma 后，知识库数据持久化在 Chroma 服务中，重启不丢 -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-vector-store-chroma</artifactId>
+        </dependency>
+
+        <!-- Spring AI RAG Advisor（QuestionAnswerAdvisor：检索 + 上下文注入 + 回答） -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-advisors-vector-store</artifactId>
+        </dependency>
+
         <!-- Common Module -->
         <dependency>
             <groupId>com.aics</groupId>

@@ -1,6 +1,6 @@
 # Spring AI 入门
 
-> 本项目使用 **Spring AI 1.0.0** 集成大语言模型，实现 AI 智能对话。
+> 本项目使用 **Spring AI 1.1.4** 集成大语言模型，实现 AI 智能对话。
 > 对应项目文件：`ai-cs-chat` 模块、`application.yml` 中的 `spring.ai` 配置
 
 ---
@@ -65,7 +65,7 @@ spring:
 <dependency>
     <groupId>org.springframework.ai</groupId>
     <artifactId>spring-ai-bom</artifactId>
-    <version>1.0.0</version>
+    <version>1.1.4</version>
     <type>pom</type>
     <scope>import</scope>
 </dependency>

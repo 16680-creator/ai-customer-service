@@ -19,3 +19,15 @@ spring:
     import:
       - optional:nacos:aics-shared.yml
       - optional:nacos:ai-cs-chat.yml
+
+  # ===== Chroma 向量库连接配置 =====
+  # 统一放在 Nacos（ai-cs-chat.yml）管理，见 deploy/nacos/configs/ai-cs-chat.yml
+  # 占位符默认值保证 Nacos 不可用时本地也能用 localhost:8000 兜底
+  ai:
+    vectorstore:
+      chroma:
+        initialize-schema: true
+        collection-name: aics-knowledge
+        client:
+          host: ${aics.mysql.host:localhost}   # 复用 MySQL 主机，保证与库同机部署一致
+          port: ${CHROMA_PORT:8000}

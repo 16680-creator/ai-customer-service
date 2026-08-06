@@ -1,6 +1,7 @@
 package com.aics.chat.service.impl;
 
 import com.aics.chat.service.ChatService;
+import com.aics.chat.service.KnowledgeBaseService;
 import com.aics.common.exception.BusinessException;
 import com.aics.common.result.Result;
 import com.aics.common.result.ResultCode;
@@ -12,6 +13,7 @@ import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.document.Document;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.stereotype.Service;
 
@@ -31,6 +33,7 @@ public class ChatServiceImpl implements ChatService {
 
     private final ChatClient chatClient;
     private final OpenAiChatModel chatModel;
+    private final KnowledgeBaseService knowledgeBaseService;
 
     /** 会话历史存储（生产环境应使用 Redis 或持久化存储） */
     private final Map<String, List<Message>> sessionHistory = new ConcurrentHashMap<>();
@@ -129,11 +132,27 @@ public class ChatServiceImpl implements ChatService {
         log.info("RAG对话请求: sessionId={}, knowledgeBase={}", sessionId, knowledgeBase);
 
         try {
-            // 构建 RAG 提示词（此处为简化实现，生产环境应接入向量检索）
-            String ragPrompt = String.format(
-                    "请基于以下知识库【%s】的内容回答用户问题。如果知识库中没有相关信息，请如实告知。\n\n用户问题：%s",
-                    knowledgeBase, message
-            );
+            // ===== 真正的 RAG 检索增强生成 =====
+            // 1. 语义检索：在指定知识库中，用向量相似度找出与用户问题最相关的 Top-5 文档片段
+            //    （底层：问题向量化 → VectorStore 余弦相似度检索 → knowledgeBase 过滤）
+            List<Document> docs = knowledgeBaseService.search(knowledgeBase, message, 5, 0.5);
+
+            // 2. 把命中的文档片段拼装成上下文文本
+            String context = knowledgeBaseService.buildContext(docs);
+
+            // 3. 将上下文注入 Prompt：让大模型"基于检索到的私有知识"作答，而不是凭空编造
+            String ragPrompt = """
+                    请严格基于下面的【知识库资料】回答用户问题。
+                    重要规则：
+                    1. 如果资料中没有相关信息，请如实告知："我暂时没有这方面的资料"，不要编造内容
+                    2. 回答时优先引用资料中的内容，不要提及"根据资料/检索结果"之类的表述
+
+                    【知识库资料】
+                    %s
+
+                    【用户问题】
+                    %s
+                    """.formatted(context.isBlank() ? "（未检索到相关资料）" : context, message);
 
             String response = chatClient.prompt()
                     .user(ragPrompt)
@@ -143,7 +162,7 @@ public class ChatServiceImpl implements ChatService {
             // 过滤思考过程
             response = cleanResponse(response);
 
-            log.info("RAG对话完成: sessionId={}", sessionId);
+            log.info("RAG对话完成: sessionId={}, 检索命中{}条", sessionId, docs.size());
             return Result.success(response);
         } catch (Exception e) {
             log.error("RAG对话异常: sessionId={}", sessionId, e);
