@@ -22,15 +22,15 @@ public class NotifyController {
 
     @Operation(summary = "发送通知给指定用户")
     @PostMapping("/send")
-    public Result<Void> sendToUser(@RequestParam String userId,
-                                    @RequestParam String message) {
+    public Result<Void> sendToUser(@RequestParam("userId") String userId,
+                                    @RequestParam("message") String message) {
         notifyService.sendToUser(userId, message);
         return Result.success();
     }
 
     @Operation(summary = "广播通知")
     @PostMapping("/broadcast")
-    public Result<Void> broadcast(@RequestParam String message) {
+    public Result<Void> broadcast(@RequestParam("message") String message) {
         notifyService.broadcast(message);
         return Result.success();
     }
