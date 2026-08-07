@@ -40,3 +40,4 @@ deploy/nacos/
 *~
 # 本地测试工具（ES 等）
 tools/elasticsearch/
+tools/rocketmq/
