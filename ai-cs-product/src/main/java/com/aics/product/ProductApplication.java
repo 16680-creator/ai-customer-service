@@ -8,7 +8,7 @@ import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 /**
  * 商品服务启动类
  */
-@SpringBootApplication(scanBasePackages = {"com.aics.product", "com.aics.common"})
+@SpringBootApplication(scanBasePackages = {"com.aics.product", "com.aics.common"}, exclude = {org.springframework.ai.model.openai.autoconfigure.OpenAiEmbeddingAutoConfiguration.class})
 @EnableDiscoveryClient
 @MapperScan("com.aics.product.mapper")
 public class ProductApplication {
