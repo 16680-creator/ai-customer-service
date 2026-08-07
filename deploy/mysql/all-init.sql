@@ -66,7 +66,7 @@ ON DUPLICATE KEY UPDATE role_name = VALUES(role_name);
 
 -- 管理员用户（密码: admin123 的BCrypt加密）
 INSERT INTO sys_user (id, username, password, nickname, role, status) VALUES
-(1, 'admin', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', '系统管理员', 'admin', 1)
+(1, 'admin', '$2a$10$hEUYL34lpABtLWdPb.QC9uUnz0ehZwNrq9aOzdCjtmzvme0gf7.Fq', '系统管理员', 'admin', 1)
 ON DUPLICATE KEY UPDATE username = VALUES(username);
 
 INSERT INTO sys_user_role (id, user_id, role_id) VALUES
