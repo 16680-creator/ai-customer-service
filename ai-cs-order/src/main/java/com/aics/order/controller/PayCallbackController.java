@@ -25,7 +25,7 @@ public class PayCallbackController {
 
     @Operation(summary = "支付结果回调")
     @PostMapping("/callback/{paymentMethod}")
-    public Map<String, String> payCallback(@PathVariable String paymentMethod,
+    public Map<String, String> payCallback(@PathVariable("paymentMethod") String paymentMethod,
                                            @RequestBody Map<String, String> params) {
         String orderNo = params.get("orderNo");
         log.info("收到支付回调: method={}, orderNo={}", paymentMethod, orderNo);

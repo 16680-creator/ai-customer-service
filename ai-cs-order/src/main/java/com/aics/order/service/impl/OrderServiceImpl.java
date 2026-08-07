@@ -140,6 +140,40 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    public java.util.List<OrderVO> listOrders(Long userId) {
+        log.info("查询用户订单列表: userId={}", userId);
+        java.util.List<Order> orders = orderMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Order>()
+                        .eq(Order::getUserId, userId)
+                        .orderByDesc(Order::getCreateTime));
+        return orders.stream().map(this::toVO).collect(java.util.stream.Collectors.toList());
+    }
+
+    private OrderVO toVO(Order order) {
+        java.util.List<OrderItem> items = orderItemMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OrderItem>().eq(OrderItem::getOrderNo, order.getOrderNo()));
+        OrderVO vo = new OrderVO();
+        vo.setOrderNo(order.getOrderNo());
+        vo.setStatus(order.getStatus());
+        vo.setTotalAmount(order.getTotalAmount());
+        vo.setDiscountAmount(order.getDiscountAmount());
+        vo.setPayAmount(order.getPayAmount());
+        vo.setFullReductionAmount(order.getFullReductionAmount());
+        vo.setCouponAmount(order.getCouponAmount());
+        vo.setPaymentMethod(order.getPaymentMethod());
+        vo.setCreateTime(order.getCreateTime());
+        vo.setExpireTime(order.getExpireTime());
+        vo.setItems(items.stream().map(item -> {
+            OrderVO.OrderItemVO itemVO = new OrderVO.OrderItemVO();
+            itemVO.setProductId(item.getProductId());
+            itemVO.setProductName(item.getProductName());
+            itemVO.setProductPrice(item.getProductPrice());
+            itemVO.setQuantity(item.getQuantity());
+            itemVO.setSubtotal(item.getSubtotal());
+            return itemVO;
+        }).collect(java.util.stream.Collectors.toList()));
+        return vo;
+    }
     public OrderVO getOrderDetail(Long userId, String orderNo) {
         Order order = orderMapper.selectOne(
                 new LambdaQueryWrapper<Order>()
@@ -215,14 +249,22 @@ public class OrderServiceImpl implements OrderService {
         order.setPayTime(LocalDateTime.now());
         orderMapper.updateById(order);
 
+          // 投递支付成功通知（notify 服务消费后 WebSocket 推送）
+          try {
+              java.util.Map<String, String> notify = new java.util.HashMap<>();
+              notify.put("userId", String.valueOf(order.getUserId()));
+              notify.put("message", "您的订单 " + orderNo + " 已支付成功，感谢您的购买！");
+              rocketMQTemplate.convertAndSend("notify-topic", notify);
+              log.info("支付成功通知已投递: orderNo={}, userId={}", orderNo, order.getUserId());
+          } catch (Exception e) {
+              log.warn("支付成功通知投递失败: orderNo={}, err={}", orderNo, e.getMessage());
+          }
+
         // 清除购物车中已下单商品
         List<OrderItem> items = orderItemMapper.selectList(
                 new LambdaQueryWrapper<OrderItem>().eq(OrderItem::getOrderNo, orderNo));
         List<Long> productIds = items.stream().map(OrderItem::getProductId).toList();
-        cartItemMapper.delete(
-                new LambdaQueryWrapper<CartItem>()
-                        .eq(CartItem::getUserId, order.getUserId())
-                        .in(CartItem::getProductId, productIds));
+        if (!productIds.isEmpty()) {                 cartItemMapper.delete(                         new LambdaQueryWrapper<CartItem>()                                 .eq(CartItem::getUserId, order.getUserId())                                 .in(CartItem::getProductId, productIds));         }
 
         log.info("支付成功: orderNo={}, userId={}", orderNo, order.getUserId());
     }

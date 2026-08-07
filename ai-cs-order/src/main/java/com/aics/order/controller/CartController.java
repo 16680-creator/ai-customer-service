@@ -50,7 +50,7 @@ public class CartController {
     @Operation(summary = "删除购物车商品")
     @DeleteMapping("/{cartItemId}")
     public Result<Void> deleteCartItem(@RequestHeader("X-User-Id") Long userId,
-                                       @PathVariable Long cartItemId) {
+                                       @PathVariable("cartItemId") Long cartItemId) {
         cartService.deleteCartItem(userId, cartItemId);
         return Result.success();
     }

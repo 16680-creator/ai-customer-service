@@ -17,6 +17,11 @@ public interface OrderService {
     /**
      * 查询订单详情
      */
+    /**
+     * 查询用户全部订单列表（AI 客服调用）
+     */
+    List<OrderVO> listOrders(Long userId);
+
     OrderVO getOrderDetail(Long userId, String orderNo);
 
     /**

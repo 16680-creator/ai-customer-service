@@ -31,17 +31,22 @@ public class OrderController {
         return Result.success("下单成功", vo);
     }
 
+    @Operation(summary = "查询用户订单列表（AI 客服调用）")
+    @GetMapping("/list")
+    public Result<java.util.List<OrderVO>> listOrders(@RequestHeader("X-User-Id") Long userId) {
+        return Result.success(orderService.listOrders(userId));
+    }
     @Operation(summary = "查询订单详情")
     @GetMapping("/{orderNo}")
     public Result<OrderVO> getOrderDetail(@RequestHeader("X-User-Id") Long userId,
-                                          @PathVariable String orderNo) {
+                                          @PathVariable("orderNo") String orderNo) {
         return Result.success(orderService.getOrderDetail(userId, orderNo));
     }
 
     @Operation(summary = "取消订单")
     @PutMapping("/{orderNo}/cancel")
     public Result<Void> cancelOrder(@RequestHeader("X-User-Id") Long userId,
-                                    @PathVariable String orderNo) {
+                                    @PathVariable("orderNo") String orderNo) {
         orderService.cancelOrder(userId, orderNo);
         return Result.success("订单已取消", null);
     }
@@ -49,7 +54,7 @@ public class OrderController {
     @Operation(summary = "更换支付方式重试")
     @PutMapping("/{orderNo}/retry-pay")
     public Result<OrderVO> retryPay(@RequestHeader("X-User-Id") Long userId,
-                                    @PathVariable String orderNo,
+                                    @PathVariable("orderNo") String orderNo,
                                     @RequestBody Map<String, String> body) {
         String paymentMethod = body.get("paymentMethod");
         return Result.success(orderService.retryPay(userId, orderNo, paymentMethod));
