@@ -1,6 +1,7 @@
 package com.aics.chat.controller;
 
 import com.aics.chat.service.ChatService;
+import com.aics.chat.util.ChatUserContext;
 import com.aics.common.result.Result;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -26,16 +27,28 @@ public class ChatController {
     @Operation(summary = "发送对话消息")
     @PostMapping("/send")
     public Result<String> chat(@RequestParam("sessionId") @NotBlank(message = "会话ID不能为空") String sessionId,
-                               @RequestParam("message") @NotBlank(message = "消息内容不能为空") String message) {
-        return chatService.chat(sessionId, message);
+                               @RequestParam("message") @NotBlank(message = "消息内容不能为空") String message,
+                               @RequestHeader(value = "X-User-Id", required = false) Long userId) {
+        try {
+            ChatUserContext.setUserId(userId);
+            return chatService.chat(sessionId, message);
+        } finally {
+            ChatUserContext.clear();
+        }
     }
 
     @Operation(summary = "RAG对话")
     @PostMapping("/rag")
     public Result<String> chatWithRag(@RequestParam("sessionId") @NotBlank(message = "会话ID不能为空") String sessionId,
                                       @RequestParam("message") @NotBlank(message = "消息内容不能为空") String message,
-                                      @RequestParam("knowledgeBase") @NotBlank(message = "知识库标识不能为空") String knowledgeBase) {
-        return chatService.chatWithRag(sessionId, message, knowledgeBase);
+                                      @RequestParam("knowledgeBase") @NotBlank(message = "知识库标识不能为空") String knowledgeBase,
+                                      @RequestHeader(value = "X-User-Id", required = false) Long userId) {
+        try {
+            ChatUserContext.setUserId(userId);
+            return chatService.chatWithRag(sessionId, message, knowledgeBase);
+        } finally {
+            ChatUserContext.clear();
+        }
     }
 
     @Operation(summary = "流式对话")

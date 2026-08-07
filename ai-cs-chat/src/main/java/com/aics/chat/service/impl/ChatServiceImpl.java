@@ -1,5 +1,6 @@
 package com.aics.chat.service.impl;
 
+import com.aics.chat.mq.ChatMessageProducer;
 import com.aics.chat.service.ChatService;
 import com.aics.chat.service.KnowledgeBaseService;
 import com.aics.common.exception.BusinessException;
@@ -34,6 +35,7 @@ public class ChatServiceImpl implements ChatService {
     private final ChatClient chatClient;
     private final OpenAiChatModel chatModel;
     private final KnowledgeBaseService knowledgeBaseService;
+    private final ChatMessageProducer chatMessageProducer;
 
     /** 会话历史存储（生产环境应使用 Redis 或持久化存储） */
     private final Map<String, List<Message>> sessionHistory = new ConcurrentHashMap<>();
@@ -100,6 +102,7 @@ public class ChatServiceImpl implements ChatService {
             // 维护会话历史
             List<Message> history = sessionHistory.computeIfAbsent(sessionId, k -> new ArrayList<>());
             history.add(new UserMessage(message));
+            chatMessageProducer.send(sessionId, "user", message);
 
             // 历史超过上限时，压缩旧消息为摘要
             if (history.size() > MAX_HISTORY_SIZE) {
@@ -117,6 +120,7 @@ public class ChatServiceImpl implements ChatService {
             response = cleanResponse(response);
 
             // 记录 AI 回复到历史
+            chatMessageProducer.send(sessionId, "assistant", response);
             history.add(new AssistantMessage(response));
 
             log.info("对话完成: sessionId={}, responseLength={}", sessionId, response.length());
