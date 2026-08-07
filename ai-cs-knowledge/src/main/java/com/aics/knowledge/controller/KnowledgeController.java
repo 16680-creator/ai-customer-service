@@ -30,16 +30,16 @@ public class KnowledgeController {
 
     @Operation(summary = "查询知识文档")
     @GetMapping("/{id}")
-    public Result<KnowledgeDocument> getDocumentById(@PathVariable Long id) {
+    public Result<KnowledgeDocument> getDocumentById(@PathVariable("id") Long id) {
         return knowledgeService.getDocumentById(id);
     }
 
     @Operation(summary = "分页查询知识文档")
     @GetMapping("/list")
     public Result<Page<KnowledgeDocument>> listDocuments(
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "10") int pageSize,
-            @RequestParam(required = false) String keyword) {
+            @RequestParam(value = "page", defaultValue = "1") int page,
+            @RequestParam(value = "pageSize", defaultValue = "10") int pageSize,
+            @RequestParam(value = "keyword", required = false) String keyword) {
         return knowledgeService.listDocuments(page, pageSize, keyword);
     }
 
@@ -51,7 +51,7 @@ public class KnowledgeController {
 
     @Operation(summary = "删除知识文档")
     @DeleteMapping("/{id}")
-    public Result<Void> deleteDocument(@PathVariable Long id) {
+    public Result<Void> deleteDocument(@PathVariable("id") Long id) {
         return knowledgeService.deleteDocument(id);
     }
 }

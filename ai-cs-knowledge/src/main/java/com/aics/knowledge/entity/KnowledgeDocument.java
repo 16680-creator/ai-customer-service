@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
  * 知识文档实体
  */
 @Data
-@TableName("t_knowledge_document")
+@TableName("kb_document")
 public class KnowledgeDocument implements Serializable {
 
     private static final long serialVersionUID = 1L;
