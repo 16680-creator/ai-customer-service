@@ -15,6 +15,7 @@ import org.springframework.data.elasticsearch.core.query.Query;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import org.springframework.data.elasticsearch.NoSuchIndexException;
 import java.util.Map;
 
 /**
@@ -44,6 +45,9 @@ public class SearchServiceImpl implements SearchService {
 
             log.info("搜索完成: index={}, 结果数={}", index, results.size());
             return Result.success(results);
+        } catch (NoSuchIndexException e) {
+            log.warn("索引不存在，返回空结果: index={}", index);
+            return Result.success(List.of());
         } catch (Exception e) {
             log.error("搜索失败: index={}, query={}", index, query, e);
             throw new BusinessException(ResultCode.SEARCH_QUERY_FAIL, "搜索查询失败: " + e.getMessage());

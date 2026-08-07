@@ -10,6 +10,7 @@
             class="image-uploader"
             drag
             :action="uploadUrl"
+            :headers="uploadHeaders"
             :show-file-list="false"
             :on-success="onUploadSuccess"
             :on-error="onUploadError"
@@ -164,10 +165,13 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { productApi } from '../api'
+import { getToken } from '../utils/auth'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Plus, CopyDocument, UploadFilled } from '@element-plus/icons-vue'
 
-const uploadUrl = 'http://localhost:8088/product/upload-image'
+const GATEWAY = import.meta.env.VITE_GATEWAY || 'http://localhost:8080'
+const uploadUrl = `${GATEWAY}/api/product/upload-image`
+const uploadHeaders = { Authorization: 'Bearer ' + (getToken() || '') }
 const uploadedUrl = ref('')
 
 const productForm = ref({
