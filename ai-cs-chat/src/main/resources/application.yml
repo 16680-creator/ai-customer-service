@@ -4,6 +4,10 @@ server:
 spring:
   application:
     name: ai-cs-chat
+  # 彻底排除 Embedding 自动配置（与 @SpringBootApplication.exclude 双保险）
+  autoconfigure:
+    exclude:
+      - org.springframework.ai.model.openai.autoconfigure.OpenAiEmbeddingAutoConfiguration
   cloud:
     nacos:
       discovery:
@@ -24,10 +28,14 @@ spring:
   # 统一放在 Nacos（ai-cs-chat.yml）管理，见 deploy/nacos/configs/ai-cs-chat.yml
   # 占位符默认值保证 Nacos 不可用时本地也能用 localhost:8000 兜底
   ai:
+    # 禁用 Spring AI 内置 Embedding 自动装配（由 SpringAiConfig 手动提供）
+    model:
+      embedding:
+        enabled: false
     vectorstore:
       chroma:
         initialize-schema: true
         collection-name: aics-knowledge
         client:
-          host: ${aics.mysql.host:localhost}   # 复用 MySQL 主机，保证与库同机部署一致
+          host: http://${aics.mysql.host:localhost}   # 复用 MySQL 主机，需带 http:// 协议头
           port: ${CHROMA_PORT:8000}

@@ -42,8 +42,8 @@ public class KnowledgeBaseController {
      */
     @Operation(summary = "文本入库")
     @PostMapping("/text")
-    public Result<Map<String, Object>> addText(@RequestParam String knowledgeBase,
-                                               @RequestParam String text) {
+    public Result<Map<String, Object>> addText(@RequestParam("knowledgeBase") String knowledgeBase,
+                                               @RequestParam("text") String text) {
         int count = knowledgeBaseService.addText(knowledgeBase, text);
         return Result.success(Map.of("knowledgeBase", knowledgeBase, "chunks", count));
     }
@@ -57,7 +57,7 @@ public class KnowledgeBaseController {
      */
     @Operation(summary = "文件入库")
     @PostMapping("/upload")
-    public Result<Map<String, Object>> upload(@RequestParam String knowledgeBase,
+    public Result<Map<String, Object>> upload(@RequestParam("knowledgeBase") String knowledgeBase,
                                               @RequestParam("file") MultipartFile file) {
         int count = knowledgeBaseService.addFile(knowledgeBase, file);
         return Result.success(Map.of("knowledgeBase", knowledgeBase,
@@ -73,8 +73,8 @@ public class KnowledgeBaseController {
      */
     @Operation(summary = "语义检索测试")
     @GetMapping("/search")
-    public Result<List<Map<String, Object>>> search(@RequestParam String knowledgeBase,
-                                                    @RequestParam String query) {
+    public Result<List<Map<String, Object>>> search(@RequestParam("knowledgeBase") String knowledgeBase,
+                                                    @RequestParam("query") String query) {
         List<Document> hits = knowledgeBaseService.search(knowledgeBase, query, 5, 0.5);
         List<Map<String, Object>> result = hits.stream().map(doc -> {
             Map<String, Object> item = new LinkedHashMap<>();
