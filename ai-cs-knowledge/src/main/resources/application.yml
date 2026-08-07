@@ -19,3 +19,12 @@ spring:
     import:
       - optional:nacos:aics-shared.yml
       - optional:nacos:ai-cs-knowledge.yml
+  # ===== Chroma 向量库（与 ai-cs-chat 共用 aics-knowledge 集合）=====
+  ai:
+    vectorstore:
+      chroma:
+        initialize-schema: true
+        collection-name: aics-knowledge
+        client:
+          host: http://${aics.mysql.host:localhost}
+          port: ${CHROMA_PORT:8000}

@@ -95,7 +95,12 @@
       <!-- 右列：商品列表 + 商品找相似 -->
       <el-col :span="6">
         <el-card shadow="hover">
-          <template #header><span style="font-weight: 600">商品列表</span></template>
+          <template #header>
+            <div style="display: flex; justify-content: space-between; align-items: center">
+              <span style="font-weight: 600">商品列表</span>
+              <el-button size="small" text type="primary" @click="openCategories">分类管理</el-button>
+            </div>
+          </template>
 
           <div class="product-item" v-for="item in products" :key="item.id">
             <el-image v-if="item.image" :src="item.image" fit="cover" class="product-img" />
@@ -105,18 +110,61 @@
               <div class="product-meta">¥{{ item.price }} · 库存 {{ item.stock }}</div>
             </div>
             <el-button size="small" type="success" @click="findSimilar(item.id)">找相似</el-button>
+            <el-button size="small" type="primary" @click="openEdit(item)">编辑</el-button>
+            <el-button size="small" type="danger" @click="deleteProduct(item)">删除</el-button>
           </div>
           <el-empty v-if="products.length === 0" description="暂无商品" />
         </el-card>
       </el-col>
     </el-row>
+
+    <!-- 编辑商品对话框 -->
+    <el-dialog v-model="editDialogVisible" title="编辑商品" width="520px">
+      <el-form label-width="80px">
+        <el-form-item label="商品名称">
+          <el-input v-model="productForm.name" />
+        </el-form-item>
+        <el-form-item label="描述">
+          <el-input v-model="productForm.description" type="textarea" :rows="2" />
+        </el-form-item>
+        <el-form-item label="价格">
+          <el-input-number v-model="productForm.price" :min="0" :precision="2" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="库存">
+          <el-input-number v-model="productForm.stock" :min="0" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="分类ID">
+          <el-input-number v-model="productForm.categoryId" :min="1" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="图片">
+          <el-input v-model="productForm.image" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="editDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="savingEdit" @click="saveEdit">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 分类管理对话框 -->
+    <el-dialog v-model="categoryDialogVisible" title="分类管理" width="480px">
+      <div style="display: flex; gap: 10px; margin-bottom: 12px">
+        <el-input v-model="newCategoryName" placeholder="新分类名称" />
+        <el-button type="primary" :loading="creatingCategory" @click="createCategory">新增</el-button>
+      </div>
+      <el-table :data="categories" size="small">
+        <el-table-column prop="id" label="ID" width="60" />
+        <el-table-column prop="name" label="分类名称" />
+        <el-table-column prop="parentId" label="父分类" width="80" />
+      </el-table>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { onMounted, ref } from 'vue'
 import { productApi } from '../api'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Plus, CopyDocument, UploadFilled } from '@element-plus/icons-vue'
 
 const uploadUrl = 'http://localhost:8088/product/upload-image'
@@ -139,6 +187,82 @@ const similarResults = ref([])
 
 const products = ref([])
 const loadingProducts = ref(false)
+
+// 编辑
+const editDialogVisible = ref(false)
+const editingId = ref(null)
+const savingEdit = ref(false)
+function openEdit(item) {
+  editingId.value = item.id
+  productForm.value = {
+    name: item.name || '',
+    description: item.description || '',
+    price: Number(item.price || 0),
+    stock: Number(item.stock || 0),
+    categoryId: item.categoryId || 1,
+    image: item.image || '',
+  }
+  editDialogVisible.value = true
+}
+async function saveEdit() {
+  if (!productForm.value.name) return ElMessage.warning('请输入商品名称')
+  savingEdit.value = true
+  try {
+    await productApi.put(`/${editingId.value}`, productForm.value)
+    ElMessage.success('商品更新成功')
+    editDialogVisible.value = false
+    loadProducts()
+  } catch (e) {
+    ElMessage.error('更新失败: ' + (e.response?.data?.message || e.message))
+  } finally {
+    savingEdit.value = false
+  }
+}
+
+// 删除
+async function deleteProduct(item) {
+  try {
+    await ElMessageBox.confirm(`确定删除商品「${item.name}」？`, '提示', { type: 'warning' })
+    await productApi.delete(`/${item.id}`)
+    ElMessage.success('商品已删除')
+    loadProducts()
+  } catch (e) {
+    // 用户取消或失败
+    if (e !== 'cancel') ElMessage.error('删除失败: ' + (e.response?.data?.message || e.message))
+  }
+}
+
+// 分类管理
+const categoryDialogVisible = ref(false)
+const categories = ref([])
+const newCategoryName = ref('')
+const creatingCategory = ref(false)
+async function loadCategories() {
+  try {
+    const res = await productApi.get('/categories')
+    categories.value = res.data?.data || []
+  } catch {
+    ElMessage.error('分类加载失败')
+  }
+}
+async function createCategory() {
+  if (!newCategoryName.value.trim()) return ElMessage.warning('请输入分类名称')
+  creatingCategory.value = true
+  try {
+    await productApi.post('/category', null, { params: { name: newCategoryName.value.trim(), parentId: 0 } })
+    ElMessage.success('分类创建成功')
+    newCategoryName.value = ''
+    loadCategories()
+  } catch (e) {
+    ElMessage.error('创建失败: ' + (e.response?.data?.message || e.message))
+  } finally {
+    creatingCategory.value = false
+  }
+}
+function openCategories() {
+  categoryDialogVisible.value = true
+  loadCategories()
+}
 
 function onUploadSuccess(res) {
   if (res.code === 200) {

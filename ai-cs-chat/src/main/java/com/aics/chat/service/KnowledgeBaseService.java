@@ -100,8 +100,10 @@ public class KnowledgeBaseService {
      */
     public List<Document> search(String knowledgeBase, String query, int topK, double threshold) {
         // 构造检索请求：query 会被 EmbeddingModel 向量化后做余弦相似度检索
+        // bge-m3 检索建议：查询文本加指令前缀，提升语义检索质量
+        String retrievalQuery = "为这个句子生成表示以用于检索相关文章：" + query;
         SearchRequest searchRequest = SearchRequest.builder()
-                .query(query)
+                .query(retrievalQuery)
                 .topK(topK)
                 .similarityThreshold(threshold)
                 .filterExpression("knowledgeBase == '" + knowledgeBase + "'") // 只检索当前知识库

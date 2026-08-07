@@ -9,7 +9,7 @@
         <span class="logo-text">AI 客服平台</span>
       </div>
       <el-menu
-        :default-active="route.path"
+        :default-active="activeMenu"
         router
         background-color="#1d1e2c"
         text-color="#a3a6ad"
@@ -23,6 +23,10 @@
         <el-menu-item index="/chat">
           <el-icon><ChatLineSquare /></el-icon>
           <span>AI 对话</span>
+        </el-menu-item>
+        <el-menu-item index="/rag-kb">
+          <el-icon><Files /></el-icon>
+          <span>向量知识库</span>
         </el-menu-item>
         <el-menu-item index="/user">
           <el-icon><User /></el-icon>
@@ -82,7 +86,7 @@
 import { useRoute, useRouter } from 'vue-router'
 import { computed, ref, watch } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
-import { Goods, ArrowDown } from '@element-plus/icons-vue'
+import { Goods, ArrowDown, ShoppingCart, List, Files } from '@element-plus/icons-vue'
 import { getUser, logout } from './utils/auth'
 
 const route = useRoute()
@@ -118,14 +122,18 @@ async function handleCommand(command) {
 const titleMap = {
   '/': '首页总览',
   '/chat': 'AI 对话',
+  '/rag-kb': '向量知识库',
   '/user': '用户管理',
   '/knowledge': '知识库',
   '/message': '消息管理',
   '/notify': '通知中心',
   '/search': '全文搜索',
   '/product': '商品图片检索',
+    '/cart': '购物车',
+    '/order': '订单管理',
 }
 
+const activeMenu = computed(() => route.path.startsWith('/order') ? '/order' : route.path)
 const currentPageTitle = computed(() => titleMap[route.path] || 'AI 客服平台')
 </script>
 

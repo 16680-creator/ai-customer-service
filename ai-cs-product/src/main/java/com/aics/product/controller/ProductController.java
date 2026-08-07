@@ -62,8 +62,8 @@ public class ProductController {
      */
     @GetMapping("/similar")
     public Result<List<ProductSimilarVO>> searchSimilar(
-            @RequestParam String text,
-            @RequestParam(defaultValue = "5") int topK) {
+            @RequestParam("text") String text,
+            @RequestParam(value = "topK", defaultValue = "5") int topK) {
         return Result.success(productVectorService.searchByText(text, topK));
     }
 
@@ -72,8 +72,8 @@ public class ProductController {
      */
     @GetMapping("/{id}/similar")
     public Result<List<ProductSimilarVO>> findSimilar(
-            @PathVariable Long id,
-            @RequestParam(defaultValue = "5") int topK) {
+            @PathVariable("id") Long id,
+            @RequestParam(value = "topK", defaultValue = "5") int topK) {
         return Result.success(productVectorService.searchByProduct(id, topK));
     }
 
@@ -91,11 +91,11 @@ public class ProductController {
      */
     @GetMapping("/list")
     public Result<IPage<ProductVO>> listProducts(
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "10") int size,
-            @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) Long categoryId,
-            @RequestParam(required = false) Integer status) {
+            @RequestParam(value = "page", defaultValue = "1") int page,
+            @RequestParam(value = "size", defaultValue = "10") int size,
+            @RequestParam(value = "keyword", required = false) String keyword,
+            @RequestParam(value = "categoryId", required = false) Long categoryId,
+            @RequestParam(value = "status", required = false) Integer status) {
         IPage<ProductVO> result = productService.getProductList(page, size, keyword, categoryId, status);
         return Result.success(result);
     }
@@ -104,7 +104,7 @@ public class ProductController {
      * 查询商品详情
      */
     @GetMapping("/{id}")
-    public Result<ProductVO> getProductDetail(@PathVariable Long id) {
+    public Result<ProductVO> getProductDetail(@PathVariable("id") Long id) {
         ProductVO vo = productService.getProductDetail(id);
         return Result.success(vo);
     }
@@ -113,7 +113,7 @@ public class ProductController {
      * 更新商品
      */
     @PutMapping("/{id}")
-    public Result<ProductVO> updateProduct(@PathVariable Long id,
+    public Result<ProductVO> updateProduct(@PathVariable("id") Long id,
                                            @Valid @RequestBody ProductUpdateDTO dto) {
         ProductVO vo = productService.updateProduct(id, dto);
         return Result.success("商品更新成功", vo);
@@ -123,7 +123,7 @@ public class ProductController {
      * 删除商品
      */
     @DeleteMapping("/{id}")
-    public Result<Void> deleteProduct(@PathVariable Long id) {
+    public Result<Void> deleteProduct(@PathVariable("id") Long id) {
         productService.deleteProduct(id);
         return Result.success();
     }
@@ -132,8 +132,8 @@ public class ProductController {
      * 扣减库存
      */
     @PutMapping("/{id}/stock/deduct")
-    public Result<Void> deductStock(@PathVariable Long id,
-                                    @RequestParam int quantity) {
+    public Result<Void> deductStock(@PathVariable("id") Long id,
+                                    @RequestParam("quantity") int quantity) {
         productService.deductStock(id, quantity);
         return Result.success();
     }
@@ -142,8 +142,8 @@ public class ProductController {
      * 恢复库存
      */
     @PutMapping("/{id}/stock/restore")
-    public Result<Void> restoreStock(@PathVariable Long id,
-                                     @RequestParam int quantity) {
+    public Result<Void> restoreStock(@PathVariable("id") Long id,
+                                     @RequestParam("quantity") int quantity) {
         productService.restoreStock(id, quantity);
         return Result.success();
     }
@@ -152,8 +152,8 @@ public class ProductController {
      * 创建分类
      */
     @PostMapping("/category")
-    public Result<ProductCategory> createCategory(@RequestParam String name,
-                                                  @RequestParam(defaultValue = "0") Long parentId) {
+    public Result<ProductCategory> createCategory(@RequestParam("name") String name,
+                                                  @RequestParam(value = "parentId", defaultValue = "0") Long parentId) {
         ProductCategory category = productService.createCategory(name, parentId);
         return Result.success("分类创建成功", category);
     }

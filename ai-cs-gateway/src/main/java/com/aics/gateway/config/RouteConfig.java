@@ -28,6 +28,11 @@ public class RouteConfig {
                         .path("/api/knowledge/**")
                         .filters(f -> f.stripPrefix(1))
                         .uri("lb://ai-cs-knowledge"))
+                // 向量知识库（chat 服务的 RAG 入库/检索）
+                .route("ai-cs-rag", r -> r
+                        .path("/api/rag/**")
+                        .filters(f -> f.stripPrefix(1))
+                        .uri("lb://ai-cs-chat"))
                 // AI 对话服务
                 .route("ai-cs-chat", r -> r
                         .path("/api/chat/**")

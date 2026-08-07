@@ -6,6 +6,7 @@ import com.aics.common.result.ResultCode;
 import com.aics.knowledge.entity.KnowledgeDocument;
 import com.aics.knowledge.mapper.KnowledgeMapper;
 import com.aics.knowledge.service.KnowledgeService;
+import com.aics.knowledge.service.KnowledgeVectorService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,7 @@ import org.springframework.util.StringUtils;
 public class KnowledgeServiceImpl implements KnowledgeService {
 
     private final KnowledgeMapper knowledgeMapper;
+    private final KnowledgeVectorService knowledgeVectorService;
 
     @Override
     public Result<Void> createDocument(KnowledgeDocument document) {
@@ -29,6 +31,8 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         document.setStatus(0);
         knowledgeMapper.insert(document);
         log.info("知识文档创建成功: id={}", document.getId());
+        // 打通：文档创建后自动向量化入库（Chroma），供 RAG 对话检索
+        knowledgeVectorService.vectorize(document);
         return Result.success();
     }
 
@@ -62,6 +66,8 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         log.info("更新知识文档: id={}", document.getId());
         knowledgeMapper.updateById(document);
         log.info("知识文档更新成功: id={}", document.getId());
+        // 打通：更新后重新向量化，保证 RAG 检索到最新内容
+        knowledgeVectorService.vectorize(document);
         return Result.success();
     }
 

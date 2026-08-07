@@ -47,6 +47,21 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- Spring AI OpenAI（Embedding） -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-model-openai</artifactId>
+        </dependency>
+
+        <!-- Spring AI 向量存储（Chroma，与 ai-cs-chat 共用知识向量库） -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-vector-store</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-vector-store-chroma</artifactId>
+        </dependency>
         <!-- Common Module -->
         <dependency>
             <groupId>com.aics</groupId>

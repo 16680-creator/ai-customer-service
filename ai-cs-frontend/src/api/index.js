@@ -18,6 +18,7 @@ const SERVICES = {
   order: `${BASE_URL}/order`,
   cart: `${BASE_URL}/cart`,
   product: `${BASE_URL}/product`,
+  rag: `${BASE_URL}/rag`,
 }
 
 function redirectToLogin() {
@@ -64,5 +65,6 @@ export const searchApi = createClient(SERVICES.search)
 export const orderApi = createClient(SERVICES.order)
 export const cartApi = createClient(SERVICES.cart)
 export const productApi = createClient(SERVICES.product)
+export const ragApi = createClient(SERVICES.rag)
 
 export default SERVICES

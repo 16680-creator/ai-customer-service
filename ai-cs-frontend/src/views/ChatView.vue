@@ -38,6 +38,26 @@
             <el-empty v-if="messages.length === 0" description="开始和 AI 对话吧" :image-size="120" />
           </div>
 
+          <div class="chat-mode-bar">
+            <el-radio-group v-model="chatMode" size="small">
+              <el-radio-button value="normal">普通对话</el-radio-button>
+              <el-radio-button value="rag">RAG 知识库对话</el-radio-button>
+            </el-radio-group>
+            <el-input
+              v-if="chatMode === 'rag'"
+              v-model="knowledgeBase"
+              placeholder="知识库标识（如 test-kb）"
+              size="small"
+              style="width: 220px; margin-left: 12px"
+              clearable
+            />
+            <el-tooltip v-if="chatMode === 'rag'" content="需先在「向量知识库」页入库资料" placement="top">
+              <el-link type="primary" :underline="false" style="margin-left: 12px" @click="$router.push('/rag-kb')">
+                前往入库
+              </el-link>
+            </el-tooltip>
+          </div>
+
           <div class="chat-input">
             <el-input
               v-model="inputMessage"
@@ -68,6 +88,8 @@ const messages = ref([])
 const inputMessage = ref('')
 const sending = ref(false)
 const messagesRef = ref(null)
+const chatMode = ref('normal')
+const knowledgeBase = ref('')
 
 function newSession() {
   const id = 'session-' + Date.now()
@@ -86,9 +108,21 @@ async function sendMessage() {
   await scrollToBottom()
 
   try {
-    const res = await chatApi.post(`/send`, null, {
-      params: { sessionId: currentSession.value, message: text }
-    })
+    let res
+    if (chatMode.value === 'rag') {
+      if (!knowledgeBase.value.trim()) {
+        ElMessage.warning('RAG 模式请先填写知识库标识')
+        sending.value = false
+        return
+      }
+      res = await chatApi.post(`/rag`, null, {
+        params: { sessionId: currentSession.value, message: text, knowledgeBase: knowledgeBase.value.trim() }
+      })
+    } else {
+      res = await chatApi.post(`/send`, null, {
+        params: { sessionId: currentSession.value, message: text }
+      })
+    }
     const reply = res.data?.data || res.data?.message || '未获取到回复'
     messages.value.push({ role: 'assistant', content: reply })
   } catch (e) {
@@ -139,5 +173,8 @@ async function scrollToBottom() {
 .msg-row.user .msg-bubble { background: #409eff; color: #fff; border-top-right-radius: 4px; }
 .msg-row.assistant .msg-bubble { background: #f0f2f5; color: #1d1e2c; border-top-left-radius: 4px; }
 
+.chat-mode-bar {
+  display: flex; align-items: center; padding: 10px 16px 0;
+}
 .chat-input { display: flex; padding: 16px; border-top: 1px solid #ebeef5; }
 </style>

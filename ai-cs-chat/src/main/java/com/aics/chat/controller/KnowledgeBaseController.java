@@ -75,7 +75,7 @@ public class KnowledgeBaseController {
     @GetMapping("/search")
     public Result<List<Map<String, Object>>> search(@RequestParam("knowledgeBase") String knowledgeBase,
                                                     @RequestParam("query") String query) {
-        List<Document> hits = knowledgeBaseService.search(knowledgeBase, query, 5, 0.5);
+        List<Document> hits = knowledgeBaseService.search(knowledgeBase, query, 5, 0.3);
         List<Map<String, Object>> result = hits.stream().map(doc -> {
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("text", doc.getText());

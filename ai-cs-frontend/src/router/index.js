@@ -11,6 +11,11 @@ const routes = [
   { path: '/notify', name: 'Notify', component: () => import('../views/NotifyView.vue') },
   { path: '/search', name: 'Search', component: () => import('../views/SearchView.vue') },
   { path: '/product', name: 'Product', component: () => import('../views/ProductView.vue') },
+  { path: '/cart', name: 'Cart', component: () => import('../views/CartView.vue') },
+  { path: '/checkout', name: 'Checkout', component: () => import('../views/CheckoutView.vue') },
+  { path: '/order', name: 'Order', component: () => import('../views/OrderView.vue') },
+  { path: '/order/:orderNo', name: 'OrderDetail', component: () => import('../views/OrderDetailView.vue') },
+  { path: '/rag-kb', name: 'VectorKb', component: () => import('../views/VectorKbView.vue') },
 ]
 
 const router = createRouter({

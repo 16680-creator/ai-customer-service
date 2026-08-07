@@ -8,7 +8,7 @@ import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 /**
  * 知识库服务启动类
  */
-@SpringBootApplication
+@SpringBootApplication(scanBasePackages = {"com.aics.knowledge", "com.aics.common"}, exclude = {org.springframework.ai.model.openai.autoconfigure.OpenAiEmbeddingAutoConfiguration.class})
 @EnableDiscoveryClient
 @MapperScan("com.aics.knowledge.mapper")
 public class KnowledgeApplication {

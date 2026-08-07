@@ -11,7 +11,7 @@ import java.util.List;
 /**
  * 跨域配置
  */
-@Configuration
+// @Configuration  // CORS 统一由网关处理，避免重复响应头导致浏览器 Network Error（2026-08-07）
 public class CorsConfig {
 
     @Bean

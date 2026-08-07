@@ -77,7 +77,7 @@ public class SpringAiConfig {
     public QuestionAnswerAdvisor ragAdvisor(VectorStore vectorStore) {
         return QuestionAnswerAdvisor.builder(vectorStore)
                 .searchRequest(SearchRequest.builder()
-                        .similarityThreshold(0.5d)
+                        .similarityThreshold(0.3d)
                         .topK(5)
                         .build())
                 .build();
