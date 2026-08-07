@@ -36,7 +36,7 @@ public class SearchServiceImpl implements SearchService {
             Query searchQuery = new CriteriaQuery(criteria)
                     .setPageable(org.springframework.data.domain.PageRequest.of(page - 1, size));
 
-            SearchHits<Map> searchHits = elasticsearchTemplate.search(searchQuery, Map.class, org.springframework.data.elasticsearch.core.IndexCoordinates.of(index));
+            SearchHits<Map> searchHits = elasticsearchTemplate.search(searchQuery, Map.class, org.springframework.data.elasticsearch.core.mapping.IndexCoordinates.of(index));
             List<Map<String, Object>> results = searchHits.getSearchHits().stream()
                     .map(SearchHit::getContent)
                     .map(content -> (Map<String, Object>) content)
@@ -54,7 +54,7 @@ public class SearchServiceImpl implements SearchService {
     public Result<Void> createIndex(String index, Map<String, Object> mappings) {
         log.info("创建索引: index={}", index);
         try {
-            boolean created = elasticsearchTemplate.indexOps(org.springframework.data.elasticsearch.core.IndexCoordinates.of(index))
+            boolean created = elasticsearchTemplate.indexOps(org.springframework.data.elasticsearch.core.mapping.IndexCoordinates.of(index))
                     .create();
             if (!created) {
                 throw new BusinessException(ResultCode.SEARCH_INDEX_CREATE_FAIL, "索引创建失败");
@@ -73,7 +73,7 @@ public class SearchServiceImpl implements SearchService {
     public Result<Void> indexDocument(String index, Map<String, Object> document) {
         log.info("索引文档: index={}", index);
         try {
-            elasticsearchTemplate.save(document, org.springframework.data.elasticsearch.core.IndexCoordinates.of(index));
+            elasticsearchTemplate.save(document, org.springframework.data.elasticsearch.core.mapping.IndexCoordinates.of(index));
             log.info("文档索引成功: index={}", index);
             return Result.success();
         } catch (Exception e) {
@@ -86,7 +86,7 @@ public class SearchServiceImpl implements SearchService {
     public Result<Void> deleteIndex(String index) {
         log.info("删除索引: index={}", index);
         try {
-            elasticsearchTemplate.indexOps(org.springframework.data.elasticsearch.core.IndexCoordinates.of(index))
+            elasticsearchTemplate.indexOps(org.springframework.data.elasticsearch.core.mapping.IndexCoordinates.of(index))
                     .delete();
             log.info("索引删除成功: index={}", index);
             return Result.success();
