@@ -81,7 +81,7 @@ docker compose -f /opt/aics/docker-compose-all.yml up -d \
 echo ""
 echo "[4/4] 初始化 MinIO..."
 sleep 5
-docker exec aics-minio sh -c "
+docker exec minio sh -c "
   mc alias set local http://localhost:9000 $MINIO_USER $MINIO_PASSWORD 2>/dev/null || true
   mc mb local/aics-knowledge --ignore-existing 2>/dev/null || true
 " 2>/dev/null || echo "  MinIO 初始化跳过"

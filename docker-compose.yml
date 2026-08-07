@@ -144,8 +144,8 @@ services:
 
   # ==================== MinIO 对象存储 ====================
   minio:
-    image: minio/minio:latest
-    container_name: aics-minio
+    image: quay.io/minio/minio:latest
+    container_name: minio
     restart: always
     ports:
       - "9000:9000"
@@ -154,7 +154,7 @@ services:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
     volumes:
-      - minio-data:/data
+      - /data/minio/data:/data
     command: server /data --console-address ":9001"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
@@ -170,7 +170,6 @@ volumes:
   mysql-data:
   redis-data:
   es-data:
-  minio-data:
 
 # ==================== 网络 ====================
 networks:

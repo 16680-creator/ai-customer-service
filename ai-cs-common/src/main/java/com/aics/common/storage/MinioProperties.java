@@ -12,8 +12,8 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "aics.minio")
 public class MinioProperties {
 
-    /** 服务地址，如 http://localhost:9000 */
-    private String endpoint = "http://localhost:9000";
+    /** 服务地址，如 http://123.60.31.79:9000 */
+    private String endpoint = "http://123.60.31.79:9000";
 
     /** 访问密钥 */
     private String accessKey = "minioadmin";
@@ -22,7 +22,7 @@ public class MinioProperties {
     private String secretKey = "minioadmin";
 
     /** 默认桶名 */
-    private String bucket = "aics-files";
+    private String bucket = "ai-cs";
 
     /** 访问地址（公网/网关地址），为空时使用 endpoint */
     private String publicEndpoint;
