@@ -3,7 +3,7 @@
     <el-row :gutter="20">
       <el-col :span="16">
         <el-card shadow="hover">
-          <template #header><span style="font-weight: 600">全文搜索 (Elasticsearch)</span></template>
+          <template #header><span style="font-weight: 600">全文搜索 (Chroma)</span></template>
 
           <div style="display: flex; gap: 10px; margin-bottom: 20px">
             <el-input v-model="indexName" placeholder="索引名称" style="width: 200px" />

@@ -13,7 +13,7 @@
     <artifactId>ai-cs-search</artifactId>
     <packaging>jar</packaging>
     <name>ai-cs-search</name>
-    <description>Search Service - Elasticsearch full-text search</description>
+    <description>Search Service - Chroma full-text search</description>
 
     <dependencies>
         <!-- Spring Boot Web -->
@@ -34,16 +34,22 @@
             <artifactId>spring-cloud-starter-alibaba-nacos-config</artifactId>
         </dependency>
 
-        <!-- Elasticsearch Java Client -->
+        <!-- Spring AI Chroma 向量库（全文检索从 Elasticsearch 切换到 Chroma） -->
         <dependency>
-            <groupId>co.elastic.clients</groupId>
-            <artifactId>elasticsearch-java</artifactId>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-vector-store-chroma</artifactId>
         </dependency>
 
-        <!-- Spring Boot Elasticsearch (transport) -->
+        <!-- Spring AI OpenAI 兼容模型（查询向量化，Embedding 使用 bge-m3 via SiliconFlow） -->
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-elasticsearch</artifactId>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-model-openai</artifactId>
+        </dependency>
+
+        <!-- Spring AI VectorStore API -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-vector-store</artifactId>
         </dependency>
 
         <!-- Common Module -->
