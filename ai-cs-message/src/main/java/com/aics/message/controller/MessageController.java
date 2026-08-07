@@ -35,22 +35,22 @@ public class MessageController {
 
     @Operation(summary = "创建会话")
     @PostMapping("/session")
-    public Result<ChatSession> createSession(@RequestParam Long userId,
-                                              @RequestParam String title) {
+    public Result<ChatSession> createSession(@RequestParam("userId") Long userId,
+                                              @RequestParam("title") String title) {
         ChatSession session = messageService.createSession(userId, title);
         return Result.success(session);
     }
 
     @Operation(summary = "获取会话消息列表")
     @GetMapping("/session/{sessionId}/messages")
-    public Result<List<ChatMessage>> getSessionMessages(@PathVariable Long sessionId) {
+    public Result<List<ChatMessage>> getSessionMessages(@PathVariable("sessionId") Long sessionId) {
         List<ChatMessage> messages = messageService.getSessionMessages(sessionId);
         return Result.success(messages);
     }
 
     @Operation(summary = "获取用户会话列表")
     @GetMapping("/sessions")
-    public Result<List<ChatSession>> getUserSessions(@RequestParam Long userId) {
+    public Result<List<ChatSession>> getUserSessions(@RequestParam("userId") Long userId) {
         List<ChatSession> sessions = messageService.getUserSessions(userId);
         return Result.success(sessions);
     }

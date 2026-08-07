@@ -25,7 +25,7 @@ public class MessageServiceImpl implements MessageService {
 
     @Override
     public void saveMessage(ChatMessage message) {
-        log.info("保存聊天消息: sessionId={}, role={}", message.getSessionId(), message.getRole());
+        log.info("保存聊天消息: sessionId={}, sessionKey={}, role={}", message.getSessionId(), message.getSessionKey(), message.getRole());
         chatMessageMapper.insert(message);
         log.info("聊天消息保存成功: id={}", message.getId());
     }
@@ -37,6 +37,7 @@ public class MessageServiceImpl implements MessageService {
         session.setUserId(userId);
         session.setTitle(title);
         session.setStatus(1);
+        session.setChannel("web");
         chatSessionMapper.insert(session);
         log.info("会话创建成功: id={}", session.getId());
         return session;
@@ -47,7 +48,7 @@ public class MessageServiceImpl implements MessageService {
         log.info("获取会话消息列表: sessionId={}", sessionId);
         LambdaQueryWrapper<ChatMessage> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(ChatMessage::getSessionId, sessionId)
-                .orderByAsc(ChatMessage::getCreatedAt);
+                .orderByAsc(ChatMessage::getCreateTime);
         return chatMessageMapper.selectList(wrapper);
     }
 
@@ -56,7 +57,7 @@ public class MessageServiceImpl implements MessageService {
         log.info("获取用户会话列表: userId={}", userId);
         LambdaQueryWrapper<ChatSession> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(ChatSession::getUserId, userId)
-                .orderByDesc(ChatSession::getUpdatedAt);
+                .orderByDesc(ChatSession::getUpdateTime);
         return chatSessionMapper.selectList(wrapper);
     }
 }
