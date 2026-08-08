@@ -166,4 +166,42 @@ class OrderServiceTest {
         bo.setPayAmount(new BigDecimal("397.00"));
         return bo;
     }
+
+    @Test
+    @DisplayName("退款 - 已支付订单退款成功并回补库存")
+    void refundOrder_paidOrder_shouldRefundAndRestoreStock() {
+        Order order = new Order();
+        order.setId(1L);
+        order.setOrderNo("ORD20260809001");
+        order.setUserId(100L);
+        order.setStatus(OrderStatus.PAID.getCode());
+
+        OrderItem item = new OrderItem();
+        item.setOrderNo("ORD20260809001");
+        item.setProductId(1001L);
+        item.setQuantity(2);
+
+        when(orderMapper.selectOne(any())).thenReturn(order);
+        when(orderItemMapper.selectList(any())).thenReturn(Arrays.asList(item));
+        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.increment("stock:1001", 2L)).thenReturn(100L);
+
+        assertDoesNotThrow(() -> orderService.refundOrder(100L, "ORD20260809001"));
+        verify(orderMapper).updateById(argThat(o -> OrderStatus.REFUNDED.getCode().equals(o.getStatus())));
+        verify(valueOperations).increment("stock:1001", 2L);
+    }
+
+    @Test
+    @DisplayName("退款 - 非已支付订单应抛出异常")
+    void refundOrder_notPaid_shouldThrow() {
+        Order order = new Order();
+        order.setId(2L);
+        order.setOrderNo("ORD20260809002");
+        order.setUserId(100L);
+        order.setStatus(OrderStatus.PENDING_PAY.getCode());
+        when(orderMapper.selectOne(any())).thenReturn(order);
+
+        assertThrows(BusinessException.class,
+                () -> orderService.refundOrder(100L, "ORD20260809002"));
+    }
 }

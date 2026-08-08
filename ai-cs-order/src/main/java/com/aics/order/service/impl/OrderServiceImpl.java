@@ -305,6 +305,31 @@ public class OrderServiceImpl implements OrderService {
         return vo;
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void refundOrder(Long userId, String orderNo) {
+        Order order = orderMapper.selectOne(
+                new LambdaQueryWrapper<Order>()
+                        .eq(Order::getOrderNo, orderNo)
+                        .eq(Order::getUserId, userId));
+        if (order == null || !OrderStatus.PAID.getCode().equals(order.getStatus())) {
+            throw new BusinessException(ResultCode.ORDER_NOT_FOUND, "仅已支付订单可退款");
+        }
+
+        // 本地状态更新：PAID → REFUNDED
+        order.setStatus(OrderStatus.REFUNDED.getCode());
+        orderMapper.updateById(order);
+
+        // 回补库存（Redis 扣减库存体系）
+        List<OrderItem> items = orderItemMapper.selectList(
+                new LambdaQueryWrapper<OrderItem>().eq(OrderItem::getOrderNo, orderNo));
+        for (OrderItem item : items) {
+            stringRedisTemplate.opsForValue().increment("stock:" + item.getProductId(), item.getQuantity());
+        }
+
+        log.info("订单退款成功: orderNo={}, userId={}", orderNo, userId);
+    }
+
     // ==================== 私有方法 ====================
 
     private void doCancelOrder(Order order) {

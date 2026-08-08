@@ -43,4 +43,9 @@ public interface OrderService {
      * 更换支付方式重试
      */
     OrderVO retryPay(Long userId, String orderNo, String paymentMethod);
+
+    /**
+     * 订单退款（已支付订单 → 已退款，回补库存）
+     */
+    void refundOrder(Long userId, String orderNo);
 }

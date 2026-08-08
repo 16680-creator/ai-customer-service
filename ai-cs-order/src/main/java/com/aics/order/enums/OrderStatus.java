@@ -12,7 +12,8 @@ public enum OrderStatus {
 
     PENDING_PAY("PENDING_PAY", "待支付"),
     PAID("PAID", "已支付"),
-    CANCELLED("CANCELLED", "已取消");
+    CANCELLED("CANCELLED", "已取消"),
+    REFUNDED("REFUNDED", "已退款");
 
     private final String code;
     private final String description;
