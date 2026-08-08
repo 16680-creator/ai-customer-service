@@ -18,6 +18,7 @@ const SERVICES = {
   order: `${BASE_URL}/order`,
   cart: `${BASE_URL}/cart`,
   product: `${BASE_URL}/product`,
+  pay: `${BASE_URL}/pay`,
   rag: `${BASE_URL}/rag`,
 }
 
@@ -65,6 +66,7 @@ export const searchApi = createClient(SERVICES.search)
 export const orderApi = createClient(SERVICES.order)
 export const cartApi = createClient(SERVICES.cart)
 export const productApi = createClient(SERVICES.product)
+export const payApi = createClient(SERVICES.pay)
 export const ragApi = createClient(SERVICES.rag)
 
 export default SERVICES

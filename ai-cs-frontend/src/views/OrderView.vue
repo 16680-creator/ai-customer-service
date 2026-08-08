@@ -62,12 +62,12 @@ function goDetail(row) {
 }
 
 function statusText(status) {
-  const map = { PENDING_PAY: '待支付', PAID: '已支付', CANCELLED: '已取消' }
+  const map = { PENDING_PAY: '待支付', PAID: '已支付', CANCELLED: '已取消', REFUNDED: '已退款' }
   return map[status] || status
 }
 
 function statusTag(status) {
-  const map = { PENDING_PAY: 'warning', PAID: 'success', CANCELLED: 'info' }
+  const map = { PENDING_PAY: 'warning', PAID: 'success', CANCELLED: 'info', REFUNDED: 'info' }
   return map[status] || 'info'
 }
 

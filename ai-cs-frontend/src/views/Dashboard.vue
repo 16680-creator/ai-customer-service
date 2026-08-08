@@ -49,6 +49,7 @@
             <el-button type="primary" plain @click="$router.push('/rag-kb')" :icon="Files">向量知识库</el-button>
             <el-button type="success" @click="$router.push('/knowledge')" :icon="Collection">知识库管理</el-button>
             <el-button type="warning" @click="$router.push('/cart')" :icon="ShoppingCart">购物车</el-button>
+            <el-button type="success" plain @click="$router.push('/shop')" :icon="ShoppingCart">商品商城</el-button>
             <el-button type="warning" plain @click="$router.push('/order')" :icon="Tickets">订单管理</el-button>
             <el-button type="info" @click="$router.push('/product')" :icon="Goods">商品管理</el-button>
             <el-button type="info" plain @click="$router.push('/search')" :icon="Search">全文搜索</el-button>

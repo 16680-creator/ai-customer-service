@@ -41,6 +41,9 @@
           <el-button type="danger" :loading="cancelling" @click="cancelOrder">取消订单</el-button>
           <el-button type="primary" :loading="paying" @click="retryPay">立即支付</el-button>
         </template>
+        <template v-else-if="order.status === 'PAID'">
+          <el-button type="warning" :loading="refunding" @click="refundOrder">模拟退款</el-button>
+        </template>
       </div>
     </template>
     <el-empty v-else description="加载中或订单不存在" />
@@ -51,7 +54,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { orderApi } from '../api'
+import { orderApi, payApi } from '../api'
 import { getUser } from '../utils/auth'
 
 const route = useRoute()
@@ -61,6 +64,7 @@ const userId = ref(getUser()?.userId || localStorage.getItem('userId') || '')
 const order = ref(null)
 const cancelling = ref(false)
 const paying = ref(false)
+const refunding = ref(false)
 
 onMounted(fetchOrder)
 
@@ -114,18 +118,36 @@ async function retryPay() {
   }
 }
 
+async function refundOrder() {
+  try {
+    await ElMessageBox.confirm('确定要模拟退款吗？退款后会回补库存并更新订单状态。', '提示', { type: 'warning' })
+    refunding.value = true
+    const { data } = await payApi.post('/mock/refund', { orderNo }, { headers: { 'X-User-Id': userId.value } })
+    if (data.code === 200) {
+      ElMessage.success('退款成功')
+      fetchOrder()
+    } else {
+      ElMessage.error(data.message)
+    }
+  } catch (e) {
+    // 用户取消或失败
+  } finally {
+    refunding.value = false
+  }
+}
+
 function statusText(status) {
-  const map = { PENDING_PAY: '待支付', PAID: '已支付', CANCELLED: '已取消' }
+  const map = { PENDING_PAY: '待支付', PAID: '已支付', CANCELLED: '已取消', REFUNDED: '已退款' }
   return map[status] || status
 }
 
 function statusTag(status) {
-  const map = { PENDING_PAY: 'warning', PAID: 'success', CANCELLED: 'info' }
+  const map = { PENDING_PAY: 'warning', PAID: 'success', CANCELLED: 'info', REFUNDED: 'info' }
   return map[status] || 'info'
 }
 
 function payMethodText(m) {
-  const map = { ALIPAY: '支付宝', WECHAT: '微信支付', BANK_CARD: '银行卡' }
+  const map = { MOCK: '模拟支付', ALIPAY: '支付宝', WECHAT: '微信支付', BANK_CARD: '银行卡', UNIONPAY: '银联云闪付' }
   return map[m] || m || '-'
 }
 

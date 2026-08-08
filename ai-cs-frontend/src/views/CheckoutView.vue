@@ -39,10 +39,12 @@
         </el-form-item>
         <el-form-item label="支付方式">
           <el-radio-group v-model="paymentMethod">
-            <el-radio value="ALIPAY">支付宝</el-radio>
-            <el-radio value="WECHAT">微信支付</el-radio>
-            <el-radio value="BANK_CARD">银行卡</el-radio>
+            <el-radio value="MOCK">模拟支付（演示）</el-radio>
+            <el-radio value="ALIPAY">支付宝（扫码）</el-radio>
+            <el-radio value="WECHAT">微信支付（扫码）</el-radio>
+            <el-radio value="UNIONPAY">银联云闪付（扫码）</el-radio>
           </el-radio-group>
+          <div class="pay-tip">支付宝/微信/银联渠道代码已实现，配置商户参数（Nacos pay.*）后即可使用；本地演示请选「模拟支付」。</div>
         </el-form-item>
         <el-form-item label="应付金额">
           <span class="pay-amount">¥{{ Number(confirmInfo.payAmount || 0).toFixed(2) }}</span>
@@ -70,7 +72,7 @@ const userId = ref(getUser()?.userId || localStorage.getItem('userId') || '')
 
 const confirmInfo = ref({})
 const selectedCouponId = ref(null)
-const paymentMethod = ref('ALIPAY')
+const paymentMethod = ref('MOCK')
 const submitting = ref(false)
 
 const usableCoupons = computed(() => (confirmInfo.value.availableCoupons || []).filter(c => c.usable))
@@ -128,6 +130,7 @@ async function submitOrder() {
 <style scoped>
 .checkout-view { padding: 20px; }
 .section { margin-bottom: 16px; }
+.pay-tip { font-size: 12px; color: #909399; line-height: 1.6; }
 .discount { color: #e6a23c; font-weight: 600; }
 .tip { color: #909399; font-size: 12px; margin-left: 8px; }
 .pay-amount { color: #e6a23c; font-size: 22px; font-weight: 700; }

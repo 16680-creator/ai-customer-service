@@ -48,6 +48,10 @@
           <el-icon><Search /></el-icon>
           <span>全文搜索</span>
         </el-menu-item>
+        <el-menu-item index="/shop">
+          <el-icon><ShoppingCart /></el-icon>
+          <span>商品商城</span>
+        </el-menu-item>
         <el-menu-item index="/product">
           <el-icon><Goods /></el-icon>
           <span>商品图片检索</span>
@@ -128,9 +132,11 @@ const titleMap = {
   '/message': '消息管理',
   '/notify': '通知中心',
   '/search': '全文搜索',
+  '/shop': '商品商城',
   '/product': '商品图片检索',
     '/cart': '购物车',
     '/order': '订单管理',
+  '/mock-pay': '模拟收银台',
 }
 
 const activeMenu = computed(() => route.path.startsWith('/order') ? '/order' : route.path)
