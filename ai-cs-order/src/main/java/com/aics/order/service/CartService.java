@@ -15,6 +15,11 @@ public interface CartService {
     CartVO getCartList(Long userId);
 
     /**
+     * 加入购物车（商品不存在/已下架/库存不足会抛出异常）
+     */
+    CartVO addToCart(Long userId, Long productId, Integer quantity);
+
+    /**
      * 修改购物车商品数量
      */
     CartVO updateQuantity(Long userId, Long cartItemId, Integer quantity);

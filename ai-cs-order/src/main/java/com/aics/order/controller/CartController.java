@@ -2,6 +2,7 @@ package com.aics.order.controller;
 
 import com.aics.common.result.Result;
 import com.aics.order.bo.PriceCalcBO;
+import com.aics.order.dto.CartAddDTO;
 import com.aics.order.dto.CartUpdateDTO;
 import com.aics.order.dto.CheckoutDTO;
 import com.aics.order.entity.CartItem;
@@ -38,6 +39,13 @@ public class CartController {
     @GetMapping("/list")
     public Result<CartVO> getCartList(@RequestHeader("X-User-Id") Long userId) {
         return Result.success(cartService.getCartList(userId));
+    }
+
+    @Operation(summary = "加入购物车")
+    @PostMapping("/add")
+    public Result<CartVO> addToCart(@RequestHeader("X-User-Id") Long userId,
+                                    @Valid @RequestBody CartAddDTO dto) {
+        return Result.success("已加入购物车", cartService.addToCart(userId, dto.getProductId(), dto.getQuantity()));
     }
 
     @Operation(summary = "修改商品数量")
