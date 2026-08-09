@@ -170,9 +170,16 @@ public class AlipayChannel implements PayChannel {
         }
     }
 
-    /** 构建支付宝客户端（protected 便于测试替换） */
+    /** 构建支付宝客户端（protected 便于测试替换；沙箱响应较慢，读超时放宽到 60s） */
     protected AlipayClient buildClient() {
-        return new DefaultAlipayClient(gateway, appId, privateKey, "json", "UTF-8", alipayPublicKey, "RSA2");
+        return DefaultAlipayClient.builder(gateway, appId, privateKey)
+                .format("json")
+                .charset("UTF-8")
+                .alipayPublicKey(alipayPublicKey)
+                .signType("RSA2")
+                .connectTimeout(10000)
+                .readTimeout(60000)
+                .build();
     }
 
     private void ensureConfigured() {

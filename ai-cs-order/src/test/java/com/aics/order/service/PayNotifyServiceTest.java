@@ -79,4 +79,28 @@ class PayNotifyServiceTest {
 
         verify(orderService, never()).handlePayCallback(any(), any());
     }
+
+    @Test
+    @DisplayName("查单兜底 - 渠道已支付应更新订单")
+    void syncByQuery_success_shouldUpdateOrder() {
+        when(payChannelFactory.getChannel("ALIPAY")).thenReturn(payChannel);
+        when(payChannel.queryPayment("ORD001")).thenReturn(PayChannel.STATUS_SUCCESS);
+
+        boolean handled = payNotifyService.syncByQuery("ORD001", "ALIPAY");
+
+        assertTrue(handled);
+        verify(orderService).handlePayCallback("ORD001", "ALIPAY");
+    }
+
+    @Test
+    @DisplayName("查单兜底 - 渠道未支付不更新订单")
+    void syncByQuery_pending_shouldNotUpdateOrder() {
+        when(payChannelFactory.getChannel("ALIPAY")).thenReturn(payChannel);
+        when(payChannel.queryPayment("ORD001")).thenReturn(PayChannel.STATUS_PENDING);
+
+        boolean handled = payNotifyService.syncByQuery("ORD001", "ALIPAY");
+
+        assertFalse(handled);
+        verify(orderService, never()).handlePayCallback(any(), any());
+    }
 }

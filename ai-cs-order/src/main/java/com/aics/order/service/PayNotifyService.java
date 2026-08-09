@@ -22,6 +22,23 @@ public class PayNotifyService {
     private final PayChannelFactory payChannelFactory;
     private final OrderService orderService;
 
+    /**
+     * 查单兜底：主动向渠道查询支付状态，渠道已支付则幂等落库（PENDING_PAY → PAID）。
+     * 用于回调丢失、或本地无公网回调地址的场景（如本地沙箱联调，扫码支付后靠轮询状态闭环）。
+     *
+     * @return 是否已按"支付成功"处理
+     */
+    public boolean syncByQuery(String orderNo, String paymentMethod) {
+        PayChannel channel = payChannelFactory.getChannel(paymentMethod);
+        String channelStatus = channel.queryPayment(orderNo);
+        if (PayChannel.STATUS_SUCCESS.equals(channelStatus)) {
+            log.info("查单兜底命中已支付: orderNo={}, method={}", orderNo, paymentMethod);
+            orderService.handlePayCallback(orderNo, paymentMethod);
+            return true;
+        }
+        return false;
+    }
+
     public void processNotify(String paymentMethod, NotifyContext context) {
         // 1. 渠道解析通知：验签（+解密），失败会抛出异常（安全红线：防止伪造支付通知）
         PayChannel channel = payChannelFactory.getChannel(paymentMethod);

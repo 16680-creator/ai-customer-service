@@ -10,6 +10,7 @@ import com.aics.order.pay.channel.PayChannelFactory;
 import com.aics.order.pay.channel.PayContext;
 import com.aics.order.pay.channel.PayResult;
 import com.aics.order.service.OrderService;
+import com.aics.order.service.PayNotifyService;
 import com.aics.order.vo.OrderVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -35,6 +36,7 @@ public class PayController {
 
     private final PayChannelFactory payChannelFactory;
     private final OrderService orderService;
+    private final PayNotifyService payNotifyService;
 
     @Operation(summary = "创建支付（渠道下单）")
     @PostMapping("/create")
@@ -72,6 +74,19 @@ public class PayController {
     public Result<Map<String, String>> queryPayStatus(@RequestHeader("X-User-Id") Long userId,
                                                       @PathVariable("orderNo") String orderNo) {
         OrderVO order = orderService.getOrderDetail(userId, orderNo);
+
+        // 查单兜底：待支付时主动向渠道查询，渠道已支付则本地幂等落库（无需公网回调也能闭环）
+        if (OrderStatus.PENDING_PAY.getCode().equals(order.getStatus())) {
+            try {
+                String method = order.getPaymentMethod() == null
+                        ? PaymentMethod.MOCK.getCode() : order.getPaymentMethod();
+                payNotifyService.syncByQuery(orderNo, method);
+                order = orderService.getOrderDetail(userId, orderNo);
+            } catch (Exception e) {
+                log.warn("查单兜底异常: orderNo={}, err={}", orderNo, e.getMessage());
+            }
+        }
+
         Map<String, String> data = new LinkedHashMap<>();
         data.put("orderNo", orderNo);
         data.put("status", order.getStatus());
