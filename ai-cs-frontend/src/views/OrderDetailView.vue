@@ -102,12 +102,20 @@ async function cancelOrder() {
 async function retryPay() {
   paying.value = true
   try {
-    const { data } = await orderApi.put(`/${orderNo}/retry-pay`, { paymentMethod: order.value.paymentMethod || 'ALIPAY' }, {
-      headers: { 'X-User-Id': userId.value }
+    const { data } = await payApi.post('/create', { orderNo, paymentMethod: order.value.paymentMethod || 'MOCK' }, {
+      headers: { 'X-User-Id': userId.value },
     })
-    if (data.code === 200 && data.data?.payUrl) {
-      ElMessage.success('支付链接已生成，正在跳转...')
-      window.open(data.data.payUrl, '_blank')
+    if (data.code === 200) {
+      const d = data.data
+      if (d.payType === 'QRCODE' && d.codeUrl) {
+        // 扫码类渠道（支付宝/微信/银联）：进入收银台渲染二维码 + 轮询
+        router.push({ path: '/mock-pay', query: { orderNo, amount: d.payAmount, payType: d.payType, codeUrl: d.codeUrl, payUrl: d.payUrl } })
+      } else if (d.payUrl) {
+        // 跳转型渠道：新窗口打开收银台
+        window.open(d.payUrl, '_blank')
+      } else {
+        ElMessage.error('未获取到支付信息')
+      }
     } else {
       ElMessage.error(data.message)
     }
