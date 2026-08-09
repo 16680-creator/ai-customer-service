@@ -65,7 +65,7 @@ public class RouteConfig {
                 .route("ai-cs-pay", r -> r
                         .path("/api/pay/**")
                         .filters(f -> f.stripPrefix(1))
-                        .uri("lb://ai-cs-order"))
+                        .uri("lb://ai-cs-pay"))
                 // 商品服务
                 .route("ai-cs-product", r -> r
                         .path("/api/product/**")
