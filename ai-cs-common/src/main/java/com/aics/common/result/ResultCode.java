@@ -61,6 +61,7 @@ public enum ResultCode {
     ORDER_NOT_FOUND(7004, "订单不存在或状态不允许操作"),
     ORDER_PAYMENT_METHOD_INVALID(7005, "支付方式无效"),
     ORDER_CART_EMPTY(7006, "购物车为空或未选择商品"),
+    ORDER_PAY_AMOUNT_MISMATCH(7007, "支付金额与订单金额不一致"),
 
     // ==================== 商品模块 8xxx ====================
     PRODUCT_NOT_FOUND(8001, "商品不存在"),
