@@ -53,6 +53,7 @@
             <el-button type="warning" plain @click="$router.push('/order')" :icon="Tickets">订单管理</el-button>
             <el-button type="info" @click="$router.push('/product')" :icon="Goods">商品管理</el-button>
             <el-button type="info" plain @click="$router.push('/search')" :icon="Search">全文搜索</el-button>
+            <el-button type="info" plain @click="$router.push('/mq')" :icon="Connection">MQ 调度</el-button>
             <el-button type="info" plain @click="$router.push('/message')" :icon="Message">消息管理</el-button>
             <el-button type="info" plain @click="$router.push('/notify')" :icon="Bell">通知中心</el-button>
             <el-button type="info" plain @click="$router.push('/user')" :icon="User">用户管理</el-button>
@@ -86,7 +87,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import {
   ChatLineSquare, Collection, User, Search, ShoppingCart, Tickets, Goods,
-  Message, Bell, Files, Refresh, ChatDotRound, Monitor
+  Message, Bell, Files, Refresh, ChatDotRound, Monitor, Connection
 } from '@element-plus/icons-vue'
 import axios from 'axios'
 import { notifyApi, messageApi } from '../api'

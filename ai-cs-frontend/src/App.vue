@@ -48,6 +48,10 @@
           <el-icon><Search /></el-icon>
           <span>全文搜索</span>
         </el-menu-item>
+        <el-menu-item index="/mq">
+          <el-icon><Connection /></el-icon>
+          <span>MQ 调度</span>
+        </el-menu-item>
         <el-menu-item index="/shop">
           <el-icon><ShoppingCart /></el-icon>
           <span>商品商城</span>
@@ -90,7 +94,7 @@
 import { useRoute, useRouter } from 'vue-router'
 import { computed, ref, watch } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
-import { Goods, ArrowDown, ShoppingCart, List, Files } from '@element-plus/icons-vue'
+import { Goods, ArrowDown, ShoppingCart, List, Files, Connection } from '@element-plus/icons-vue'
 import { getUser, logout } from './utils/auth'
 
 const route = useRoute()
@@ -132,6 +136,7 @@ const titleMap = {
   '/message': '消息管理',
   '/notify': '通知中心',
   '/search': '全文搜索',
+  '/mq': 'MQ 调度中心',
   '/shop': '商品商城',
   '/product': '商品图片检索',
     '/cart': '购物车',

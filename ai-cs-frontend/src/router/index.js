@@ -11,6 +11,7 @@ const routes = [
   { path: '/notify', name: 'Notify', component: () => import('../views/NotifyView.vue') },
   { path: '/search', name: 'Search', component: () => import('../views/SearchView.vue') },
   { path: '/shop', name: 'Shop', component: () => import('../views/ShopView.vue') },
+  { path: '/mq', name: 'Mq', component: () => import('../views/MqView.vue') },
   { path: '/product', name: 'Product', component: () => import('../views/ProductView.vue') },
   { path: '/cart', name: 'Cart', component: () => import('../views/CartView.vue') },
   { path: '/checkout', name: 'Checkout', component: () => import('../views/CheckoutView.vue') },
