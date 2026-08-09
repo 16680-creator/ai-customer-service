@@ -21,6 +21,7 @@
         <module>ai-cs-message</module>
         <module>ai-cs-notify</module>
         <module>ai-cs-order</module>
+        <module>ai-cs-pay</module>
         <module>ai-cs-product</module>
     </modules>
 
