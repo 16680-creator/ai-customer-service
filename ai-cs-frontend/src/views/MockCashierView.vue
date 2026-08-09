@@ -129,7 +129,7 @@ const countdownText = computed(() => {
   const s = Math.max(0, Math.floor(remainMs.value / 1000))
   const mm = String(Math.floor(s / 60)).padStart(2, '0')
   const ss = String(s % 60).padStart(2, '0')
-  return ${mm}:
+  return `${mm}:${ss}`
 })
 
 function sleep(ms) {
