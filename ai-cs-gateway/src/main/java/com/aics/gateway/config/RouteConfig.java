@@ -66,6 +66,11 @@ public class RouteConfig {
                         .path("/api/pay/**")
                         .filters(f -> f.stripPrefix(1))
                         .uri("lb://ai-cs-pay"))
+                // RocketMQ 调度服务（独立 ai-cs-mq）
+                .route("ai-cs-mq", r -> r
+                        .path("/api/mq/**")
+                        .filters(f -> f.stripPrefix(1))
+                        .uri("lb://ai-cs-mq"))
                 // 商品服务
                 .route("ai-cs-product", r -> r
                         .path("/api/product/**")
