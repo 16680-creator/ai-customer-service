@@ -109,7 +109,7 @@ async function retryPay() {
       const d = data.data
       if (d.payType === 'QRCODE' && d.codeUrl) {
         // 扫码类渠道（支付宝/微信/银联）：进入收银台渲染二维码 + 轮询
-        router.push({ path: '/mock-pay', query: { orderNo, amount: d.payAmount, payType: d.payType, codeUrl: d.codeUrl, payUrl: d.payUrl } })
+        router.push({ path: '/mock-pay', query: { orderNo, amount: d.payAmount, payType: d.payType, codeUrl: d.codeUrl, payUrl: d.payUrl, expireTime: d.expireTime || '' } })
       } else if (d.payUrl) {
         // 跳转型渠道：新窗口打开收银台
         window.open(d.payUrl, '_blank')
@@ -145,12 +145,12 @@ async function refundOrder() {
 }
 
 function statusText(status) {
-  const map = { PENDING_PAY: '待支付', PAID: '已支付', CANCELLED: '已取消', REFUNDED: '已退款' }
+  const map = { PENDING_PAY: '待支付', PAID: '已支付', REFUNDING: '退款中', CANCELLED: '已取消', REFUNDED: '已退款' }
   return map[status] || status
 }
 
 function statusTag(status) {
-  const map = { PENDING_PAY: 'warning', PAID: 'success', CANCELLED: 'info', REFUNDED: 'info' }
+  const map = { PENDING_PAY: 'warning', PAID: 'success', REFUNDING: 'warning', CANCELLED: 'info', REFUNDED: 'info' }
   return map[status] || 'info'
 }
 

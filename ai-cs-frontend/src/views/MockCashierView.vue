@@ -28,6 +28,7 @@
         <img v-if="qrDataUrl" :src="qrDataUrl" class="qr-img" alt="支付二维码" />
         <el-skeleton v-else animated style="width: 240px; height: 240px" />
         <div class="qr-tip">请使用 支付宝 / 微信 / 云闪付 App 扫码支付</div>
+        <div v-if="expireTime && !expired && !status" class="countdown">支付剩余时间：{{ countdownText }}</div>
         <div class="qr-actions">
           <el-button :loading="polling" @click="refreshStatus">刷新状态</el-button>
           <el-button @click="$router.push(`/order/${orderNo}`)">返回订单</el-button>
@@ -57,7 +58,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import QRCode from 'qrcode'
@@ -71,6 +72,9 @@ const amount = route.query.amount || '-'
 const payType = route.query.payType || 'REDIRECT'
 const codeUrl = route.query.codeUrl || ''
 const payUrl = route.query.payUrl || ''
+const expireTime = route.query.expireTime || ''
+const remainMs = ref(0)
+const expired = ref(false)
 const userId = ref(getUser()?.userId || '')
 
 const qrDataUrl = ref('')
@@ -95,6 +99,37 @@ onMounted(async () => {
     }
     startPolling()
   }
+  startCountdown()
+})
+
+onUnmounted(() => {
+  if (timer) clearInterval(timer)
+})
+
+let timer = null
+
+/** 支付截止倒计时（订单超时后自动提示） */
+function startCountdown() {
+  if (!expireTime) return
+  const end = new Date(String(expireTime).replace('T', ' ').replace(/-/g, '/')).getTime()
+  if (Number.isNaN(end)) return
+  timer = setInterval(() => {
+    remainMs.value = end - Date.now()
+    if (remainMs.value <= 0) {
+      remainMs.value = 0
+      expired.value = true
+      if (timer) clearInterval(timer)
+      polling.value = false
+      result.value = { type: 'warning', text: '订单已超时，未在有效期内支付。返回订单查看，系统会自动关单并释放库存。' }
+    }
+  }, 1000)
+}
+
+const countdownText = computed(() => {
+  const s = Math.max(0, Math.floor(remainMs.value / 1000))
+  const mm = String(Math.floor(s / 60)).padStart(2, '0')
+  const ss = String(s % 60).padStart(2, '0')
+  return ${mm}:
 })
 
 function sleep(ms) {
@@ -225,5 +260,10 @@ function statusText(s) {
 }
 .status-tag {
   margin-top: 4px;
+}
+.countdown {
+  color: #e6a23c;
+  font-size: 14px;
+  font-weight: 600;
 }
 </style>
