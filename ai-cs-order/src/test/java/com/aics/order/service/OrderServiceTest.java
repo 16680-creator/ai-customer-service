@@ -1,6 +1,7 @@
 package com.aics.order.service;
 
 import com.aics.common.exception.BusinessException;
+import com.aics.order.client.OrderPayClient;
 import com.aics.order.entity.CartItem;
 import com.aics.order.entity.Order;
 import com.aics.order.entity.OrderItem;
@@ -23,9 +24,9 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -48,13 +49,13 @@ class OrderServiceTest {
     @Mock
     private PromotionService promotionService;
     @Mock
-    private PaymentService paymentService;
-    @Mock
     private StringRedisTemplate stringRedisTemplate;
     @Mock
     private ValueOperations<String, String> valueOperations;
     @Mock
     private RocketMQTemplate rocketMQTemplate;
+    @Mock
+    private OrderPayClient orderPayClient;
 
     @InjectMocks
     private OrderServiceImpl orderService;
@@ -84,7 +85,7 @@ class OrderServiceTest {
     }
 
     @Test
-    @DisplayName("正常下单 - 生成订单并返回支付信息")
+    @DisplayName("正常下单 - 生成待支付订单")
     void createOrder_shouldSucceed() {
         when(cartItemMapper.selectBatchIds(anyList())).thenReturn(Arrays.asList(cartItem1, cartItem2));
         when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
@@ -93,7 +94,6 @@ class OrderServiceTest {
         when(promotionService.calculatePrice(any(), eq(100L), isNull()))
                 .thenReturn(buildPriceCalcBO());
         when(orderMapper.insert(any())).thenReturn(1);
-        when(paymentService.createPayment(anyString(), any(), anyString())).thenReturn("https://pay.example.com");
 
         OrderVO result = orderService.createOrder(100L, Arrays.asList(1L, 2L), null, "WECHAT");
 
@@ -116,8 +116,8 @@ class OrderServiceTest {
     }
 
     @Test
-    @DisplayName("支付成功回调 - 幂等处理")
-    void handlePayCallback_idempotent() {
+    @DisplayName("支付确认 - 幂等：已支付订单重复确认不重复处理")
+    void confirmPay_idempotent() {
         Order order = new Order();
         order.setId(1L);
         order.setOrderNo("20260801143022010001");
@@ -126,20 +126,52 @@ class OrderServiceTest {
 
         when(orderMapper.selectOne(any())).thenReturn(order);
 
-        // 已支付订单再次回调不应重复处理
-        assertDoesNotThrow(() -> orderService.handlePayCallback("20260801143022010001", "WECHAT"));
+        assertDoesNotThrow(() -> orderService.confirmPay("20260801143022010001", "WECHAT", null, "tx1"));
         verify(orderMapper, never()).updateById(any());
     }
 
     @Test
-    @DisplayName("超时取消 - 未支付订单自动取消")
+    @DisplayName("支付确认 - 金额不一致应抛出异常")
+    void confirmPay_amountMismatch_shouldThrow() {
+        Order order = new Order();
+        order.setId(1L);
+        order.setOrderNo("20260801143022010002");
+        order.setStatus(OrderStatus.PENDING_PAY.getCode());
+        order.setPayAmount(new BigDecimal("199.00"));
+        order.setUserId(100L);
+
+        when(orderMapper.selectOne(any())).thenReturn(order);
+
+        assertThrows(BusinessException.class,
+                () -> orderService.confirmPay("20260801143022010002", "WECHAT", new BigDecimal("0.01"), "tx1"));
+    }
+
+    @Test
+    @DisplayName("支付确认 - 金额一致更新为已支付")
+    void confirmPay_success() {
+        Order order = new Order();
+        order.setId(1L);
+        order.setOrderNo("20260801143022010003");
+        order.setStatus(OrderStatus.PENDING_PAY.getCode());
+        order.setPayAmount(new BigDecimal("199.00"));
+        order.setUserId(100L);
+
+        when(orderMapper.selectOne(any())).thenReturn(order);
+
+        orderService.confirmPay("20260801143022010003", "WECHAT", new BigDecimal("199.00"), "tx1");
+
+        verify(orderMapper).updateById(argThat(o -> OrderStatus.PAID.getCode().equals(o.getStatus())));
+    }
+
+    @Test
+    @DisplayName("超时取消 - 未支付订单自动取消并通知支付服务关单")
     void cancelExpiredOrder_shouldCancel() {
         Order order = new Order();
         order.setId(1L);
         order.setOrderNo("20260801143022010001");
         order.setStatus(OrderStatus.PENDING_PAY.getCode());
         order.setUserId(100L);
-        order.setCouponId(null);
+        order.setPaymentMethod("WECHAT");
 
         OrderItem item = new OrderItem();
         item.setProductId(1001L);
@@ -154,22 +186,12 @@ class OrderServiceTest {
         verify(orderMapper).updateById(argThat(o ->
                 OrderStatus.CANCELLED.getCode().equals(o.getStatus())));
         verify(valueOperations).increment("stock:1001", 2);
-    }
-
-    private com.aics.order.bo.PriceCalcBO buildPriceCalcBO() {
-        com.aics.order.bo.PriceCalcBO bo = new com.aics.order.bo.PriceCalcBO();
-        bo.setTotalAmount(new BigDecimal("427.00"));
-        bo.setFullReductionAmount(new BigDecimal("30.00"));
-        bo.setFullReductionRuleName("满200减30");
-        bo.setCouponAmount(BigDecimal.ZERO);
-        bo.setDiscountAmount(new BigDecimal("30.00"));
-        bo.setPayAmount(new BigDecimal("397.00"));
-        return bo;
+        verify(orderPayClient).closeChannel("WECHAT", "20260801143022010001");
     }
 
     @Test
-    @DisplayName("退款 - 已支付订单退款成功并回补库存")
-    void refundOrder_paidOrder_shouldRefundAndRestoreStock() {
+    @DisplayName("退款确认 - 已支付订单退款成功并回补库存")
+    void refundConfirm_paidOrder_shouldRefundAndRestoreStock() {
         Order order = new Order();
         order.setId(1L);
         order.setOrderNo("ORD20260809001");
@@ -186,14 +208,14 @@ class OrderServiceTest {
         when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
         when(valueOperations.increment("stock:1001", 2L)).thenReturn(100L);
 
-        assertDoesNotThrow(() -> orderService.refundOrder(100L, "ORD20260809001"));
-        verify(orderMapper).updateById(argThat(o -> OrderStatus.REFUNDED.getCode().equals(o.getStatus())));
+        assertDoesNotThrow(() -> orderService.refundConfirm("ORD20260809001"));
+        assertEquals(OrderStatus.REFUNDED.getCode(), order.getStatus());
         verify(valueOperations).increment("stock:1001", 2L);
     }
 
     @Test
-    @DisplayName("退款 - 非已支付订单应抛出异常")
-    void refundOrder_notPaid_shouldThrow() {
+    @DisplayName("退款确认 - 非已支付订单应抛出异常")
+    void refundConfirm_notPaid_shouldThrow() {
         Order order = new Order();
         order.setId(2L);
         order.setOrderNo("ORD20260809002");
@@ -202,6 +224,35 @@ class OrderServiceTest {
         when(orderMapper.selectOne(any())).thenReturn(order);
 
         assertThrows(BusinessException.class,
-                () -> orderService.refundOrder(100L, "ORD20260809002"));
+                () -> orderService.refundConfirm("ORD20260809002"));
+    }
+
+    @Test
+    @DisplayName("订单支付信息 - 返回状态/金额/过期时间")
+    void getOrderPayDetail_shouldReturnMap() {
+        Order order = new Order();
+        order.setOrderNo("ORD20260809003");
+        order.setUserId(100L);
+        order.setStatus(OrderStatus.PENDING_PAY.getCode());
+        order.setPayAmount(new BigDecimal("199.00"));
+        order.setPaymentMethod("ALIPAY");
+        when(orderMapper.selectOne(any())).thenReturn(order);
+
+        Map<String, Object> data = orderService.getOrderPayDetail("ORD20260809003");
+
+        assertEquals("ORD20260809003", data.get("orderNo"));
+        assertEquals("PENDING_PAY", data.get("status"));
+        assertEquals("ALIPAY", data.get("paymentMethod"));
+    }
+
+    private com.aics.order.bo.PriceCalcBO buildPriceCalcBO() {
+        com.aics.order.bo.PriceCalcBO bo = new com.aics.order.bo.PriceCalcBO();
+        bo.setTotalAmount(new BigDecimal("427.00"));
+        bo.setFullReductionAmount(new BigDecimal("30.00"));
+        bo.setFullReductionRuleName("满200减30");
+        bo.setCouponAmount(BigDecimal.ZERO);
+        bo.setDiscountAmount(new BigDecimal("30.00"));
+        bo.setPayAmount(new BigDecimal("397.00"));
+        return bo;
     }
 }

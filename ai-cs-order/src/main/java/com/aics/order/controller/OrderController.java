@@ -51,12 +51,5 @@ public class OrderController {
         return Result.success("订单已取消", null);
     }
 
-    @Operation(summary = "更换支付方式重试")
-    @PutMapping("/{orderNo}/retry-pay")
-    public Result<OrderVO> retryPay(@RequestHeader("X-User-Id") Long userId,
-                                    @PathVariable("orderNo") String orderNo,
-                                    @RequestBody Map<String, String> body) {
-        String paymentMethod = body.get("paymentMethod");
-        return Result.success(orderService.retryPay(userId, orderNo, paymentMethod));
-    }
+
 }

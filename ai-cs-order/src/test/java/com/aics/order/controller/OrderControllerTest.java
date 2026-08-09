@@ -146,31 +146,4 @@ class OrderControllerTest {
                 () -> orderController.cancelOrder(100L, "ORD_PAID"));
         assertEquals(7004, ex.getCode());
     }
-
-    // ==================== retryPay ====================
-
-    @Test
-    @DisplayName("重试支付 - 成功返回新支付URL")
-    void retryPay_success() {
-        OrderVO vo = new OrderVO();
-        vo.setOrderNo("ORD001");
-        vo.setPayUrl("https://openapi.alipay.com/pay?order=ORD001");
-        when(orderService.retryPay(100L, "ORD001", "ALIPAY")).thenReturn(vo);
-
-        Result<OrderVO> result = orderController.retryPay(100L, "ORD001", Map.of("paymentMethod", "ALIPAY"));
-
-        assertEquals(200, result.getCode());
-        assertEquals("https://openapi.alipay.com/pay?order=ORD001", result.getData().getPayUrl());
-    }
-
-    @Test
-    @DisplayName("重试支付 - 订单非待支付状态应报错")
-    void retryPay_notPending_shouldThrow() {
-        when(orderService.retryPay(100L, "ORD_CANCELLED", "WECHAT"))
-                .thenThrow(new BusinessException(ResultCode.ORDER_NOT_FOUND, "订单不存在或已非待支付状态"));
-
-        BusinessException ex = assertThrows(BusinessException.class,
-                () -> orderController.retryPay(100L, "ORD_CANCELLED", Map.of("paymentMethod", "WECHAT")));
-        assertEquals(7004, ex.getCode());
-    }
 }
