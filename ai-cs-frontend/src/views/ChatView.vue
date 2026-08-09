@@ -78,9 +78,11 @@
 
 <script setup>
 import { ref, nextTick } from 'vue'
-import { chatApi } from '../api'
+import { getToken } from '../utils/auth'
 import { ElMessage } from 'element-plus'
 import { Plus, Promotion } from '@element-plus/icons-vue'
+
+const GATEWAY = import.meta.env.VITE_GATEWAY || 'http://localhost:8080'
 
 const sessions = ref([{ id: 'session-1', title: '默认会话' }])
 const currentSession = ref('session-1')
@@ -98,37 +100,69 @@ function newSession() {
   messages.value = []
 }
 
+// 真正的流式对话（SSE）：fetch + ReadableStream 解析，逐 token 追加（打字机效果）
 async function sendMessage() {
   const text = inputMessage.value.trim()
   if (!text) return
+  if (chatMode.value === 'rag' && !knowledgeBase.value.trim()) {
+    return ElMessage.warning('RAG 模式请先填写知识库标识')
+  }
 
   messages.value.push({ role: 'user', content: text })
   inputMessage.value = ''
   sending.value = true
   await scrollToBottom()
 
+  // 预置空回复气泡，流式填充
+  const assistant = { role: 'assistant', content: '' }
+  messages.value.push(assistant)
+  await scrollToBottom()
+
   try {
-    let res
-    if (chatMode.value === 'rag') {
-      if (!knowledgeBase.value.trim()) {
-        ElMessage.warning('RAG 模式请先填写知识库标识')
-        sending.value = false
-        return
+    const params = new URLSearchParams({ sessionId: currentSession.value, message: text })
+    if (chatMode.value === 'rag') params.set('knowledgeBase', knowledgeBase.value.trim())
+
+    const resp = await fetch(`${GATEWAY}/api/chat/stream/sse?${params}`, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + (getToken() || '') }
+    })
+    if (!resp.ok || !resp.body) throw new Error('HTTP ' + resp.status)
+
+    const reader = resp.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let streamError = null
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+
+      // 按 SSE 事件分隔（空行）逐条解析
+      let sep
+      while ((sep = buffer.indexOf('\n\n')) >= 0) {
+        const rawEvent = buffer.slice(0, sep)
+        buffer = buffer.slice(sep + 2)
+        for (const line of rawEvent.split('\n')) {
+          if (!line.startsWith('data:')) continue
+          const data = line.slice(5).trim()
+          if (!data) continue
+          let obj
+          try { obj = JSON.parse(data) } catch { continue }
+          if (obj.content) {
+            assistant.content += obj.content
+            await scrollToBottom()
+          }
+          if (obj.error) streamError = obj.error
+        }
       }
-      res = await chatApi.post(`/rag`, null, {
-        params: { sessionId: currentSession.value, message: text, knowledgeBase: knowledgeBase.value.trim() }
-      })
-    } else {
-      res = await chatApi.post(`/send`, null, {
-        params: { sessionId: currentSession.value, message: text }
-      })
     }
-    const reply = res.data?.data || res.data?.message || '未获取到回复'
-    messages.value.push({ role: 'assistant', content: reply })
+
+    if (streamError) throw new Error(streamError)
+    if (!assistant.content) assistant.content = '(无回复)'
   } catch (e) {
-    const errMsg = e.response?.data?.message || e.message || '请求失败'
-    messages.value.push({ role: 'assistant', content: '❌ 错误: ' + errMsg })
-    ElMessage.error('对话请求失败: ' + errMsg)
+    assistant.content = '❌ 错误: ' + (e.message || '请求失败')
+    ElMessage.error('对话请求失败: ' + (e.message || ''))
   } finally {
     sending.value = false
     await scrollToBottom()

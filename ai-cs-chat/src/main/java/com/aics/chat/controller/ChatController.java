@@ -7,8 +7,10 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.Map;
 
@@ -56,5 +58,19 @@ public class ChatController {
     public Result<Map<String, Object>> chatStream(@RequestParam("sessionId") @NotBlank(message = "会话ID不能为空") String sessionId,
                                                    @RequestParam("message") @NotBlank(message = "消息内容不能为空") String message) {
         return chatService.chatStream(sessionId, message);
+    }
+
+    @Operation(summary = "SSE 流式对话（逐 token 推送）")
+    @PostMapping(value = "/stream/sse", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter chatStreamSse(@RequestParam("sessionId") @NotBlank(message = "会话ID不能为空") String sessionId,
+                                    @RequestParam("message") @NotBlank(message = "消息内容不能为空") String message,
+                                    @RequestParam(value = "knowledgeBase", required = false) String knowledgeBase,
+                                    @RequestHeader(value = "X-User-Id", required = false) Long userId) {
+        try {
+            ChatUserContext.setUserId(userId);
+            return chatService.chatStreamSse(sessionId, message, knowledgeBase);
+        } finally {
+            ChatUserContext.clear();
+        }
     }
 }

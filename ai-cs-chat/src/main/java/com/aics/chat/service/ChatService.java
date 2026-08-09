@@ -1,6 +1,7 @@
 package com.aics.chat.service;
 
 import com.aics.common.result.Result;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.Map;
 
@@ -36,4 +37,14 @@ public interface ChatService {
      * @return 流式响应
      */
     Result<Map<String, Object>> chatStream(String sessionId, String message);
+
+    /**
+     * 真正的 SSE 流式对话（逐 token 推送，打字机效果）
+     *
+     * @param sessionId      会话ID
+     * @param message        用户消息
+     * @param knowledgeBase  知识库标识（可空，空则普通对话；非空则 RAG 对话）
+     * @return SSE 发射器，逐 token 推送 {@code data: {"content":"..."}} 事件
+     */
+    SseEmitter chatStreamSse(String sessionId, String message, String knowledgeBase);
 }

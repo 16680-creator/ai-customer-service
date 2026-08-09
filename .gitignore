@@ -41,3 +41,7 @@ deploy/nacos/
 # 本地测试工具（ES 等）
 tools/elasticsearch/
 tools/rocketmq/
+
+# Codex 临时文件
+.codex-tmp/
+.codex-patch1.txt

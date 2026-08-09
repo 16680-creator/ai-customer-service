@@ -17,8 +17,12 @@ import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -179,16 +183,102 @@ public class ChatServiceImpl implements ChatService {
         log.info("流式对话请求: sessionId={}", sessionId);
 
         try {
-            // 流式对话返回初始信息，实际流式输出通过 SSE 或 WebSocket 推送
-            Map<String, Object> result = Map.of(
-                    "sessionId", sessionId,
-                    "status", "streaming",
-                    "message", "流式对话已启动，请通过SSE端点接收响应"
-            );
+            // 流式对话返回初始信息，实际流式输出通过 SSE 端点 /chat/stream/sse 推送
+            Map<String, Object> result = new HashMap<>();
+            result.put("sessionId", sessionId);
+            result.put("status", "streaming");
+            result.put("message", "流式对话已启动，请使用 /chat/stream/sse 端点接收 SSE 流式响应");
             return Result.success(result);
         } catch (Exception e) {
             log.error("流式对话异常: sessionId={}", sessionId, e);
             throw new BusinessException(ResultCode.CHAT_AI_SERVICE_UNAVAILABLE, "AI服务调用失败: " + e.getMessage());
         }
+    }
+
+    @Override
+    public SseEmitter chatStreamSse(String sessionId, String message, String knowledgeBase) {
+        log.info("SSE流式对话请求: sessionId={}, knowledgeBase={}", sessionId, knowledgeBase);
+        SseEmitter emitter = new SseEmitter(0L);
+        boolean hasKb = StringUtils.hasText(knowledgeBase);
+
+        try {
+            // 1. 维护会话历史（与 chat() 一致）：记录用户消息 + 投递 MQ
+            List<Message> history = sessionHistory.computeIfAbsent(sessionId, k -> new ArrayList<>());
+            history.add(new UserMessage(message));
+            chatMessageProducer.send(sessionId, "user", message);
+            if (history.size() > MAX_HISTORY_SIZE) {
+                history = compressHistory(history);
+                sessionHistory.put(sessionId, history);
+            }
+
+            // lambda 中需要引用历史列表（effectively final）
+            final List<Message> streamHistory = history;
+
+            // 2. 构造流式 Flux：普通对话带历史；RAG 对话注入知识库上下文
+            Flux<String> flux;
+            if (hasKb) {
+                List<Document> docs = knowledgeBaseService.search(knowledgeBase, message, 5, 0.5);
+                String context = knowledgeBaseService.buildContext(docs);
+                String ragPrompt = """
+                        请严格基于下面的【知识库资料】回答用户问题。
+                        重要规则：
+                        1. 如果资料中没有相关信息，请如实告知："我暂时没有这方面的资料"，不要编造内容
+                        2. 回答时优先引用资料中的内容，不要提及"根据资料/检索结果"之类的表述
+
+                        【知识库资料】
+                        %s
+
+                        【用户问题】
+                        %s
+                        """.formatted(context.isBlank() ? "（未检索到相关资料）" : context, message);
+                flux = chatClient.prompt().user(ragPrompt).stream().content();
+            } else {
+                flux = chatClient.prompt().messages(history).stream().content();
+            }
+
+            // 3. 订阅流：逐 token 通过 SSE 推送，结束后更新历史 + 投递 MQ
+            StringBuilder full = new StringBuilder();
+            flux.subscribe(
+                    chunk -> {
+                        if (chunk != null && !chunk.isEmpty()) {
+                            full.append(chunk);
+                            try {
+                                emitter.send(SseEmitter.event().data(Map.of("content", chunk)));
+                            } catch (Exception e) {
+                                log.warn("SSE发送失败: sessionId={}, err={}", sessionId, e.getMessage());
+                            }
+                        }
+                    },
+                    error -> {
+                        log.error("SSE流式对话异常: sessionId={}", sessionId, error);
+                        try {
+                            emitter.send(SseEmitter.event().data(Map.of("error", String.valueOf(error.getMessage()))));
+                        } catch (Exception ignore) {
+                            // ignore
+                        }
+                        emitter.complete();
+                    },
+                    () -> {
+                        String response = cleanResponse(full.toString());
+                        try {
+                            chatMessageProducer.send(sessionId, "assistant", response);
+                            streamHistory.add(new AssistantMessage(response));
+                            emitter.send(SseEmitter.event().data(Map.of("done", true, "content", response)));
+                        } catch (Exception e) {
+                            log.warn("SSE完成事件发送失败: sessionId={}, err={}", sessionId, e.getMessage());
+                        }
+                        emitter.complete();
+                    }
+            );
+        } catch (Exception e) {
+            log.error("SSE流式对话初始化异常: sessionId={}", sessionId, e);
+            try {
+                emitter.send(SseEmitter.event().data(Map.of("error", String.valueOf(e.getMessage()))));
+            } catch (Exception ignore) {
+                // ignore
+            }
+            emitter.complete();
+        }
+        return emitter;
     }
 }
