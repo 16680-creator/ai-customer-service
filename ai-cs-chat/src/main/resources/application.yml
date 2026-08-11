@@ -25,8 +25,7 @@ spring:
       - optional:nacos:ai-cs-chat.yml
 
   # ===== Chroma 向量库连接配置 =====
-  # 统一放在 Nacos（ai-cs-chat.yml）管理，见 deploy/nacos/configs/ai-cs-chat.yml
-  # 占位符默认值保证 Nacos 不可用时本地也能用 localhost:8000 兜底
+  # 统一放在 Nacos（ai-cs-chat.yml）管理
   ai:
     # 禁用 Spring AI 内置 Embedding 自动装配（由 SpringAiConfig 手动提供）
     model:
@@ -37,20 +36,80 @@ spring:
         initialize-schema: true
         collection-name: aics-knowledge
         client:
-          host: http://${aics.mysql.host:localhost}   # 复用 MySQL 主机，需带 http:// 协议头
+          host: http://${aics.mysql.host:localhost}
           port: ${CHROMA_PORT:8000}
 
-# ===== RocketMQ 配置（对话消息投递/落库）=====
-rocketmq:
-  name-server: ${ROCKETMQ_NAME_SERVER:127.0.0.1:9876}
-  producer:
-    group: chat-producer-group
-
-# ===== Redis 配置（会话历史热缓存）=====
-spring:
+  # ===== Redis 配置（会话历史热缓存） =====
   data:
     redis:
       host: ${REDIS_HOST:127.0.0.1}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
       database: ${REDIS_DATABASE:0}
+
+# ===== RocketMQ 配置（对话消息投递/落库） =====
+rocketmq:
+  name-server: ${ROCKETMQ_NAME_SERVER:127.0.0.1:9876}
+  producer:
+    group: chat-producer-group
+
+# ===== Resilience4j 弹性容错配置 =====
+# 对应 ResilientAiService 和 Resilience4jConfig 中的注解 name
+resilience4j:
+  timelimiter:
+    instances:
+      # 非流式 LLM 调用超时（chat / chatWithRag / compressHistory）
+      chatService:
+        timeout-duration: 30s
+        cancel-running-future: true
+      # SSE 流式 LLM 调用超时（首次 token 到达限制）
+      sseChatService:
+        timeout-duration: 60s
+        cancel-running-future: true
+  retry:
+    instances:
+      # LLM 调用重试策略
+      chatService:
+        max-attempts: 3
+        wait-duration: 1s
+        multiplier: 2
+        retry-exceptions:
+          - java.net.SocketTimeoutException
+          - java.net.ConnectException
+          - org.springframework.web.client.ResourceAccessException
+          - java.util.concurrent.TimeoutException
+        ignore-exceptions:
+          - com.aics.common.exception.BusinessException
+          - java.lang.IllegalArgumentException
+  circuitbreaker:
+    instances:
+      # LLM 调用熔断器
+      chatService:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        minimum-number-of-calls: 3
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+        record-exceptions:
+          - java.util.concurrent.TimeoutException
+          - org.springframework.web.client.ResourceAccessException
+          - java.net.SocketTimeoutException
+        ignore-exceptions:
+          - com.aics.common.exception.BusinessException
+          - java.lang.IllegalArgumentException
+      # SSE 流式 LLM 调用熔断器
+      sseChatService:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        minimum-number-of-calls: 3
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+        record-exceptions:
+          - java.util.concurrent.TimeoutException
+          - org.springframework.web.client.ResourceAccessException
+          - java.net.SocketTimeoutException
+        ignore-exceptions:
+          - com.aics.common.exception.BusinessException
+          - java.lang.IllegalArgumentException

@@ -9,14 +9,12 @@ import com.aics.common.result.Result;
 import com.aics.common.result.ResultCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.document.Document;
-import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -26,18 +24,21 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.regex.Pattern;
 
 /**
  * AI 对话服务实现
+ *
+ * <p>所有 LLM 调用均通过 {@link ResilientAiService} 执行，获得超时/重试/熔断/降级能力。</p>
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class ChatServiceImpl implements ChatService {
 
-    private final ChatClient chatClient;
-    private final OpenAiChatModel chatModel;
+    private final ResilientAiService resilientAiService;
     private final KnowledgeBaseService knowledgeBaseService;
     private final ChatHistoryService chatHistoryService;
 
@@ -47,8 +48,11 @@ public class ChatServiceImpl implements ChatService {
     /** 压缩后保留的最近消息数 */
     private static final int KEEP_RECENT_SIZE = 10;
 
+    /** SSE 超时时间：5 分钟（与 TimeLimiter 60s 配合，Limiter 先触发，Emiter 兜底） */
+    private static final long SSE_EMITTER_TIMEOUT = 5 * 60 * 1000L;
+
     /** 过滤模型思考过程标签 */
-    private static final Pattern THINK_PATTERN = Pattern.compile("<think>.*?</think>", Pattern.DOTALL);
+    private static final Pattern THINK_PATTERN = Pattern.compile(" thinking.*? response", Pattern.DOTALL);
 
     /**
      * 清除 AI 回复中的思考过程标签
@@ -90,11 +94,11 @@ public class ChatServiceImpl implements ChatService {
         }
 
         try {
-            // 调用 AI 生成摘要
-            String summary = chatModel.call(
+            // 通过 ResilientAiService 调用 AI 生成摘要（带超时/重试/熔断）
+            String summary = resilientAiService.callSummary(
                     new Prompt("请将以下对话历史压缩为简洁的摘要，保留关键信息（用户名、订单号、重要决定等），"
                             + "用1-3句话概括，作为后续对话的上下文参考：\n\n" + conversation)
-            ).getResult().getOutput().getText();
+            ).get();
 
             summary = cleanResponse(summary);
             log.info("会话历史压缩完成: {}条消息 -> 摘要({}字)", oldMessages.size(), summary.length());
@@ -115,7 +119,7 @@ public class ChatServiceImpl implements ChatService {
         log.info("对话请求: sessionId={}, message={}", sessionId, message);
 
         try {
-            // 从持久化历史加载（Redis 优先，未命中回源 message 表），替代内存 Map
+            // 从持久化历史加载（Redis 优先，未命中回源 message 表）
             List<Message> history = toSpringMessages(chatHistoryService.load(sessionId));
             history.add(new UserMessage(message));
             chatHistoryService.append(sessionId, "user", message);
@@ -125,11 +129,8 @@ public class ChatServiceImpl implements ChatService {
                 history = compressHistory(history);
             }
 
-            // 调用 AI 模型，携带完整会话历史（工具已通过 defaultToolCallbacks 全局注册）
-            String response = chatClient.prompt()
-                    .messages(history)
-                    .call()
-                    .content();
+            // 通过 ResilientAiService 弹性调用 LLM（超时/重试/熔断）
+            String response = resilientAiService.callChat(history).get();
 
             // 过滤思考过程
             response = cleanResponse(response);
@@ -140,9 +141,13 @@ public class ChatServiceImpl implements ChatService {
 
             log.info("对话完成: sessionId={}, responseLength={}", sessionId, response.length());
             return Result.success(response);
+        } catch (ExecutionException e) {
+            Throwable cause = e.getCause();
+            log.error("AI 服务调用异常: sessionId={}, cause={}", sessionId, cause != null ? cause.getMessage() : e.getMessage());
+            throw new BusinessException(ResultCode.CHAT_AI_SERVICE_UNAVAILABLE, "AI服务调用失败: " + getFriendlyMessage(cause));
         } catch (Exception e) {
             log.error("对话异常: sessionId={}", sessionId, e);
-            throw new BusinessException(ResultCode.CHAT_AI_SERVICE_UNAVAILABLE, "AI服务调用失败: " + e.getMessage());
+            throw new BusinessException(ResultCode.CHAT_AI_SERVICE_UNAVAILABLE, "AI服务调用失败: " + getFriendlyMessage(e));
         }
     }
 
@@ -151,15 +156,11 @@ public class ChatServiceImpl implements ChatService {
         log.info("RAG对话请求: sessionId={}, knowledgeBase={}", sessionId, knowledgeBase);
 
         try {
-            // ===== 真正的 RAG 检索增强生成 =====
-            // 1. 语义检索：在指定知识库中，用向量相似度找出与用户问题最相关的 Top-5 文档片段
-            //    （底层：问题向量化 → VectorStore 余弦相似度检索 → knowledgeBase 过滤）
+            // 语义检索：在指定知识库中找出与用户问题最相关的 Top-5 文档片段
             List<Document> docs = knowledgeBaseService.search(knowledgeBase, message, 5, 0.5);
-
-            // 2. 把命中的文档片段拼装成上下文文本
             String context = knowledgeBaseService.buildContext(docs);
 
-            // 3. 将上下文注入 Prompt：让大模型"基于检索到的私有知识"作答，而不是凭空编造
+            // 构建 RAG Prompt
             String ragPrompt = """
                     请严格基于下面的【知识库资料】回答用户问题。
                     重要规则：
@@ -173,19 +174,19 @@ public class ChatServiceImpl implements ChatService {
                     %s
                     """.formatted(context.isBlank() ? "（未检索到相关资料）" : context, message);
 
-            String response = chatClient.prompt()
-                    .user(ragPrompt)
-                    .call()
-                    .content();
-
-            // 过滤思考过程
+            // 通过 ResilientAiService 弹性调用 LLM
+            String response = resilientAiService.callRagChat(ragPrompt).get();
             response = cleanResponse(response);
 
             log.info("RAG对话完成: sessionId={}, 检索命中{}条", sessionId, docs.size());
             return Result.success(response);
+        } catch (ExecutionException e) {
+            Throwable cause = e.getCause();
+            log.error("RAG对话异常: sessionId={}, cause={}", sessionId, cause != null ? cause.getMessage() : e.getMessage());
+            throw new BusinessException(ResultCode.CHAT_AI_SERVICE_UNAVAILABLE, "AI服务调用失败: " + getFriendlyMessage(cause));
         } catch (Exception e) {
             log.error("RAG对话异常: sessionId={}", sessionId, e);
-            throw new BusinessException(ResultCode.CHAT_AI_SERVICE_UNAVAILABLE, "AI服务调用失败: " + e.getMessage());
+            throw new BusinessException(ResultCode.CHAT_AI_SERVICE_UNAVAILABLE, "AI服务调用失败: " + getFriendlyMessage(e));
         }
     }
 
@@ -194,7 +195,6 @@ public class ChatServiceImpl implements ChatService {
         log.info("流式对话请求: sessionId={}", sessionId);
 
         try {
-            // 流式对话返回初始信息，实际流式输出通过 SSE 端点 /chat/stream/sse 推送
             Map<String, Object> result = new HashMap<>();
             result.put("sessionId", sessionId);
             result.put("status", "streaming");
@@ -209,11 +209,12 @@ public class ChatServiceImpl implements ChatService {
     @Override
     public SseEmitter chatStreamSse(String sessionId, String message, String knowledgeBase) {
         log.info("SSE流式对话请求: sessionId={}, knowledgeBase={}", sessionId, knowledgeBase);
-        SseEmitter emitter = new SseEmitter(0L);
+        // 使用合理的超时时间，替代原来的 0L（永不超时）
+        SseEmitter emitter = new SseEmitter(SSE_EMITTER_TIMEOUT);
         boolean hasKb = StringUtils.hasText(knowledgeBase);
 
         try {
-            // 1. 维护会话历史（与 chat() 一致）：从持久化历史加载 + 记录用户消息（Redis + MQ 双写）
+            // 1. 维护会话历史
             List<Message> history = toSpringMessages(chatHistoryService.load(sessionId));
             history.add(new UserMessage(message));
             chatHistoryService.append(sessionId, "user", message);
@@ -221,11 +222,10 @@ public class ChatServiceImpl implements ChatService {
                 history = compressHistory(history);
             }
 
-            // lambda 中需要引用历史列表（effectively final）
             final List<Message> streamHistory = history;
 
-            // 2. 构造流式 Flux：普通对话带历史；RAG 对话注入知识库上下文
-            Flux<String> flux;
+            // 2. 通过 ResilientAiService 弹性获取流式 Flux
+            CompletableFuture<Flux<String>> futureFlux;
             if (hasKb) {
                 List<Document> docs = knowledgeBaseService.search(knowledgeBase, message, 5, 0.5);
                 String context = knowledgeBaseService.buildContext(docs);
@@ -241,16 +241,31 @@ public class ChatServiceImpl implements ChatService {
                         【用户问题】
                         %s
                         """.formatted(context.isBlank() ? "（未检索到相关资料）" : context, message);
-                flux = chatClient.prompt().user(ragPrompt).stream().content();
+                futureFlux = resilientAiService.callSseRagStream(ragPrompt);
             } else {
-                flux = chatClient.prompt().messages(history).stream().content();
+                futureFlux = resilientAiService.callSseStream(streamHistory);
             }
 
-            // 3. 订阅流：逐 token 通过 SSE 推送，结束后更新历史 + 投递 MQ
+            // 等待 Flux 就绪（受 TimeLimiter 保护，不会无限等待）
+            Flux<String> flux = futureFlux.get();
+
+            // 3. 订阅流：逐 token 通过 SSE 推送，结束后更新历史
             StringBuilder full = new StringBuilder();
             flux.subscribe(
                     chunk -> {
                         if (chunk != null && !chunk.isEmpty()) {
+                            // 检查是否为降级错误标记
+                            if (chunk.startsWith("[ERROR]")) {
+                                String errorMsg = chunk.substring(7);
+                                log.warn("SSE流式降级: sessionId={}, msg={}", sessionId, errorMsg);
+                                try {
+                                    emitter.send(SseEmitter.event().data(Map.of("error", errorMsg)));
+                                } catch (Exception ignore) {
+                                    // ignore
+                                }
+                                emitter.complete();
+                                return;
+                            }
                             full.append(chunk);
                             try {
                                 emitter.send(SseEmitter.event().data(Map.of("content", chunk)));
@@ -266,7 +281,7 @@ public class ChatServiceImpl implements ChatService {
                         } catch (Exception ignore) {
                             // ignore
                         }
-                        emitter.complete();
+                        emitter.completeWithError(error);
                     },
                     () -> {
                         String response = cleanResponse(full.toString());
@@ -280,15 +295,35 @@ public class ChatServiceImpl implements ChatService {
                         emitter.complete();
                     }
             );
+        } catch (ExecutionException e) {
+            Throwable cause = e.getCause();
+            String errorMsg = getFriendlyMessage(cause);
+            log.error("SSE流式初始化异常: sessionId={}, cause={}", sessionId, errorMsg);
+            try {
+                emitter.send(SseEmitter.event().data(Map.of("error", errorMsg)));
+            } catch (Exception ignore) {
+                // ignore
+            }
+            emitter.complete();
         } catch (Exception e) {
+            String errorMsg = getFriendlyMessage(e);
             log.error("SSE流式对话初始化异常: sessionId={}", sessionId, e);
             try {
-                emitter.send(SseEmitter.event().data(Map.of("error", String.valueOf(e.getMessage()))));
+                emitter.send(SseEmitter.event().data(Map.of("error", errorMsg)));
             } catch (Exception ignore) {
                 // ignore
             }
             emitter.complete();
         }
+        // 设置 SSE 超时回调，超时时自动清理
+        emitter.onTimeout(() -> {
+            log.warn("SSE连接超时: sessionId={}", sessionId);
+            emitter.complete();
+        });
+        emitter.onError(throwable -> {
+            log.warn("SSE连接异常: sessionId={}, err={}", sessionId, throwable.getMessage());
+            emitter.complete();
+        });
         return emitter;
     }
 
@@ -296,5 +331,22 @@ public class ChatServiceImpl implements ChatService {
     public Result<List<ChatHistoryMessage>> getHistory(String sessionKey) {
         log.info("查询会话历史: sessionKey={}", sessionKey);
         return Result.success(chatHistoryService.load(sessionKey));
+    }
+
+    /**
+     * 将异常转换为友好的用户提示。
+     */
+    private String getFriendlyMessage(Throwable e) {
+        if (e == null) return "未知错误";
+        if (e instanceof io.github.resilience4j.circuitbreaker.CallNotPermittedException) {
+            return "AI服务当前负载较高，已被熔断保护，请稍后再试";
+        }
+        if (e instanceof java.util.concurrent.TimeoutException
+                || e.getMessage() != null && e.getMessage().contains("TimeLimiter")
+                || e.getMessage() != null && e.getMessage().contains("timeout")) {
+            return "AI服务响应超时，请稍后重试";
+        }
+        String msg = e.getMessage();
+        return msg != null ? msg : "AI服务调用异常";
     }
 }
