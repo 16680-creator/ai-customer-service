@@ -53,6 +53,12 @@ public class MessageServiceImpl implements MessageService {
     }
 
     @Override
+    public List<ChatMessage> getMessagesBySessionKey(String sessionKey) {
+        log.info("获取会话消息列表: sessionKey={}", sessionKey);
+        return chatMessageMapper.selectBySessionKey(sessionKey, 200);
+    }
+
+    @Override
     public List<ChatSession> getUserSessions(Long userId) {
         log.info("获取用户会话列表: userId={}", userId);
         LambdaQueryWrapper<ChatSession> wrapper = new LambdaQueryWrapper<>();

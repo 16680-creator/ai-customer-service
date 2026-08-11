@@ -35,6 +35,14 @@ public interface MessageService {
     List<ChatMessage> getSessionMessages(Long sessionId);
 
     /**
+     * 按会话标识 sessionKey 获取消息列表（按创建时间升序）
+     *
+     * @param sessionKey 会话标识
+     * @return 消息列表
+     */
+    List<ChatMessage> getMessagesBySessionKey(String sessionKey);
+
+    /**
      * 获取用户会话列表
      *
      * @param userId 用户ID

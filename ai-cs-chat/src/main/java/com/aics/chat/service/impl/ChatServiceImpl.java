@@ -1,6 +1,7 @@
 package com.aics.chat.service.impl;
 
-import com.aics.chat.mq.ChatMessageProducer;
+import com.aics.chat.dto.ChatHistoryMessage;
+import com.aics.chat.service.ChatHistoryService;
 import com.aics.chat.service.ChatService;
 import com.aics.chat.service.KnowledgeBaseService;
 import com.aics.common.exception.BusinessException;
@@ -25,7 +26,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
 /**
@@ -39,10 +39,7 @@ public class ChatServiceImpl implements ChatService {
     private final ChatClient chatClient;
     private final OpenAiChatModel chatModel;
     private final KnowledgeBaseService knowledgeBaseService;
-    private final ChatMessageProducer chatMessageProducer;
-
-    /** 会话历史存储（生产环境应使用 Redis 或持久化存储） */
-    private final Map<String, List<Message>> sessionHistory = new ConcurrentHashMap<>();
+    private final ChatHistoryService chatHistoryService;
 
     /** 最大历史消息数，超过时触发压缩 */
     private static final int MAX_HISTORY_SIZE = 20;
@@ -59,6 +56,21 @@ public class ChatServiceImpl implements ChatService {
     private String cleanResponse(String response) {
         if (response == null) return "";
         return THINK_PATTERN.matcher(response).replaceAll("").trim();
+    }
+
+    /**
+     * 将持久化历史 DTO 转换为 Spring AI Message 列表
+     */
+    private List<Message> toSpringMessages(List<ChatHistoryMessage> history) {
+        List<Message> messages = new ArrayList<>(history.size());
+        for (ChatHistoryMessage msg : history) {
+            if ("user".equals(msg.getRole())) {
+                messages.add(new UserMessage(msg.getContent()));
+            } else {
+                messages.add(new AssistantMessage(msg.getContent()));
+            }
+        }
+        return messages;
     }
 
     /**
@@ -103,15 +115,14 @@ public class ChatServiceImpl implements ChatService {
         log.info("对话请求: sessionId={}, message={}", sessionId, message);
 
         try {
-            // 维护会话历史
-            List<Message> history = sessionHistory.computeIfAbsent(sessionId, k -> new ArrayList<>());
+            // 从持久化历史加载（Redis 优先，未命中回源 message 表），替代内存 Map
+            List<Message> history = toSpringMessages(chatHistoryService.load(sessionId));
             history.add(new UserMessage(message));
-            chatMessageProducer.send(sessionId, "user", message);
+            chatHistoryService.append(sessionId, "user", message);
 
             // 历史超过上限时，压缩旧消息为摘要
             if (history.size() > MAX_HISTORY_SIZE) {
                 history = compressHistory(history);
-                sessionHistory.put(sessionId, history);
             }
 
             // 调用 AI 模型，携带完整会话历史（工具已通过 defaultToolCallbacks 全局注册）
@@ -124,7 +135,7 @@ public class ChatServiceImpl implements ChatService {
             response = cleanResponse(response);
 
             // 记录 AI 回复到历史
-            chatMessageProducer.send(sessionId, "assistant", response);
+            chatHistoryService.append(sessionId, "assistant", response);
             history.add(new AssistantMessage(response));
 
             log.info("对话完成: sessionId={}, responseLength={}", sessionId, response.length());
@@ -202,13 +213,12 @@ public class ChatServiceImpl implements ChatService {
         boolean hasKb = StringUtils.hasText(knowledgeBase);
 
         try {
-            // 1. 维护会话历史（与 chat() 一致）：记录用户消息 + 投递 MQ
-            List<Message> history = sessionHistory.computeIfAbsent(sessionId, k -> new ArrayList<>());
+            // 1. 维护会话历史（与 chat() 一致）：从持久化历史加载 + 记录用户消息（Redis + MQ 双写）
+            List<Message> history = toSpringMessages(chatHistoryService.load(sessionId));
             history.add(new UserMessage(message));
-            chatMessageProducer.send(sessionId, "user", message);
+            chatHistoryService.append(sessionId, "user", message);
             if (history.size() > MAX_HISTORY_SIZE) {
                 history = compressHistory(history);
-                sessionHistory.put(sessionId, history);
             }
 
             // lambda 中需要引用历史列表（effectively final）
@@ -261,7 +271,7 @@ public class ChatServiceImpl implements ChatService {
                     () -> {
                         String response = cleanResponse(full.toString());
                         try {
-                            chatMessageProducer.send(sessionId, "assistant", response);
+                            chatHistoryService.append(sessionId, "assistant", response);
                             streamHistory.add(new AssistantMessage(response));
                             emitter.send(SseEmitter.event().data(Map.of("done", true, "content", response)));
                         } catch (Exception e) {
@@ -280,5 +290,11 @@ public class ChatServiceImpl implements ChatService {
             emitter.complete();
         }
         return emitter;
+    }
+
+    @Override
+    public Result<List<ChatHistoryMessage>> getHistory(String sessionKey) {
+        log.info("查询会话历史: sessionKey={}", sessionKey);
+        return Result.success(chatHistoryService.load(sessionKey));
     }
 }

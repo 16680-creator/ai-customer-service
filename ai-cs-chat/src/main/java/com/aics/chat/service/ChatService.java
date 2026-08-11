@@ -1,8 +1,10 @@
 package com.aics.chat.service;
 
+import com.aics.chat.dto.ChatHistoryMessage;
 import com.aics.common.result.Result;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -47,4 +49,12 @@ public interface ChatService {
      * @return SSE 发射器，逐 token 推送 {@code data: {"content":"..."}} 事件
      */
     SseEmitter chatStreamSse(String sessionId, String message, String knowledgeBase);
+
+    /**
+     * 查询会话历史（历史回看）
+     *
+     * @param sessionKey 会话标识
+     * @return 按时间升序的历史消息列表
+     */
+    Result<List<ChatHistoryMessage>> getHistory(String sessionKey);
 }

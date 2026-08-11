@@ -48,6 +48,13 @@ public class MessageController {
         return Result.success(messages);
     }
 
+    @Operation(summary = "获取会话消息列表（按 sessionKey）")
+    @GetMapping("/session-key/{sessionKey}/messages")
+    public Result<List<ChatMessage>> getMessagesBySessionKey(@PathVariable("sessionKey") String sessionKey) {
+        List<ChatMessage> messages = messageService.getMessagesBySessionKey(sessionKey);
+        return Result.success(messages);
+    }
+
     @Operation(summary = "获取用户会话列表")
     @GetMapping("/sessions")
     public Result<List<ChatSession>> getUserSessions(@RequestParam("userId") Long userId) {

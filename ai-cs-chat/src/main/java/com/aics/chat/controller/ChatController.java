@@ -1,5 +1,6 @@
 package com.aics.chat.controller;
 
+import com.aics.chat.dto.ChatHistoryMessage;
 import com.aics.chat.service.ChatService;
 import com.aics.chat.util.ChatUserContext;
 import com.aics.common.result.Result;
@@ -12,6 +13,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -72,5 +74,11 @@ public class ChatController {
         } finally {
             ChatUserContext.clear();
         }
+    }
+
+    @Operation(summary = "查询会话历史（历史回看）")
+    @GetMapping("/history")
+    public Result<List<ChatHistoryMessage>> getHistory(@RequestParam("sessionKey") @NotBlank(message = "会话标识不能为空") String sessionKey) {
+        return chatService.getHistory(sessionKey);
     }
 }
