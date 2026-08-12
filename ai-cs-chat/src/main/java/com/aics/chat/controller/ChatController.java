@@ -116,7 +116,7 @@ public class ChatController {
      *
      * <p>返回 {@link SseEmitter}，业务层订阅 LLM 的 {@code Flux<String>}，
      * 每个 token 通过 {@code data: {"content":"..."}} 事件推送；流结束时推送
-     * {@code {"done":true,"content":"完整回复","citations":[...]}} 事件。</p>
+     * {@code {"done":true,"citations":[...]}} 事件（正文已逐 token 推送，不重复携带）。</p>
      *
      * <p>当 {@code knowledgeBase} 非空时走 RAG 流式（带引用溯源），否则走普通流式。</p>
      *

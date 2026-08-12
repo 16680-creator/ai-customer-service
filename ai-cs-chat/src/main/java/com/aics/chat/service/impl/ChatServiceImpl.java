@@ -6,6 +6,7 @@ import com.aics.chat.dto.CitationItemDTO;
 import com.aics.chat.service.ChatHistoryService;
 import com.aics.chat.service.ChatService;
 import com.aics.chat.service.KnowledgeBaseService;
+import com.aics.chat.util.ChatUserContext;
 import com.aics.common.exception.BusinessException;
 import com.aics.common.result.Result;
 import com.aics.common.result.ResultCode;
@@ -76,6 +77,19 @@ public class ChatServiceImpl implements ChatService {
     }
 
     /**
+     * 将当前登录用户身份注入消息上下文头部，供 Tool Calling 获取用户ID。
+     * <p>SSE 流式链路中 LLM 调用与 Tool 回调在异步线程执行，ThreadLocal 不可用，
+     * 因此把 userId 写入 SystemMessage，保证订单查询等用户维度工具能拿到正确身份。</p>
+     */
+    private void injectUserContext(List<Message> history) {
+        Long userId = ChatUserContext.getUserId();
+        if (userId != null) {
+            history.add(0, new SystemMessage(
+                    "当前登录用户ID为 " + userId + "，调用订单查询等工具时必须使用该ID（纯数字）作为参数。"));
+        }
+    }
+
+    /**
      * 将持久化历史 DTO 转换为 Spring AI Message 列表
      */
     private List<Message> toSpringMessages(List<ChatHistoryMessage> history) {
@@ -137,6 +151,7 @@ public class ChatServiceImpl implements ChatService {
         try {
             // 从持久化历史加载（Redis 优先，未命中回源 message 表）
             List<Message> history = toSpringMessages(chatHistoryService.load(sessionId));
+            injectUserContext(history);
             history.add(new UserMessage(message));
             chatHistoryService.append(sessionId, "user", message);
 
@@ -247,6 +262,7 @@ public class ChatServiceImpl implements ChatService {
         try {
             // 1. 维护会话历史
             List<Message> history = toSpringMessages(chatHistoryService.load(sessionId));
+            injectUserContext(history);
             history.add(new UserMessage(message));
             chatHistoryService.append(sessionId, "user", message);
             if (history.size() > MAX_HISTORY_SIZE) {
@@ -329,10 +345,9 @@ public class ChatServiceImpl implements ChatService {
                         try {
                             chatHistoryService.append(sessionId, "assistant", response);
                             streamHistory.add(new AssistantMessage(response));
-                            // done 事件携带回答正文 + 引用溯源列表
+                            // done 事件仅携带引用溯源列表（正文已逐 token 推送，不再重复携带）
                             Map<String, Object> doneEvent = new HashMap<>();
                             doneEvent.put("done", true);
-                            doneEvent.put("content", response);
                             doneEvent.put("citations", citations);
                             emitter.send(SseEmitter.event().data(doneEvent));
                         } catch (Exception e) {
