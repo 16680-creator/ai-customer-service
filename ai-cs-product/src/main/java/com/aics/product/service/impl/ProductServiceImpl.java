@@ -11,6 +11,7 @@ import com.aics.product.mapper.ProductMapper;
 import com.aics.product.service.ProductService;
 import com.aics.product.vo.ProductVO;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
@@ -157,32 +158,52 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public void deductStock(Long productId, int quantity) {
-        Product product = productMapper.selectById(productId);
-        if (product == null) {
-            throw new BusinessException(ResultCode.PRODUCT_NOT_FOUND, "商品不存在");
-        }
-        if (product.getStock() < quantity) {
+        // 实时库存扣减：以 DB 为权威源，用「条件更新」保证原子性，避免并发超卖。
+        // 仅当当前库存 >= 扣减数量时才执行 stock = stock - qty，返回受影响行数（0 表示不足/不存在）。
+        int rows = productMapper.update(null, new LambdaUpdateWrapper<Product>()
+                .eq(Product::getId, productId)
+                .ge(Product::getStock, quantity)
+                .setSql("stock = stock - " + quantity)
+                .setSql("sales = sales + " + quantity));
+        if (rows == 0) {
+            // 扣减失败：商品不存在 或 库存不足
+            Product product = productMapper.selectById(productId);
+            if (product == null) {
+                throw new BusinessException(ResultCode.PRODUCT_NOT_FOUND, "商品不存在");
+            }
             throw new BusinessException(ResultCode.PRODUCT_STOCK_INSUFFICIENT,
                     "商品库存不足，当前库存: " + product.getStock());
         }
-        product.setStock(product.getStock() - quantity);
-        product.setSales(product.getSales() + quantity);
-        productMapper.updateById(product);
+        // 同步 Redis 镜像，使「商品详情/列表」与「购物车校验」读到一致的实时库存
+        Product product = productMapper.selectById(productId);
         stringRedisTemplate.opsForValue().set("stock:" + productId, String.valueOf(product.getStock()));
-        log.info("库存扣减成功: productId={}, quantity={}, remaining={}", productId, quantity, product.getStock());
+        log.info("库存扣减成功(实时): productId={}, quantity={}, remaining={}", productId, quantity, product.getStock());
     }
 
     @Override
     public void restoreStock(Long productId, int quantity) {
-        Product product = productMapper.selectById(productId);
-        if (product == null) {
+        // 实时回补：DB 原子 stock = stock + qty，sales 同步回退（不低于 0）
+        int rows = productMapper.update(null, new LambdaUpdateWrapper<Product>()
+                .eq(Product::getId, productId)
+                .setSql("stock = stock + " + quantity)
+                .setSql("sales = GREATEST(0, sales - " + quantity + ")"));
+        if (rows == 0) {
             throw new BusinessException(ResultCode.PRODUCT_NOT_FOUND, "商品不存在");
         }
-        product.setStock(product.getStock() + quantity);
-        product.setSales(Math.max(0, product.getSales() - quantity));
-        productMapper.updateById(product);
+        Product product = productMapper.selectById(productId);
         stringRedisTemplate.opsForValue().set("stock:" + productId, String.valueOf(product.getStock()));
-        log.info("库存恢复成功: productId={}, quantity={}, current={}", productId, quantity, product.getStock());
+        log.info("库存回补成功(实时): productId={}, quantity={}, current={}", productId, quantity, product.getStock());
+    }
+
+    @Override
+    public void syncStockCache() {
+        // 运维校准：历史订单曾只扣 Redis 镜像、从不回写 DB，导致 Redis 与 DB 不一致。
+        // 切换为「DB 权威源」后，部署完成时全量把 DB 同步到 Redis，使镜像立即对齐。
+        List<Product> all = productMapper.selectList(null);
+        for (Product p : all) {
+            stringRedisTemplate.opsForValue().set("stock:" + p.getId(), String.valueOf(p.getStock()));
+        }
+        log.info("库存缓存校准完成(DB全量同步Redis): count={}", all.size());
     }
 
     @Override

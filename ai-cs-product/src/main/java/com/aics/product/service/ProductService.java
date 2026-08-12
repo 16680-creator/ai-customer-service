@@ -49,6 +49,11 @@ public interface ProductService {
     void restoreStock(Long productId, int quantity);
 
     /**
+     * 校准库存缓存：将 DB 库存全量同步到 Redis 镜像（消除历史双写不一致，部署后运维调用一次即可对齐）
+     */
+    void syncStockCache();
+
+    /**
      * 创建分类
      */
     ProductCategory createCategory(String name, Long parentId);

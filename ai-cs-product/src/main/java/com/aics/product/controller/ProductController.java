@@ -149,6 +149,15 @@ public class ProductController {
     }
 
     /**
+     * 校准库存缓存：DB 全量同步 Redis 镜像（运维用，消除历史双写不一致）
+     */
+    @PostMapping("/stock/sync")
+    public Result<Void> syncStockCache() {
+        productService.syncStockCache();
+        return Result.success();
+    }
+
+    /**
      * 创建分类
      */
     @PostMapping("/category")

@@ -5,6 +5,7 @@ import com.aics.common.exception.BusinessException;
 import com.aics.common.result.ResultCode;
 import com.aics.order.bo.PriceCalcBO;
 import com.aics.order.client.OrderPayClient;
+import com.aics.order.client.ProductStockClient;
 import com.aics.order.entity.*;
 import com.aics.order.enums.CouponStatus;
 import com.aics.order.enums.OrderStatus;
@@ -17,7 +18,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.rocketmq.spring.core.RocketMQTemplate;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -44,7 +45,7 @@ public class OrderServiceImpl implements OrderService {
     private final CartItemMapper cartItemMapper;
     private final CouponMapper couponMapper;
     private final PromotionService promotionService;
-    private final StringRedisTemplate stringRedisTemplate;
+    private final ProductStockClient productStockClient;
     private final RocketMQTemplate rocketMQTemplate;
     private final OrderPayClient orderPayClient;
 
@@ -62,15 +63,30 @@ public class OrderServiceImpl implements OrderService {
             throw new BusinessException(ResultCode.ORDER_CART_EMPTY);
         }
 
-        // 2. Redis 库存预扣
-        for (CartItem item : cartItems) {
-            Long remaining = stringRedisTemplate.opsForValue()
-                    .decrement("stock:" + item.getProductId(), item.getQuantity());
-            if (remaining == null || remaining < 0) {
-                rollbackStock(cartItems, item);
-                throw new BusinessException(ResultCode.ORDER_STOCK_INSUFFICIENT,
-                        "商品库存不足: " + item.getProductName());
+        // 2. 实时扣减库存（以商品服务 DB 为权威源，原子扣减；失败回滚已扣项）
+        //    注意：跨服务调用不在本地事务内，采用「先扣后用、失败回补」的尽力一致策略。
+        List<Long> deductedProducts = new ArrayList<>();
+        try {
+            for (CartItem item : cartItems) {
+                productStockClient.deductStock(item.getProductId(), item.getQuantity());
+                deductedProducts.add(item.getProductId());
             }
+        } catch (Exception e) {
+            // 回滚本次已成功扣减的商品（按商品聚合本次订单数量，避免重复回补）
+            for (Long pid : deductedProducts) {
+                int qty = cartItems.stream()
+                        .filter(i -> i.getProductId().equals(pid))
+                        .mapToInt(CartItem::getQuantity)
+                        .sum();
+                try {
+                    productStockClient.restoreStock(pid, qty);
+                } catch (Exception ignore) {
+                    log.warn("库存回滚失败（需人工核查）: productId={}, qty={}", pid, qty);
+                }
+            }
+            log.warn("库存扣减失败，已回滚已扣项: err={}", e.getMessage());
+            throw new BusinessException(ResultCode.ORDER_STOCK_INSUFFICIENT,
+                    "商品库存不足或服务异常，请稍后再试");
         }
 
         // 3. 计算价格
@@ -253,11 +269,11 @@ public class OrderServiceImpl implements OrderService {
         order.setStatus(OrderStatus.REFUNDED.getCode());
         orderMapper.updateById(order);
 
-        // 回补库存（Redis 扣减库存体系）
+        // 回补库存（实时回补商品服务 DB 库存）
         List<OrderItem> items = orderItemMapper.selectList(
                 new LambdaQueryWrapper<OrderItem>().eq(OrderItem::getOrderNo, orderNo));
         for (OrderItem item : items) {
-            stringRedisTemplate.opsForValue().increment("stock:" + item.getProductId(), item.getQuantity());
+            productStockClient.restoreStock(item.getProductId(), item.getQuantity());
         }
 
         log.info("订单退款确认: orderNo={}", orderNo);
@@ -287,11 +303,11 @@ public class OrderServiceImpl implements OrderService {
         order.setCancelTime(LocalDateTime.now());
         orderMapper.updateById(order);
 
-        // 归还库存
+        // 归还库存（实时回补商品服务 DB 库存）
         List<OrderItem> items = orderItemMapper.selectList(
                 new LambdaQueryWrapper<OrderItem>().eq(OrderItem::getOrderNo, order.getOrderNo()));
         for (OrderItem item : items) {
-            stringRedisTemplate.opsForValue().increment("stock:" + item.getProductId(), item.getQuantity());
+            productStockClient.restoreStock(item.getProductId(), item.getQuantity());
         }
 
         // 通知支付服务关闭渠道订单（使二维码失效）
@@ -318,13 +334,6 @@ public class OrderServiceImpl implements OrderService {
             orderPayClient.closeChannel(order.getPaymentMethod(), order.getOrderNo());
         } catch (Exception e) {
             log.warn("通知支付服务关单失败: orderNo={}, err={}", order.getOrderNo(), e.getMessage());
-        }
-    }
-
-    private void rollbackStock(List<CartItem> cartItems, CartItem failedItem) {
-        for (CartItem item : cartItems) {
-            if (item == failedItem) break;
-            stringRedisTemplate.opsForValue().increment("stock:" + item.getProductId(), item.getQuantity());
         }
     }
 

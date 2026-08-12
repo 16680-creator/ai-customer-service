@@ -2,6 +2,7 @@ package com.aics.order.service;
 
 import com.aics.common.exception.BusinessException;
 import com.aics.order.client.OrderPayClient;
+import com.aics.order.client.ProductStockClient;
 import com.aics.order.entity.CartItem;
 import com.aics.order.entity.Order;
 import com.aics.order.entity.OrderItem;
@@ -20,8 +21,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.ValueOperations;
 
 import java.math.BigDecimal;
 import java.util.Arrays;
@@ -49,9 +48,7 @@ class OrderServiceTest {
     @Mock
     private PromotionService promotionService;
     @Mock
-    private StringRedisTemplate stringRedisTemplate;
-    @Mock
-    private ValueOperations<String, String> valueOperations;
+    private ProductStockClient productStockClient;
     @Mock
     private RocketMQTemplate rocketMQTemplate;
     @Mock
@@ -88,9 +85,7 @@ class OrderServiceTest {
     @DisplayName("正常下单 - 生成待支付订单")
     void createOrder_shouldSucceed() {
         when(cartItemMapper.selectBatchIds(anyList())).thenReturn(Arrays.asList(cartItem1, cartItem2));
-        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(valueOperations.decrement(eq("stock:1001"), eq(2L))).thenReturn(8L);
-        when(valueOperations.decrement(eq("stock:1002"), eq(1L))).thenReturn(9L);
+        doNothing().when(productStockClient).deductStock(anyLong(), anyInt());
         when(promotionService.calculatePrice(any(), eq(100L), isNull()))
                 .thenReturn(buildPriceCalcBO());
         when(orderMapper.insert(any())).thenReturn(1);
@@ -101,6 +96,8 @@ class OrderServiceTest {
         assertNotNull(result.getOrderNo());
         assertEquals("PENDING_PAY", result.getStatus());
         verify(orderMapper).insert(any());
+        verify(productStockClient).deductStock(eq(1001L), eq(2));
+        verify(productStockClient).deductStock(eq(1002L), eq(1));
         verify(rocketMQTemplate).syncSend(eq("order-timeout-topic"), any(), anyLong(), anyInt());
     }
 
@@ -108,11 +105,14 @@ class OrderServiceTest {
     @DisplayName("库存不足 - 拒绝下单")
     void createOrder_stockInsufficient_shouldThrow() {
         when(cartItemMapper.selectBatchIds(anyList())).thenReturn(Arrays.asList(cartItem1));
-        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(valueOperations.decrement(eq("stock:1001"), eq(2L))).thenReturn(-1L);
+        // 商品服务扣减库存返回 4xx（库存不足），RestTemplate 抛异常 -> 下单拒绝
+        doThrow(new BusinessException(ResultCode.ORDER_STOCK_INSUFFICIENT, "库存不足"))
+                .when(productStockClient).deductStock(eq(1001L), eq(2));
 
         assertThrows(BusinessException.class,
                 () -> orderService.createOrder(100L, Arrays.asList(1L), null, "WECHAT"));
+        // 单个商品即失败，无已扣项需回滚
+        verify(productStockClient, never()).restoreStock(anyLong(), anyInt());
     }
 
     @Test
@@ -179,13 +179,13 @@ class OrderServiceTest {
 
         when(orderMapper.selectOne(any())).thenReturn(order);
         when(orderItemMapper.selectList(any())).thenReturn(List.of(item));
-        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
+        doNothing().when(productStockClient).restoreStock(eq(1001L), eq(2));
 
         orderService.cancelExpiredOrder("20260801143022010001");
 
         verify(orderMapper).updateById(argThat(o ->
                 OrderStatus.CANCELLED.getCode().equals(o.getStatus())));
-        verify(valueOperations).increment("stock:1001", 2);
+        verify(productStockClient).restoreStock(eq(1001L), eq(2));
         verify(orderPayClient).closeChannel("WECHAT", "20260801143022010001");
     }
 
@@ -205,12 +205,11 @@ class OrderServiceTest {
 
         when(orderMapper.selectOne(any())).thenReturn(order);
         when(orderItemMapper.selectList(any())).thenReturn(Arrays.asList(item));
-        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(valueOperations.increment("stock:1001", 2L)).thenReturn(100L);
+        doNothing().when(productStockClient).restoreStock(eq(1001L), eq(2));
 
         assertDoesNotThrow(() -> orderService.refundConfirm("ORD20260809001"));
         assertEquals(OrderStatus.REFUNDED.getCode(), order.getStatus());
-        verify(valueOperations).increment("stock:1001", 2L);
+        verify(productStockClient).restoreStock(eq(1001L), eq(2));
     }
 
     @Test

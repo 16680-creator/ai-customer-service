@@ -169,6 +169,7 @@ async function addToCart(p) {
     if (data.code === 200) {
       ElMessage.success(`「${p.name}」已加入购物车`)
       loadCartCount()
+      loadProducts() // 刷新商城库存，实时反映扣减（库存以商品服务 DB 为权威源）
     } else {
       ElMessage.error(data.message || '加入购物车失败')
     }

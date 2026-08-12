@@ -116,14 +116,11 @@ public class CartServiceImpl implements CartService {
             throw new BusinessException(ResultCode.ORDER_NOT_FOUND, "购物车项不存在");
         }
 
-        // 校验库存
-        String stockStr = stringRedisTemplate.opsForValue().get("stock:" + cartItem.getProductId());
-        if (stockStr != null) {
-            int stock = Integer.parseInt(stockStr);
-            if (quantity > stock) {
-                throw new BusinessException(ResultCode.ORDER_STOCK_INSUFFICIENT,
-                        "库存不足，最多可购买 " + stock + " 件");
-            }
+        // 实时校验库存：优先取商品服务实时库存，其次 Redis 镜像兜底
+        int available = currentStock(cartItem.getProductId());
+        if (quantity > available) {
+            throw new BusinessException(ResultCode.ORDER_STOCK_INSUFFICIENT,
+                    "库存不足，最多可购买 " + available + " 件");
         }
 
         cartItem.setQuantity(quantity);
@@ -151,15 +148,45 @@ public class CartServiceImpl implements CartService {
     }
 
     private int availableStock(Long productId, Integer productStock) {
+        // 实时库存以商品服务返回的 DB 库存为准；Redis 镜像仅在商品服务不可用时兜底
+        if (productStock != null) {
+            return productStock;
+        }
         String stockStr = stringRedisTemplate.opsForValue().get("stock:" + productId);
         if (stockStr != null) {
             try {
-                return Integer.parseInt(stockStr);
+                int v = Integer.parseInt(stockStr);
+                if (v >= 0) return v; // 历史脏数据（负数）视为无效，继续走下方兜底
             } catch (NumberFormatException ignored) {
-                // 忽略 Redis 中异常库存值，回退到商品快照
+                // 忽略 Redis 中异常库存值
             }
         }
-        return productStock == null ? Integer.MAX_VALUE : productStock;
+        return Integer.MAX_VALUE;
+    }
+
+    /**
+     * 获取商品实时可用库存：优先商品服务 DB 库存，其次 Redis 镜像兜底。
+     */
+    private int currentStock(Long productId) {
+        try {
+            ProductRemoteDTO remote = restTemplate.getForObject(
+                    "http://ai-cs-product/product/{id}", ProductRemoteDTO.class, productId);
+            if (remote != null && remote.getData() != null && remote.getData().getStock() != null) {
+                return remote.getData().getStock();
+            }
+        } catch (Exception e) {
+            log.warn("获取实时库存失败，改用 Redis 兜底: productId={}", productId, e);
+        }
+        String stockStr = stringRedisTemplate.opsForValue().get("stock:" + productId);
+        if (stockStr != null) {
+            try {
+                int v = Integer.parseInt(stockStr);
+                if (v >= 0) return v; // 历史脏数据（负数）视为无效，继续走下方兜底
+            } catch (NumberFormatException ignored) {
+                // 忽略异常值
+            }
+        }
+        return Integer.MAX_VALUE;
     }
 
     private CartVO.CartItemVO toCartItemVO(CartItem item) {
