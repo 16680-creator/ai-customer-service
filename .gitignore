@@ -50,3 +50,6 @@ tools/rocketmq-all-5.1.4-bin-release.zip
 # Codex 临时文件
 .codex-tmp/
 .codex-patch1.txt
+
+# IDE tools.workbuddy/
+tools/nacos-config/lib/

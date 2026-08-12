@@ -1,4 +1,7 @@
 spring:
+  ai:
+    openai:
+      api-key: sk-d62eb12cc72b48bf91b7a519b0018cab
   data:
     redis:
       host: 123.60.31.79

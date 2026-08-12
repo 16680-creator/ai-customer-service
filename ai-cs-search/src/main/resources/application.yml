@@ -9,6 +9,7 @@ spring:
     exclude:
       - org.springframework.ai.model.openai.autoconfigure.OpenAiEmbeddingAutoConfiguration
       - org.springframework.ai.model.openai.autoconfigure.OpenAiAudioSpeechAutoConfiguration
+      - org.springframework.ai.model.openai.autoconfigure.OpenAiAudioTranscriptionAutoConfiguration
   cloud:
     nacos:
       discovery:
