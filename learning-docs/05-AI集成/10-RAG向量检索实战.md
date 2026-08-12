@@ -409,3 +409,134 @@ Chroma 是持久化服务，数据落盘，应用重启不丢（除非删容器/
    兜底 `application.yml` 均已补充这两个字段。
 4. **版本与兼容性**：父 POM `spring-ai.version` 已由 `1.0.0` 改为 `1.1.4`；实测
    Spring AI `1.1.4` + Spring Boot `3.2.5` 编译通过，无需升级 Boot。
+
+---
+
+## 十一、两阶段检索升级（召回 + Rerank）
+
+> 背景：早期 `search()` 是**单次向量检索**直接取 Top-5。向量相似度只能反映"整体语义接近"，
+> 容易出现：字面上相关但语义偏差的片段混入、真正精确的片段被挤出前 5。
+> 升级后改为 **宽召回（Top-20）→ Rerank 精排（Top-5）** 的两阶段链路，检索精度显著提升。
+
+### 1. 链路变化对比
+
+```
+【旧】单次检索
+  用户问题 ──► Embedding 向量化 ──► VectorStore 相似度检索(Top-5, 阈值0.5) ──► 直接作为上下文
+
+【新】两阶段检索
+  用户问题 ──► Embedding 向量化 ──► 向量宽召回(Top-20, 低阈值0.5) ──► Rerank 精排(Top-5, minScore 0.7)
+                                      │                                    │
+                                      └── Rerank 服务异常/无 Key 时 ──► 回退相似度排序取 Top-5（降级）
+```
+
+**为什么先宽召回？** 检索质量 = 召回率 × 精排准确率。第一阶段把阈值放宽、条数放大
+（Top-20），宁可多召回一些候选，把"是否真相关"的判断交给更聪明的 Rerank 模型。
+
+### 2. 核心实现（KnowledgeBaseService.search）
+
+文件：`ai-cs-chat/src/main/java/com/aics/chat/service/KnowledgeBaseService.java`
+
+```java
+/** 第一阶段宽召回的 Top-K（配置 aics.rag.recall-top-k） */
+@Value("${aics.rag.recall-top-k:20}")
+private int recallTopK = 20;
+
+/** 第一阶段宽召回的相似度阈值（配置 aics.rag.recall-threshold） */
+@Value("${aics.rag.recall-threshold:0.5}")
+private double recallThreshold = 0.5;
+
+/** Rerank 精排服务（可选注入：bean 不存在时返回 null，检索退化为基础相似度排序） */
+private final ObjectProvider<RerankService> rerankServiceProvider;
+
+public List<Document> search(String knowledgeBase, String query, int topK, double threshold) {
+    // 阶段一：宽召回（Top-20，低阈值，保证召回率）
+    List<Document> recallDocs = searchRaw(knowledgeBase, query, recallTopK, recallThreshold);
+    if (recallDocs.isEmpty()) {
+        return recallDocs;
+    }
+
+    // 阶段二：Rerank 精排（可选，bean 不存在或调用失败时退化）
+    RerankService rerankService = rerankServiceProvider.getIfAvailable();
+    if (rerankService != null) {
+        try {
+            List<RerankResultItem> reranked = rerankService.rerank(query, recallDocs, topK).block();
+            if (reranked != null && !reranked.isEmpty()) {
+                // 按 Rerank 返回的 index 回取原文档，即得到精排后的 Top-N
+                List<Document> result = new ArrayList<>(reranked.size());
+                for (RerankResultItem item : reranked) {
+                    int idx = item.getIndex();
+                    if (idx >= 0 && idx < recallDocs.size()) {
+                        result.add(recallDocs.get(idx));
+                    }
+                }
+                return result;
+            }
+        } catch (Exception e) {
+            log.warn("知识库[{}]Rerank调用异常，降级为相似度排序: {}", knowledgeBase, e.getMessage());
+        }
+    }
+
+    // 退化路径：向量结果已按相似度降序，直接取 Top-N
+    List<Document> fallback = recallDocs.size() <= topK ? recallDocs : recallDocs.subList(0, topK);
+    return fallback;
+}
+```
+
+> 使用 `ObjectProvider<RerankService>` 注入：Rerank 是可选的增强组件，
+> 即使服务没起 / Bean 不存在，检索链路也能正常运行（降级为相似度排序），不破坏主流程。
+
+### 3. 宽召回细节（searchRaw）
+
+```java
+private List<Document> searchRaw(String knowledgeBase, String query, int topK, double threshold) {
+    // bge-m3 检索建议：查询文本加指令前缀，提升语义检索质量
+    String retrievalQuery = "为这个句子生成表示以用于检索相关文章：" + query;
+    SearchRequest searchRequest = SearchRequest.builder()
+            .query(retrievalQuery)
+            .topK(topK)
+            .similarityThreshold(threshold)
+            .filterExpression("knowledgeBase == '" + knowledgeBase + "'") // 只检索当前知识库
+            .build();
+    return vectorStore.similaritySearch(searchRequest);
+}
+```
+
+> 技巧：本项目 Embedding 使用 **bge-m3**，其官方检索建议给查询加指令前缀
+> `"为这个句子生成表示以用于检索相关文章："`（英文模型对应 `"Represent this sentence for searching relevant passages:"`），
+> 能显著提升查询向量质量。
+
+### 4. 配置说明（Nacos ai-cs-chat.yml）
+
+```yaml
+aics:
+  # RAG 两阶段检索配置
+  rag:
+    recall-top-k: 20        # 第一阶段宽召回条数（越大召回率越高，但 Rerank 开销越大）
+    recall-threshold: 0.5   # 宽召回相似度阈值（低于它直接丢弃）
+```
+
+调参建议：
+- 知识库文档量大 / 分块细 → `recall-top-k` 可加到 30~50，保证候选覆盖；
+- 知识库小 / 主题集中 → 20 足够，减少 Rerank 的 API 开销；
+- `recall-threshold` 不建议设太高（0.5 左右），精排阶段由 Rerank 的 `min-score` 把关。
+
+### 5. Rerank 详细内容
+
+Rerank 原理、硅基流动 `bge-reranker-v2-m3` API 调用、`SiliconFlowRerankService` 完整代码、
+降级策略与全部配置项，详见：[14-RAG进阶实战-Rerank重排序.md](14-RAG进阶实战-Rerank重排序.md)。
+
+### 6. 验证方法
+
+```bash
+# 1. 确保 Nacos 中已配置 aics.rag.* 与 aics.rerank.*（见 14 号文档）
+# 2. 启动服务后，检索测试接口返回的条数与顺序应体现 Rerank 效果：
+curl "http://localhost:8083/rag/knowledge-base/search?knowledgeBase=product-manual&query=退货政策"
+
+# 3. 观察日志中的两阶段链路：
+#    知识库[product-manual]宽召回完成: 命中20条
+#    知识库[product-manual]Rerank精排完成: 召回20条 -> 返回5条
+
+# 4. 降级验证：临时把 aics.rerank.api-key 置空后重启，
+#    日志出现 "Rerank降级: apiKey为空或无待重排文档"，检索仍正常返回（相似度排序）。
+```
