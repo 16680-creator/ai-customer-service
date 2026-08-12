@@ -164,7 +164,7 @@ chat(8083)/knowledge(8082) 新 jar，逐项实测：
 | 能力 | 接口 | 实测结果 |
 |------|------|---------|
 | US1 评估 | POST /rag/eval/run | ✅ 加载 golden 集（20 条）→ 检索 → 指标(recall/mrr/hitRate) → LLM-Judge 均分 → 门禁判定；product-manual 库无数据时 hitRate=0、passed=false（行为正确） |
-| US2 Hybrid | GET /chat/retrieve/test?mode=HYBRID | ✅ 全局未启用时自动降级纯向量（degraded=true, reason=hybrid 全局未启用）；成功路径需 ai-cs-search+ES（本环境未部署，单测已覆盖） |
+| US2 Hybrid | GET /chat/retrieve/test?mode=HYBRID | ✅ 全链路实测：启动 ai-cs-search(8084) + 临时开启 hybrid 开关 → chat Feign → search 混合检索 → 返回 5 条命中（mode=HYBRID, degraded=false，top1 为刚收录的 FAQ）；ES 未部署时 search 侧自动走向量路；开关关闭时自动降级纯向量 |
 | US3 改写/HyDE | GET /chat/retrieve/test?mode=HYBRID_QUERY_REWRITE | ✅ 临时开启开关后实测成功路径：LLM 改写→多查询+HyDE→向量检索→RRF 融合返回 5 条命中、未降级；关闭后自动降级 |
 | US4 GraphRAG | POST /rag/graph/triple + GET /rag/graph/query | ✅ 三元组入库（id 1/2）→ 多跳查询 depth=2 命中「退款政策→申请入口→审核时效」2 条 |
 | US5 图表 | POST /chat/chart | ✅ LLM 生成结论 + chartType=PIE 自动判定 + ECharts option 返回 |
@@ -185,7 +185,7 @@ chat(8083)/knowledge(8082) 新 jar，逐项实测：
 
 ### 环境限制（已登记）
 
-- Hybrid 成功路径需 ai-cs-search 服务 + Elasticsearch（本环境未部署），降级路径已实测、成功路径由单测覆盖
+- Hybrid 双路 RRF 完整成功路径需 Elasticsearch（本环境 9200 未部署），当前已验证 chat→search 全链路（ES 降级为向量路）；Rerank/Embedding API Key 走 Nacos，无硬编码
 - GraphRAG 默认 InMemory 存储实测通过；Neo4j 版需 Neo4j 实例（单测基于 Mock 驱动）
 
 ## 六、后续待办（跟踪）
