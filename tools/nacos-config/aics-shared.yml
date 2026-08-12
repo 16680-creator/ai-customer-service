@@ -1,0 +1,19 @@
+spring:
+  data:
+    redis:
+      host: 123.60.31.79
+      port: 6379
+      password: ""
+      database: 0
+rocketmq:
+  name-server: 127.0.0.1:9876
+aics:
+  mysql:
+    host: 123.60.31.79
+  jwt:
+    secret: aics-platform-jwt-secret-key-must-be-at-least-256-bits-long-for-hs256
+    expire-hours: 24
+  embedding:
+    base-url: https://api.siliconflow.cn
+    api-key: ${SILICONFLOW_API_KEY}
+    model: BAAI/bge-m3

@@ -41,6 +41,8 @@ deploy/nacos/
 # 本地测试工具（ES 等）
 tools/elasticsearch/
 tools/rocketmq/
+# Nacos 运行数据（derby/raft，含敏感配置快照，切 MySQL 后废弃）
+tools/nacos/data/
 
 # Codex 临时文件
 .codex-tmp/

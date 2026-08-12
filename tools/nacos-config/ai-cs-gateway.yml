@@ -1,0 +1,13 @@
+# 网关配置
+spring:
+  cloud:
+    gateway:
+      # 全局跨域配置（前端 localhost:5173 -> 网关 8080）
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowed-origin-patterns: "*"
+            allowed-methods: "*"
+            allowed-headers: "*"
+            allow-credentials: true
+            max-age: 3600
