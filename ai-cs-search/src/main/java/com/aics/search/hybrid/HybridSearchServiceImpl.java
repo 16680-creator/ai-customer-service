@@ -17,15 +17,20 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * 混合检索服务实现
+ * 混合检索服务实现 —— "关键词 + 语义"双路召回再融合。
  *
- * <p>双路召回 + RRF 融合：
+ * <h3>学习要点（技术：Hybrid Search / BM25 / 降级）</h3>
  * <ul>
- *   <li>ES 路：multiMatch 关键词检索（title^2, content），按 knowledgeBase 过滤，取 Top-20</li>
- *   <li>向量路：Chroma similaritySearch 语义检索（bge-m3），按 knowledgeBase 过滤，取 Top-20</li>
- *   <li>融合：RrfMerger 倒数排名融合，输出 topK 条</li>
+ *   <li><b>为什么双路</b>：ES 关键词检索(BM25 multiMatch)对精确串（型号/编号/专有名词）强，
+ *       对同义改写弱；向量检索（bge-m3）反之。双路召回可互补。</li>
+ *   <li><b>ES 路</b>：{@code multiMatch(title^2, content)} 按 knowledgeBase 过滤取 Top-20，
+ *       title 权重翻倍因为标题更关键。</li>
+ *   <li><b>向量路</b>：Chroma similaritySearch，同样按 knowledgeBase 过滤取 Top-20。</li>
+ *   <li><b>RRF 融合</b>：两路各自排名后由 {@link RrfMerger} 倒数排名融合，
+ *       不依赖分数可比性（BM25 分与向量距离量纲不同，不能直接相加）。</li>
+ *   <li><b>降级</b>：任一路异常自动降级——ES 挂返回向量结果、向量挂返回 ES 结果，
+ *       保证搜索功能不整体失效。</li>
  * </ul>
- * 任一路异常自动降级：ES 挂时仅返回向量结果，向量挂时仅返回 ES 结果。
  */
 @Slf4j
 @Service

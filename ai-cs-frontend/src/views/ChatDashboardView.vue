@@ -1,3 +1,10 @@
+<!--
+  AI 数据看板（US5 结构化问答增强的前端落地）
+  学习要点：
+  1. 问数图表 = 后端生成「自然语言结论 + ECharts 配置(echartsOption)」，前端只负责渲染
+  2. echarts.init(dom) 后 setOption(json) 即可画图；数据变化先 dispose 旧实例再重建
+  3. chartType=NONE（单行/空数据）时不渲染图表，避免误导
+-->
 <template>
   <div class="chat-dashboard">
     <el-card shadow="hover">
@@ -29,17 +36,18 @@
 
 <script setup>
 import { ref, nextTick, onBeforeUnmount } from 'vue'
-import * as echarts from 'echarts'
+import * as echarts from 'echarts'   // ECharts 图表库
 import { ElMessage } from 'element-plus'
 import { chatApi } from '../api'
 
-const question = ref('')
-const rowsText = ref('')
-const answer = ref(null)
+const question = ref('')      // 用户问题（如"各分类销量分布"）
+const rowsText = ref('')      // 查询结果 JSON 文本（NL2SQL 的 rows）
+const answer = ref(null)      // 后端返回的 ChartAnswer（结论+图表类型+option）
 const loading = ref(false)
-const chartRef = ref(null)
-let chartInstance = null
+const chartRef = ref(null)    // 图表容器 DOM 引用
+let chartInstance = null      // ECharts 实例（需手动管理生命周期）
 
+/** 填充示例数据，便于快速体验 */
 function loadSample() {
   question.value = '各分类销量分布'
   rowsText.value = JSON.stringify([
@@ -50,6 +58,7 @@ function loadSample() {
   ])
 }
 
+/** 调用后端 /chat/chart 生成结论 + 图表配置，再渲染 */
 async function generate() {
   let rows = []
   try {
@@ -75,7 +84,9 @@ async function generate() {
   }
 }
 
+/** 用后端返回的 ECharts option 渲染图表；NONE 类型不渲染 */
 function renderChart(data) {
+  // 复用实例前先销毁，避免多次 setOption 叠加状态
   if (chartInstance) {
     chartInstance.dispose()
     chartInstance = null
@@ -85,6 +96,7 @@ function renderChart(data) {
   chartInstance.setOption(data.echartsOption || {})
 }
 
+// 组件卸载时释放图表实例，防止内存泄漏
 onBeforeUnmount(() => {
   if (chartInstance) chartInstance.dispose()
 })

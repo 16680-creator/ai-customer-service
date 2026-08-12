@@ -9,10 +9,17 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 多查询结果融合（RRF，Reciprocal Rank Fusion）。
+ * 多查询结果融合 —— RRF（Reciprocal Rank Fusion，倒数排名融合）。
  *
- * <p>把多路检索结果（如多个改写子查询、HyDE 文档查询）按排名融合：
- * 对每个文档累加 {@code 1 / (rrfK + rank)}，按总分降序取 Top-N，并按文档 ID 去重。</p>
+ * <h3>学习要点（技术：RRF 融合算法）</h3>
+ * <ul>
+ *   <li><b>为什么需要融合</b>：查询改写后有多路子查询结果、还有 HyDE 结果，
+ *       需要合并成一份有序列表。RRF 是业界常用、无需训练分数的融合算法。</li>
+ *   <li><b>核心公式</b>：对每个文档累加 {@code 1 / (rrfK + rank)}。
+ *       排名越靠前贡献越大；在【多路中都靠前】的文档总分最高——天然实现"共识优先"。</li>
+ *   <li><b>rrfK 常数</b>：通常取 60，越大排名差异的影响越小（平滑）。</li>
+ *   <li><b>去重</b>：同一文档多路出现只保留一次，并把融合分写入 metadata.rrfScore。</li>
+ * </ul>
  */
 public final class MultiQueryMerger {
 

@@ -14,10 +14,18 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * 查询改写 + HyDE 服务。
+ * 查询改写 + HyDE 服务 —— 让 LLM 当"检索查询优化师"。
  *
- * <p>把模糊问题交给 LLM：生成多个精确子查询（JSON 数组）+ 一条假设性回答文档（HyDE）。
- * 任何异常（超时/解析失败）返回空子查询，由调用方降级为原始问题检索。</p>
+ * <h3>学习要点（技术：查询改写 / HyDE / 结构化输出）</h3>
+ * <ul>
+ *   <li><b>查询改写</b>：用户口语问题（"那个功能怎么用"）直接检索往往召回差；
+ *       让 LLM 生成多个精确子查询，可显著扩大召回面。</li>
+ *   <li><b>HyDE</b>：Hypothetical Document Embeddings —— 先生成"假设性标准答案"，
+ *       再对这段文档做向量化检索。假设文档比问题包含更多实体词，与真实知识文档更相似。</li>
+ *   <li><b>结构化输出</b>：要求 LLM 只输出 JSON（subQueries + hydeDocument），
+ *       再解析——这是与大模型交互的常见模式，比自由文本更可靠。</li>
+ *   <li><b>降级</b>：任何异常（超时/非法 JSON）返回空列表，调用方用原始问题检索，主流程不中断。</li>
+ * </ul>
  */
 @Slf4j
 @Service
@@ -31,10 +39,10 @@ public class QueryRewriteService {
     private final ObjectMapper objectMapper;
 
     /**
-     * 改写查询。
+     * 改写查询：LLM 生成子查询 + HyDE 文档。
      *
      * @param question 原始问题
-     * @return 改写结果；失败时 subQueries 为空
+     * @return 改写结果；失败时 subQueries 为空（调用方降级用原问题）
      */
     public RewriteResult rewrite(String question) {
         RewriteResult result = new RewriteResult();

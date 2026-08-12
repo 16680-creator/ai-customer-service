@@ -15,10 +15,16 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * golden 测试集加载器。
+ * golden 测试集加载器 —— 把 JSON 测试集读成内存对象。
  *
- * <p>支持 {@code classpath:} 与 {@code file:} 前缀路径，JSON 为 GoldenCase 数组；
- * 单条非法（缺 question）跳过并告警，不影响整体加载。</p>
+ * <h3>学习要点（技术：golden 回归测试）</h3>
+ * <ul>
+ *   <li><b>golden 集是什么</b>：一组「问题 + 期望命中文档 + 参考答案」的固定样本，
+ *       相当于单元测试里的"断言"，是 RAG 质量回归的标尺。</li>
+ *   <li><b>路径协议</b>：支持 {@code classpath:}（打包进 jar，如 CI/运行时）
+ *       与 {@code file:}（磁盘绝对路径，如运营手工维护的生产样本）。</li>
+ *   <li><b>容错</b>：单条非法（缺 question）跳过并告警，避免一条脏数据毁掉整次评估。</li>
+ * </ul>
  */
 @Slf4j
 @Component

@@ -6,7 +6,17 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * ECharts option 构建器（纯 Java，不依赖 LLM，避免幻觉非法 JSON）。
+ * ECharts option 构建器 —— 用纯 Java 拼标准图表配置。
+ *
+ * <h3>学习要点（技术：ECharts 配置结构）</h3>
+ * <ul>
+ *   <li><b>为什么不用 LLM 生成 option</b>：ECharts 配置结构是确定的
+ *       （series/xAxis/yAxis 等），LLM 可能输出非法 JSON 或错误字段名，
+ *       纯 Java 构建零风险、可单测。</li>
+ *   <li><b>三种图表</b>：pie（分类占比）、bar（数值对比）、line（时间趋势），
+ *       关键是把数据行拆成 name/value 或 categories/values 两个数组。</li>
+ *   <li><b>LinkedHashMap</b>：保持字段顺序，让生成的 JSON 稳定可读。</li>
+ * </ul>
  */
 public final class EChartsOptionBuilder {
 

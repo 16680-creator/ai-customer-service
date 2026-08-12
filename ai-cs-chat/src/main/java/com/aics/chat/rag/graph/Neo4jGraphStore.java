@@ -15,12 +15,20 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Neo4j 图数据库存储实现（生产级图存储）。
+ * Neo4j 图数据库存储实现 —— GraphRAG 的生产级存储。
  *
- * <p>每个三元组存储为一个 {@code :Triple} 节点（subject/predicate/object/knowledgeBase），
- * 多跳查询先按知识库拉取三元组，再用共享 BFS 工具 {@link GraphTripleBfs} 展开，
- * 与内存版语义完全一致。通过 {@code aics.rag.graph.storage=neo4j} 启用，
- * 未配置时默认使用 {@link InMemoryGraphStore}。</p>
+ * <h3>学习要点（技术：Neo4j / Cypher / 图存储抽象）</h3>
+ * <ul>
+ *   <li><b>为什么用 Neo4j</b>：真正的图数据库专为"关系遍历"优化，
+ *       适合大规模实体关联；本项目用 {@code :Triple} 节点保存三元组，简单直观。</li>
+ *   <li><b>Cypher 语句</b>：CREATE 写节点、MATCH+DELETE 删节点、MATCH 查询；
+ *       参数用 {@link org.neo4j.driver.Values#parameters} 绑定，避免拼接注入。</li>
+ *   <li><b>多跳语义复用</b>：先按知识库拉出三元组，再复用 {@link GraphTripleBfs}
+ *       做 BFS——与内存版完全一致，只是"存储介质"不同，这正是接口抽象的好处。</li>
+ *   <li><b>条件装配</b>：{@code storage=neo4j} 时才激活本 Bean（见 @ConditionalOnProperty），
+ *       默认内存版，Neo4j 未部署时主链路不受影响。</li>
+ *   <li><b>资源管理</b>：Session 用 try-with-resources 自动关闭；{@code @PreDestroy} 关闭 Driver。</li>
+ * </ul>
  */
 @Slf4j
 @Repository

@@ -18,11 +18,19 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * AI 智能问数（NL2SQL）工具服务。
+ * AI 智能问数（NL2SQL）工具服务 —— 让大模型直接查数据库。
  *
- * <p>以 Spring AI {@link Tool} 方式注册给 LLM：用户用自然语言提问后，
- * 模型自行判断需要查哪个库、组装 SELECT SQL，调用本工具执行并返回结果，
- * 再由模型基于结果组织自然语言回复。整个过程对用户透明。</p>
+ * <h3>学习要点（技术：Function Calling / NL2SQL / 安全防护）</h3>
+ * <ul>
+ *   <li><b>原理</b>：以 Spring AI {@link Tool} 方式注册给 LLM。用户自然语言提问 →
+ *       模型判断查哪个库、组装 SELECT SQL → 调用本工具执行 → 模型把结果组织成自然语言回复。</li>
+ *   <li><b>为什么这么设计</b>：把"写 SQL"交给模型，把"执行安全"交给代码。
+ *       模型不直接连数据库，只通过白名单校验后的只读通道查询。</li>
+ *   <li><b>安全五道闸</b>：①仅 SELECT 单条（拦分号/注释绕过）②拦写操作关键字
+ *       ③禁系统库/危险函数 ④强制 LIMIT 100 防拖库 ⑤JDBC readOnly + 10s 超时双保险。</li>
+ *   <li><b>多库路由</b>：通过 database 参数路由到 user/product/order/chat/knowledge
+ *       五个业务库的只读数据源。</li>
+ * </ul>
  *
  * <h3>安全策略（只读 + 白名单）</h3>
  * <ul>
@@ -88,7 +96,11 @@ public class Nl2SqlQueryService {
     }
 
     /**
-     * 执行只读 SQL 查询（LLM 工具入口）。
+     * 执行只读 SQL 查询 —— LLM 工具入口（@Tool 暴露给模型）。
+     *
+     * <p>执行顺序：①按 database 选只读数据源 → ②白名单校验 SQL → ③强制 LIMIT →
+     * ④JDBC 执行（10s 超时）→ ⑤结果转 JSON 文本返回给模型。
+     * 日期字段序列化为可读字符串，便于模型理解。</p>
      *
      * @param database 逻辑库标识：user(用户) / product(商品) / order(订单支付) / chat(对话消息) / knowledge(知识库)
      * @param sql      只读 SELECT 查询语句

@@ -15,6 +15,16 @@ import java.util.Locale;
  * 本地哈希向量 Embedding（零依赖，用于开发/测试环境跑通检索链路）。
  * 提取英文单词与中文二元字符组，经双哈希映射到固定维度向量，L2 归一化。
  * 生产环境可替换为 Ollama / MiniMax / OpenAI 的 EmbeddingModel Bean。
+ *
+ * <h3>学习要点（技术：Embedding 兜底 / 特征哈希）</h3>
+ * <ul>
+ *   <li><b>为什么需要</b>：开发环境可能没有 API Key，用哈希把文本映射成固定维度向量，
+ *       让 RAG/向量检索链路"能跑通"（语义质量一般，仅兜底）。</li>
+ *   <li><b>原理</b>：对文本提取英文单词 + 中文二元字符组，双哈希取模投影到固定维度
+ *       向量（特征哈希），相同文本得到相同向量，可做相似度计算。</li>
+ *   <li><b>与真实模型的区别</b>：哈希向量没有语义泛化能力；
+ *       生产必须切换 bge-m3 等真实 Embedding（见各模块 OpenAiEmbeddingConfig）。</li>
+ * </ul>
  */
 public class HashEmbeddingModel implements EmbeddingModel {
 

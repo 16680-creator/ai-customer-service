@@ -1,3 +1,10 @@
+<!--
+  知识库运营看板（US6 知识库运营闭环的前端落地）
+  学习要点：
+  1. 闭环：聚类主题 → 缺口标记(gapFlag) → 一键收录 FAQ → 触发知识向量更新
+  2. report.status = INSUFFICIENT_DATA 表示提问样本不足（<20 条），提示而非报错
+  3. hitRate = 主题代表问题在知识库的检索命中率，低命中=知识库缺口
+-->
 <template>
   <div class="knowledge-ops">
     <el-card shadow="hover">
@@ -62,11 +69,12 @@ import { ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { knowledgeApi } from '../api'
 
-const period = ref('2026-08-01~2026-08-12')
-const questionsText = ref('')
-const report = ref(null)
+const period = ref('2026-08-01~2026-08-12')  // 统计周期
+const questionsText = ref('')                 // 提问 JSON（[{id, text}]）
+const report = ref(null)                      // 聚类报告（主题+缺口）
 const loading = ref(false)
 
+/** 生成 24 条示例提问（两个语义相近的退款问题），便于体验聚类 */
 function loadSample() {
   const samples = []
   for (let i = 1; i <= 24; i++) {
@@ -76,6 +84,7 @@ function loadSample() {
   questionsText.value = JSON.stringify(samples)
 }
 
+/** 调用后端 /knowledge/ops/cluster 运行聚类 + 缺口分析 */
 async function runCluster() {
   let questions = []
   try {
@@ -99,6 +108,7 @@ async function runCluster() {
   }
 }
 
+/** 一键收录 FAQ：把缺口主题转成 FAQ 知识文档，自动触发向量化 */
 async function adoptFaq(row) {
   const { value } = await ElMessageBox.prompt('请输入 FAQ 答案（留空使用主题问题）', '收录 FAQ', {
     inputValue: '',

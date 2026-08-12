@@ -14,10 +14,17 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * RAG 评估服务实现。
+ * RAG 评估服务实现 —— golden 回归测试的核心编排。
  *
- * <p>流程：加载 golden 集 → 逐条检索（RagEvalDataSource）→ 计算指标 → 可选 LLM 打分 →
- * 汇总报告 → 阈值门禁（hitRate / LLM 均分）。</p>
+ * <h3>学习要点（技术：RAG 评估 / 指标计算 / LLM-as-Judge）</h3>
+ * <ul>
+ *   <li><b>评估管线</b>：加载 golden 集 → 逐条检索({@link RagEvalDataSource}) → 计算指标 →
+ *       可选 LLM 打分 → 汇总报告 → 阈值门禁（hitRate / LLM 均分）。</li>
+ *   <li><b>指标含义</b>：Recall@k（期望文档被召回的比例）、MRR（首个命中排名的倒数）、
+ *       HitRate（至少命中一条的用例占比）——分别度量"召回全不全 / 排得前不前 / 有没有命中"。</li>
+ *   <li><b>可对比实验</b>：同一 golden 集在不同检索模式（VECTOR/HYBRID）下各跑一次，
+ *       即可量化改动前后的质量差异，这是"用数据说话"的关键。</li>
+ * </ul>
  */
 @Slf4j
 @Service
@@ -28,6 +35,15 @@ public class RagEvalServiceImpl implements RagEvaluator {
     private final RagEvalDataSource dataSource;
     private final RagAnswerJudge answerJudge;
 
+    /**
+     * 执行完整评估。
+     *
+     * <p>逐条处理：检索 → 记录命中文档 ID → 与期望文档比对计算指标 → 有参考答案时
+     * 调用 LLM Judge 打分。最后按"含期望文档的用例"汇总平均指标，并做阈值门禁。</p>
+     *
+     * @param request 评估请求（golden 集路径、知识库、模式、Top-K、阈值）
+     * @return 评估报告（含汇总指标、LLM 均分、逐条明细、passed 门禁结果）
+     */
     @Override
     public RagEvalReport evaluate(RagEvalRequest request) {
         List<GoldenCase> cases = caseLoader.load(request.getGoldenSetPath());
@@ -106,6 +122,12 @@ public class RagEvalServiceImpl implements RagEvaluator {
         return report;
     }
 
+    /**
+     * 安全检索：单条用例检索失败不中断整个评估，降级为空结果。
+     *
+     * <p>这是评估工具与在线服务的关键差异：评估必须"跑完全部用例"才能出报告，
+     * 不能因为个别失败就整体崩溃——失败用例记 0 命中即可。</p>
+     */
     private List<Document> retrieveSafely(RagEvalDataSource ds, String kb, String query, int topK) {
         try {
             return ds.retrieve(kb, query, topK);

@@ -6,16 +6,16 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * 图表类型自动判定（纯函数）。
+ * 图表类型自动判定 —— 纯函数，根据数据特征选图表。
  *
- * <p>规则：
+ * <h3>学习要点（规则引擎式判定）</h3>
  * <ul>
- *   <li>空或单行数据 → NONE（无分布维度）</li>
- *   <li>存在时间列（键名含 time/date/month/日期/时间/月份） → LINE</li>
- *   <li>存在非数值列（分类维度）：类别数 ≤ 12 → PIE，否则 → BAR</li>
- *   <li>全数值列 → BAR</li>
+ *   <li><b>单行/空 → NONE</b>：没有分布维度，硬画图反而误导。</li>
+ *   <li><b>时间列 → LINE</b>：时间趋势用折线最直观（键名含 time/date/month/月份等）。</li>
+ *   <li><b>分类列 → PIE/BAR</b>：类别少（≤12）用饼图看占比，多则柱状图更清晰。</li>
+ *   <li><b>全数值 → BAR</b>：数值型分布默认柱状图。</li>
+ *   <li>作为纯函数可独立单测，是"确定性逻辑不走 LLM"原则的示例。</li>
  * </ul>
- * </p>
  */
 public final class ChartTypeDetector {
 

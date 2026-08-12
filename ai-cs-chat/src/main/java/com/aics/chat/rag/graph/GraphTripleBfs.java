@@ -7,10 +7,18 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * 图谱多跳展开工具（BFS，纯函数）。
+ * 图谱多跳展开工具 —— 基于 BFS（广度优先搜索）的纯函数。
  *
- * <p>在给定三元组集合上，从实体出发按 subject ↔ object 双向展开指定深度，
- * 通过 visited 集合防止循环边导致无限递归。供内存版与 Neo4j 版图存储复用。</p>
+ * <h3>学习要点（算法：BFS 多跳遍历）</h3>
+ * <ul>
+ *   <li><b>为什么是 BFS</b>：从起始实体出发，按"直接关系 → 再跳一层 → …"逐层扩散，
+ *       与"多跳"的定义天然吻合；每层用 frontier 队列保存待访问实体。</li>
+ *   <li><b>双向边</b>：三元组既是 subject→object，也反向 object→subject，
+ *       所以匹配条件为 {@code current.equals(subject) || current.equals(object)}。</li>
+ *   <li><b>防循环</b>：visitedEntities 记录已访问实体、visitedTripleIds 记录已用三元组，
+ *       防止 A→B→A 这类循环边导致死循环。</li>
+ *   <li><b>纯函数</b>：不依赖任何存储，内存版与 Neo4j 版复用同一套展开逻辑，保证语义一致。</li>
+ * </ul>
  */
 public final class GraphTripleBfs {
 

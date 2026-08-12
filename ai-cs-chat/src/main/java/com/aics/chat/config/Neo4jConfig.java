@@ -11,7 +11,16 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.util.StringUtils;
 
 /**
- * Neo4j 图数据库连接配置（storage=neo4j 时启用）。
+ * Neo4j 图数据库连接配置 —— 创建 {@link Driver} 连接。
+ *
+ * <h3>学习要点（技术：驱动装配 / 条件配置）</h3>
+ * <ul>
+ *   <li><b>Driver 生命周期</b>：Neo4j 驱动是重量级连接池，全局单例，
+ *       {@code destroyMethod = "close"} 让 Spring 容器关闭时自动释放。</li>
+ *   <li><b>鉴权</b>：配置了用户名才用 basic 认证，否则走无认证连接（本地开发）。</li>
+ *   <li><b>条件启用</b>：仅当 Nacos {@code aics.rag.graph.storage=neo4j} 时才装配，
+ *       且 uri 必填（缺失直接启动失败并给出明确提示），避免"配了半截"的坑。</li>
+ * </ul>
  */
 @Slf4j
 @Configuration

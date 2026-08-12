@@ -12,7 +12,15 @@ import org.springframework.util.StringUtils;
 import java.util.Map;
 
 /**
- * FAQ 收录服务：保存 FAQ 条目并创建知识文档，触发向量化（复用 RocketMQ 链路）。
+ * FAQ 收录服务 —— 把运营确认的主题变成可检索的知识。
+ *
+ * <h3>学习要点（技术：复用增量同步链路）</h3>
+ * <ul>
+ *   <li><b>两步落库</b>：①写入 kb_faq 表（FAQ 元数据）；②调用 KnowledgeService.createDocument
+ *       创建知识文档，后者会发 RocketMQ 消息异步向量化到 Chroma（复用已有增量同步能力）。</li>
+ *   <li><b>为什么复用</b>：知识文档的"DB 落库 → MQ → 向量化"链路在 002 功能已建好，
+ *       FAQ 作为知识文档的一种直接复用，零新增链路、天然幂等可重试。</li>
+ * </ul>
  */
 @Slf4j
 @Service

@@ -11,29 +11,21 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 
 /**
- * 知识文档向量化服务
+ * 知识文档向量化服务 —— 知识库"写路径"的向量化入口。
  *
- * <p>将知识库文档内容切块、向量化后写入 Chroma（与 ai-cs-chat 共用 aics-knowledge 集合），
- * RAG 对话使用 knowledgeBase = "knowledge" 即可检索知识库文档。</p>
- *
- * <p>核心流程（{@link #vectorize}）：</p>
- * <ol>
- *   <li>内容校验：空内容直接跳过</li>
- *   <li>切分：使用 Spring AI 的 TokenTextSplitter 按 Token 切块（适配 bge-m3 上下文窗口）</li>
- *   <li>Embedding：由 {@link com.aics.knowledge.config.KnowledgeAiConfig} 注入的
- *       EmbeddingModel（硅基流动 bge-m3）生成向量</li>
- *   <li>写 Chroma：每个分块附带 knowledgeBase / documentId / title 元数据，
- *       供 RAG 检索过滤与溯源</li>
- * </ol>
- *
- * <p>为什么知识库模块自己也要向量化：</p>
+ * <h3>学习要点（技术：RAG 入库链路 / Chunking / Metadata）</h3>
  * <ul>
- *   <li>ai-cs-chat 的 VectorStore 主要面向"检索"（读路径），而知识库模块是"写入方"（写路径），
- *       两者共用同一 Chroma 集合与同一 Embedding 模型，向量空间必须一致</li>
- *   <li>知识库模块负责自身内容的全生命周期（创建/更新/删除 → 切块/Embedding/写库/删库），
- *       避免对话模块耦合知识库内部结构</li>
- *   <li>通过 RocketMQ 解耦：知识库写 DB 后异步向量化，对话侧无感</li>
+ *   <li><b>为什么切块（Chunking）</b>：①大模型上下文有限，不能塞整本手册；
+ *       ②相似度检索按"片段"匹配，块小更精准；③每块可独立检索、独立溯源。</li>
+ *   <li><b>为什么带 metadata</b>：knowledgeBase 用于按库过滤、documentId 用于溯源与删除、
+ *       title 用于展示——检索结果靠这些元数据才能"讲清楚出处"。</li>
+ *   <li><b>读/写分离</b>：本服务是写入方（写路径），ai-cs-chat 是检索方（读路径），
+ *       共用同一 Chroma 集合与同一 bge-m3 模型，保证向量空间一致。</li>
+ *   <li><b>异步解耦</b>：知识库写 DB 后经 RocketMQ 异步触发本服务，天然可重试。</li>
  * </ul>
+ *
+ * <p>核心流程（{@link #vectorize}）：内容校验 → TokenTextSplitter 按 Token 切块 →
+ * EmbeddingModel 向量化 → 写 Chroma（附带元数据）。</p>
  */
 @Slf4j
 @Service

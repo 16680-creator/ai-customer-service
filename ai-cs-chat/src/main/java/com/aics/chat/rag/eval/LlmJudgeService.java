@@ -10,10 +10,18 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * LLM-as-Judge 打分实现（复用现有 ChatClient/DeepSeek）。
+ * LLM-as-Judge 打分实现 —— 让大模型当"阅卷老师"。
  *
- * <p>对"问题 + 回答 + 参考答案"进行 1-5 分打分，解析输出中的首个数字；
- * 任何异常（超时/解析失败/无参考）返回 null，由调用方降级处理。</p>
+ * <h3>学习要点（技术：LLM-as-Judge / 可观测性）</h3>
+ * <ul>
+ *   <li><b>为什么用 LLM 打分</b>：回答质量（准确性/完整性/简洁性）难以用规则量化，
+ *       大模型能理解语义并给出 1-5 分，是 RAG 评估中"回答质量"维度的常用做法。</li>
+ *   <li><b>提示词设计</b>：明确评分维度（准确性/完整性/简洁性）+ 只输出数字，
+ *       降低模型自由发挥导致的解析失败。</li>
+ *   <li><b>健壮性</b>：任何异常（超时/解析失败）返回 null，调用方降级，
+ *       保证评估管线不会因单个打分失败而中断。</li>
+ *   <li>复用现有 {@link ChatClient}（DeepSeek），不额外引入模型供应商。</li>
+ * </ul>
  */
 @Slf4j
 @Service

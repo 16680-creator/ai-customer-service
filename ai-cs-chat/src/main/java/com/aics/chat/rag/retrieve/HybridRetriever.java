@@ -23,10 +23,16 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 对话侧统一检索编排。
+ * 对话侧统一检索编排 —— 把多种检索技术组合成一个入口。
  *
- * <p>支持 VECTOR / HYBRID / HYBRID_QUERY_REWRITE / GRAPH_RAG 四种模式，
- * 任一增强降级时回退纯向量，保证回答不中断。</p>
+ * <h3>学习要点（技术：多路检索编排 / 优雅降级）</h3>
+ * <ul>
+ *   <li><b>策略模式</b>：四种检索模式（向量/Hybrid/改写/图谱）通过 {@link RetrievalMode}
+ *       枚举分派到不同方法，新增模式无需改动调用方。</li>
+ *   <li><b>降级设计</b>：每种增强都有两层兜底——①全局开关未开启时直接回退纯向量；
+ *       ②外部依赖（搜索服务/LLM/图谱）异常时 catch 后回退纯向量。保证"核心对话永远可用"。</li>
+ *   <li><b>存量兼容</b>：默认 VECTOR，业务方不传新参数行为不变，这是渐进式改造的关键。</li>
+ * </ul>
  */
 @Slf4j
 @Service
@@ -41,7 +47,10 @@ public class HybridRetriever {
     private final RagRetrieveProperties properties;
 
     /**
-     * 执行检索。
+     * 执行检索：按模式分派，返回带降级信息的统一结果。
+     *
+     * <p>调用方（如 RAG 对话）只依赖 {@link RetrieveResult} 的 documents 字段，
+     * 无需关心内部用了哪种技术——这正是"编排层"的价值。</p>
      *
      * @param knowledgeBase 知识库标识
      * @param query         查询
@@ -76,13 +85,24 @@ public class HybridRetriever {
         }
     }
 
-    /** 纯向量检索（存量默认路径） */
+    /**
+     * 纯向量检索 —— 存量默认路径。
+     *
+     * <p>底层是 {@link KnowledgeBaseService#search}：把问题用 bge-m3 向量化后，
+     * 在 Chroma 中做余弦相似度 Top-K 检索，并按 knowledgeBase 元数据过滤。</p>
+     */
     private RetrieveResult vector(String knowledgeBase, String query, int topK, String degradeReason) {
         List<Document> docs = knowledgeBaseService.search(knowledgeBase, query, topK, 0.0);
         return buildResult(query, docs, RetrievalMode.VECTOR.name(), degradeReason);
     }
 
-    /** Hybrid：ES+向量 RRF 混合检索（Feign 调 ai-cs-search） */
+    /**
+     * Hybrid 混合检索 —— 通过 Feign 调用 ai-cs-search 的 /search/hybrid。
+     *
+     * <p><b>为什么混合</b>：向量检索对语义相似好、对精确串（型号/订单号）差；
+     * ES 关键词(BM25)恰好相反。两者 RRF 融合可兼顾精确与语义。
+     * 跨服务调用走 Feign（HTTP 契约），遵守微服务间不直接依赖内部类的约束。</p>
+     */
     private RetrieveResult hybrid(String knowledgeBase, String query, int topK) {
         try {
             Result<ChatHybridPageVO> result = searchFeignClient.hybridSearch(knowledgeBase, query, 1, topK);
@@ -118,7 +138,14 @@ public class HybridRetriever {
         }
     }
 
-    /** 改写 + HyDE：多查询 + 假设文档分别向量检索，RRF 融合 */
+    /**
+     * 查询改写 + HyDE —— 提升模糊问题的召回。
+     *
+     * <p><b>查询改写</b>：LLM 把"那个功能怎么用"拆成多个精确子查询，扩大召回面；
+     * <b>HyDE</b>（Hypothetical Document Embeddings）：让 LLM 先生成"假设性标准答案文档"，
+     * 用它的向量去检索——假设文档比问题本身包含更多关键词，命中率更高。
+     * 多路结果用 {@link MultiQueryMerger}（RRF）融合去重。</p>
+     */
     private RetrieveResult rewriteHybrid(String knowledgeBase, String query, int topK) {
         RewriteResult rewrite = queryRewriteService.rewrite(query);
         List<String> queries = new ArrayList<>();

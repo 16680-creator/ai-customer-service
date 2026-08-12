@@ -10,7 +10,16 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 问数回答生成器：自然语言结论（LLM，失败降级模板）+ 图表类型判定 + ECharts 配置。
+ * 问数回答生成器 —— 结论（LLM）+ 图表类型判定 + ECharts 配置。
+ *
+ * <h3>学习要点（技术：LLM 结论生成 / 降级模板）</h3>
+ * <ul>
+ *   <li><b>分工</b>：图表类型判定与 ECharts option 构建是确定性逻辑（纯 Java，
+ *       避免 LLM 幻觉出非法 JSON）；只有"结论"这种开放性文本交给 LLM。</li>
+ *   <li><b>降级</b>：LLM 结论失败时回退模板（"共 N 行数据，详见图表"），
+ *       图表仍可正常渲染——LLM 只是增强项，不是必需依赖。</li>
+ *   <li><b>边界</b>：空数据/单行数据由 ChartTypeDetector 判定为 NONE，不硬生成图表。</li>
+ * </ul>
  */
 @Slf4j
 @Service

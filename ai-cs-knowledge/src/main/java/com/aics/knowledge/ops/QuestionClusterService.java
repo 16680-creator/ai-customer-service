@@ -8,7 +8,15 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 提问聚类编排服务：聚类 → 缺口检测 → 报告。
+ * 提问聚类编排服务 —— 把"聚类"和"缺口检测"串成完整流程。
+ *
+ * <h3>学习要点（技术：编排层 / 数据量门槛）</h3>
+ * <ul>
+ *   <li><b>编排职责</b>：先校验数据量（不足 20 条返回 INSUFFICIENT_DATA，
+ *       避免小样本产生无意义主题），再聚类 → 逐主题缺口检测 → 汇总报告。</li>
+ *   <li><b>状态表达</b>：OK / INSUFFICIENT_DATA 两种状态让前端能区分
+ *       "正常结果"与"数据不足提示"。</li>
+ * </ul>
  */
 @Slf4j
 @Service

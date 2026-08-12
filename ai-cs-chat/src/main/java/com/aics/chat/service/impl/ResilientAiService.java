@@ -21,8 +21,17 @@ import java.util.concurrent.CompletionException;
 /**
  * 弹性 AI 调用服务 —— 为 LLM 调用提供超时/重试/熔断/降级能力。
  *
- * <p>使用 Resilience4j 注解（@TimeLimiter / @Retry / @CircuitBreaker）包装底层 LLM 调用，
- * 防止因 AI 服务响应慢或不可用导致线程挂起或雪崩。</p>
+ * <h3>学习要点（技术：Resilience4j 四大容错）</h3>
+ * <ul>
+ *   <li><b>@TimeLimiter（超时）</b>：LLM 慢响应不能无限等。非流式 30s、流式只限"首 token 60s"。</li>
+ *   <li><b>@Retry（重试）</b>：只重试网络类临时故障（超时/连接拒绝），
+ *       业务异常（如鉴权 4xx）不重试，避免浪费配额。</li>
+ *   <li><b>@CircuitBreaker（熔断）</b>：失败率超阈值(50%)即打开熔断，
+ *       快速失败保护下游，半开状态试探恢复。</li>
+ *   <li><b>@Fallback（降级）</b>：超时/熔断后返回友好提示，而不是把异常抛给用户。</li>
+ *   <li><b>为什么返回 CompletableFuture</b>：TimeLimiter 靠 Future.get(timeout) 实现超时，
+ *       方法签名必须返回 Future 才能被切面拦截。</li>
+ * </ul>
  *
  * <h3>调用链</h3>
  * <pre>

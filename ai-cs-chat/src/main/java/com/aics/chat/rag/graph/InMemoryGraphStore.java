@@ -11,11 +11,19 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * 进程内知识图谱存储（默认实现，开发/测试用）。
+ * 进程内知识图谱存储 —— 默认实现（零外部依赖，开发/测试用）。
  *
- * <p>使用 {@link LinkedHashMap} 保存三元组；多跳展开复用共享 BFS 工具
- * {@link GraphTripleBfs}，与 Neo4j 版语义一致。通过
- * {@code aics.rag.graph.storage} 配置切换（默认 in-memory）。</p>
+ * <h3>学习要点（技术：图存储抽象 / 条件装配）</h3>
+ * <ul>
+ *   <li><b>为什么先做内存版</b>：不依赖 Neo4j 即可验证完整 GraphRAG 链路，
+ *       且作为单测的基础实现。</li>
+ *   <li><b>接口抽象</b>：业务层只依赖 {@link GraphStore} 接口；生产可切换
+ *       {@link Neo4jGraphStore}（通过 Nacos {@code aics.rag.graph.storage} 配置）。</li>
+ *   <li><b>条件装配</b>：{@code @ConditionalOnProperty} 保证默认只激活内存版，
+ *       配置 neo4j 时才激活 Neo4j 版，避免两个 Bean 冲突。</li>
+ *   <li><b>线程安全</b>：add/delete/queryMultiHop 加 synchronized，
+ *       因为 HashMap 在多线程写时可能破坏结构。</li>
+ * </ul>
  */
 @Slf4j
 @Repository

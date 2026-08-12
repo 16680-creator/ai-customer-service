@@ -11,10 +11,21 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * OpenAI 兼容 Embedding 配置（支持中转站）。
- * 通过 aics.ai.embedding.provider=openai 启用；
- * base-url / api-key / 模型名均支持环境变量注入。
+ * OpenAI 兼容 Embedding 配置 —— 商品向量化的模型来源。
+ *
+ * <h3>学习要点（技术：Embedding 模型装配）</h3>
+ * <ul>
+ *   <li><b>为什么用 OpenAI 协议</b>：硅基流动等平台兼容 OpenAI 的 /embeddings 接口，
+ *       用 Spring AI 的 OpenAiEmbeddingModel 一行接入 bge-m3 多语言向量模型。</li>
+ *   <li><b>@ConditionalOnProperty</b>：仅当配置 {@code aics.ai.embedding.provider=openai} 时启用；
+ *       默认走本地 HashEmbeddingModel（零依赖兜底，见 ai-cs-common）。</li>
+ *   <li><b>为什么向量模型必须唯一</b>：所有商品/文档向量必须来自同一模型，
+ *       否则向量空间不一致、余弦相似度无意义。</li>
+ * </ul>
  */
+@Configuration
+@ConditionalOnProperty(name = "aics.ai.embedding.provider", havingValue = "openai")
+public class OpenAiEmbeddingConfig {
 @Configuration
 @ConditionalOnProperty(name = "aics.ai.embedding.provider", havingValue = "openai")
 public class OpenAiEmbeddingConfig {
