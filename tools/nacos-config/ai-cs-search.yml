@@ -1,4 +1,7 @@
 spring:
+  elasticsearch:
+    uris: http://123.60.31.79:9200
+
   ai:
     vectorstore:
       chroma:
