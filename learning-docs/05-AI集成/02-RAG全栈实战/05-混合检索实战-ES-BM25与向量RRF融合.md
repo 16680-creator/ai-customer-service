@@ -1,7 +1,7 @@
 # 混合检索实战：ES BM25 与向量 RRF 融合
 
 > 本文档对应 `ai-cs-search` 模块的 `hybrid` 包，讲解**双路召回 + RRF 融合**的混合检索。
-> 前置知识：[10-RAG向量检索实战.md](10-RAG向量检索实战.md)（向量检索）、[14-RAG进阶实战-Rerank重排序.md](14-RAG进阶实战-Rerank重排序.md)。
+> 前置知识：[03-RAG向量检索实战.md](03-RAG向量检索实战.md)（向量检索）、[04-RAG进阶实战-Rerank重排序.md](04-RAG进阶实战-Rerank重排序.md)。
 >
 > **核心目标**：让"精确关键词查询"和"模糊语义查询"都能被检索命中——
 > ES BM25 管字面匹配，Chroma 向量管语义相似，最后用 RRF 算法把两路排名融合成一份结果。
@@ -450,7 +450,7 @@ curl "http://localhost:8084/search/hybrid?index=product-manual&query=AICS-X200&s
 
 **Q2：ES 索引和 Chroma 的数据一致性怎么保证？**
 双写：文档入库时同时写 ES 索引与 Chroma 向量（可参考
-[18-知识库增量同步实战-RocketMQ驱动向量化.md](18-知识库增量同步实战-RocketMQ驱动向量化.md) 的消息驱动思路）。
+[08-知识库增量同步实战-RocketMQ驱动向量化.md](08-知识库增量同步实战-RocketMQ驱动向量化.md) 的消息驱动思路）。
 
 **Q3：为什么融合用排名而不是分数？**
 向量分数（余弦相似度 0~1）与 BM25 分数（可到几十甚至上百）量纲完全不同，直接加权需要

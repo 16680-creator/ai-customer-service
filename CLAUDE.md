@@ -93,11 +93,11 @@ chat / knowledge / search / message / notify / user / order / product → common
 详见 [specs/README.md](specs/README.md)。
 
 <!-- SPECKIT START -->
-当前活动功能：电商购物车结算流程
-- feature-id: `001-cart-checkout`
-- 分支: `001-cart-checkout`
-- 实施计划: [specs/001-cart-checkout/plan.md](specs/001-cart-checkout/plan.md)
-- 功能规格: [specs/001-cart-checkout/spec.md](specs/001-cart-checkout/spec.md)
+当前活动功能：RAG 检索质量升级五件套
+- feature-id: `002-rag-quality-upgrade`
+- 分支: `002-rag-quality-upgrade`
+- 实施计划: [specs/002-rag-quality-upgrade/plan.md](specs/002-rag-quality-upgrade/plan.md)
+- 功能规格: [specs/002-rag-quality-upgrade/spec.md](specs/002-rag-quality-upgrade/spec.md)
 <!-- SPECKIT END -->
 
 ---

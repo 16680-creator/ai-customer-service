@@ -318,4 +318,4 @@ String reply = chatClient.prompt()
 
 ## 下一步
 
-→ [03-LLM工程化实践](./03-LLM工程化实践.md)
+→ [02-LLM工程化实践](../01-SpringAI框架集成/02-LLM工程化实践.md)

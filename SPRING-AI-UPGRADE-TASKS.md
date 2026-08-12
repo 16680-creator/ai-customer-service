@@ -80,10 +80,10 @@ Spring AI 1.1.x 有以下可能变化，需逐一核对并修正：
 ### 任务 4：更新文档
 **状态**：✅ 已完成（2026-08-06）
 
-- [x] `learning-docs/05-AI集成/10-RAG向量检索实战.md`：更新 Spring AI 版本说明（1.0.0 → 1.1.4）、
+- [x] `learning-docs/05-AI集成/02-RAG全栈实战/03-RAG向量检索实战.md`：更新 Spring AI 版本说明（1.0.0 → 1.1.4）、
       补充 `tenant-name`/`database-name` 配置示例、新增 “Chroma v2 API 兼容性说明“ 小节与 FAQ Q6
 - [x] 记录 Chroma v2 API 的兼容性说明：v1 返回 410、1.1.4 字符串比对 bug 修复、tenant/database 配置
-- [x] 同步修正 `learning-docs/05-AI集成/01-SpringAI入门.md`、`learning-docs/01-Java基础/02-Maven多模块管理.md`
+- [x] 同步修正 `learning-docs/05-AI集成/01-SpringAI框架集成/01-SpringAI入门.md`、`learning-docs/01-Java基础/02-Maven多模块管理.md`
       中的版本号，及 `VectorStoreConfig.java` 中过时的 starter 坐标注释
 
 ---
@@ -91,7 +91,7 @@ Spring AI 1.1.x 有以下可能变化，需逐一核对并修正：
 ## 进度备注（2026-08-06 下班前快照）
 - 任务 1：✅ 编译通过（JDK 21，`mvn -pl ai-cs-chat -am compile -DskipTests`），Spring AI 1.1.4 + Spring Boot 3.2.5 无冲突，任务 2 跳过
 - 任务 3：子项 1（包名）与子项 3（starter 坐标）已确认；子项 2（tenant/database 配置）已改本地与 Nacos 源文件，并已发布到本地 Nacos
-- 任务 4：✅ 已完成——更新 `learning-docs/05-AI集成/10-RAG向量检索实战.md`（版本说明、Chroma v2 兼容性小节、FAQ Q6），
+- 任务 4：✅ 已完成——更新 `learning-docs/05-AI集成/02-RAG全栈实战/03-RAG向量检索实战.md`（版本说明、Chroma v2 兼容性小节、FAQ Q6），
   同步修正 `01-SpringAI入门.md`、`02-Maven多模块管理.md` 版本号与 `VectorStoreConfig.java` 注释
 - 最终验证：未执行。远端 Chroma `123.60.31.79:8000` 当前从本机不可达，需在有网络/内网环境启动服务后验证入库与检索
 

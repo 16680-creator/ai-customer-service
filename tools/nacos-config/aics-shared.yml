@@ -15,5 +15,5 @@ aics:
     expire-hours: 24
   embedding:
     base-url: https://api.siliconflow.cn
-    api-key: ${SILICONFLOW_API_KEY}
+    api-key: sk-aonceapnbwfoswegzsieghnijdddzbsccsitmndyevpfdwcs
     model: BAAI/bge-m3

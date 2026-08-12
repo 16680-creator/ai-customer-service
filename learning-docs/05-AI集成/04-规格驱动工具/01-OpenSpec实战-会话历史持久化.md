@@ -1,7 +1,7 @@
 # OpenSpec 实战：会话历史持久化（Redis 热缓存 + message 表）
 
 > 本次用一个完整需求走通 **OpenSpec 开发区模式**：`/opsx-propose`（规划）→ `/opsx-apply`（实施）→ `/opsx-archive`（归档）。
-> 目录：`learning-docs/05-AI集成/11-OpenSpec实战-会话历史持久化.md`
+> 目录：`learning-docs/05-AI集成/04-规格驱动工具/01-OpenSpec实战-会话历史持久化.md`
 
 ---
 

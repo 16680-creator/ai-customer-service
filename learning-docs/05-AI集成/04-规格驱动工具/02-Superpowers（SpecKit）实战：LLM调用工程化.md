@@ -154,7 +154,7 @@ T5: 修复 SSE 超时控制（SseEmitter 0L 问题）
 
 T6: 编写实战文档
   依赖：T5
-  文件：learning-docs/05-AI集成/12-LLM调用工程化-Resilience4j实战.md
+  文件：learning-docs/05-AI集成/04-规格驱动工具/02-Superpowers（SpecKit）实战：LLM调用工程化.md
 ```
 
 **任务依赖关系**：

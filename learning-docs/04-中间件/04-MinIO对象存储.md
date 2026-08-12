@@ -282,4 +282,4 @@ public class KnowledgeService {
 
 ## 下一步
 
-→ [05-AI集成/01-SpringAI入门](../05-AI集成/01-SpringAI入门.md)
+→ [05-AI集成/01-SpringAI框架集成/01-SpringAI入门](../05-AI集成/01-SpringAI框架集成/01-SpringAI入门.md)

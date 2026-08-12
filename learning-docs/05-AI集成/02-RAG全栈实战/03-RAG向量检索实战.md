@@ -1,7 +1,7 @@
 # RAG 向量检索实战（Embedding + VectorStore + Advisor）
 
 > 本文档针对本项目 `ai-cs-chat` 模块，讲解"真正的 RAG 向量检索"是如何落地的。
-> 与 [02-RAG检索增强生成.md](02-RAG检索增强生成.md) 的理论篇不同，本文是**代码篇**，逐行讲解本项目实现。
+> 与 [01-RAG检索增强生成.md](01-RAG检索增强生成.md) 的理论篇不同，本文是**代码篇**，逐行讲解本项目实现。
 >
 > **核心目标**：让 `chatWithRag` 名副其实——先做**语义向量检索**，再把命中的文档注入上下文，最后让大模型基于私有知识作答。
 
@@ -524,7 +524,7 @@ aics:
 ### 5. Rerank 详细内容
 
 Rerank 原理、硅基流动 `bge-reranker-v2-m3` API 调用、`SiliconFlowRerankService` 完整代码、
-降级策略与全部配置项，详见：[14-RAG进阶实战-Rerank重排序.md](14-RAG进阶实战-Rerank重排序.md)。
+降级策略与全部配置项，详见：[04-RAG进阶实战-Rerank重排序.md](04-RAG进阶实战-Rerank重排序.md)。
 
 ### 6. 验证方法
 
