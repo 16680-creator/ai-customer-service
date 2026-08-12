@@ -6,6 +6,9 @@ import com.aics.chat.dto.CitationItemDTO;
 import com.aics.chat.service.ChatHistoryService;
 import com.aics.chat.service.ChatService;
 import com.aics.chat.service.KnowledgeBaseService;
+import com.aics.chat.rag.retrieve.HybridRetriever;
+import com.aics.chat.rag.retrieve.RetrievalMode;
+import com.aics.chat.rag.retrieve.RetrieveResult;
 import com.aics.chat.util.ChatUserContext;
 import com.aics.common.exception.BusinessException;
 import com.aics.common.result.Result;
@@ -55,6 +58,7 @@ public class ChatServiceImpl implements ChatService {
     private final ResilientAiService resilientAiService;
     private final KnowledgeBaseService knowledgeBaseService;
     private final ChatHistoryService chatHistoryService;
+    private final HybridRetriever hybridRetriever;
 
     /** 最大历史消息数，超过时触发压缩 */
     private static final int MAX_HISTORY_SIZE = 20;
@@ -188,11 +192,23 @@ public class ChatServiceImpl implements ChatService {
      */
     @Override
     public Result<ChatRagResponseDTO> chatWithRag(String sessionId, String message, String knowledgeBase) {
-        log.info("RAG对话请求: sessionId={}, knowledgeBase={}", sessionId, knowledgeBase);
+        return chatWithRag(sessionId, message, knowledgeBase, false, false);
+    }
+
+    /**
+     * RAG 对话（支持 Hybrid / 查询改写增强）。
+     *
+     * @param hybrid  是否启用 ES+向量混合检索（默认 false 保持纯向量）
+     * @param rewrite 是否启用查询改写/HyDE（默认 false）
+     */
+    public Result<ChatRagResponseDTO> chatWithRag(String sessionId, String message, String knowledgeBase,
+                                                  boolean hybrid, boolean rewrite) {
+        log.info("RAG对话请求: sessionId={}, knowledgeBase={}, hybrid={}, rewrite={}",
+                sessionId, knowledgeBase, hybrid, rewrite);
 
         try {
-            // 语义检索：在指定知识库中找出与用户问题最相关的 Top-5 文档片段
-            List<Document> docs = knowledgeBaseService.search(knowledgeBase, message, 5, 0.5);
+            // 检索：纯向量 / Hybrid / 改写（增强失败自动降级纯向量）
+            List<Document> docs = retrieveRagDocs(knowledgeBase, message, 5, 0.5, hybrid, rewrite);
             String context = knowledgeBaseService.buildContext(docs);
 
             // 构建 RAG Prompt
@@ -254,7 +270,16 @@ public class ChatServiceImpl implements ChatService {
      */
     @Override
     public SseEmitter chatStreamSse(String sessionId, String message, String knowledgeBase) {
-        log.info("SSE流式对话请求: sessionId={}, knowledgeBase={}", sessionId, knowledgeBase);
+        return chatStreamSse(sessionId, message, knowledgeBase, false, false);
+    }
+
+    /**
+     * SSE 流式对话（支持 Hybrid / 查询改写增强）。
+     */
+    public SseEmitter chatStreamSse(String sessionId, String message, String knowledgeBase,
+                                    boolean hybrid, boolean rewrite) {
+        log.info("SSE流式对话请求: sessionId={}, knowledgeBase={}, hybrid={}, rewrite={}",
+                sessionId, knowledgeBase, hybrid, rewrite);
         // 使用合理的超时时间，替代原来的 0L（永不超时）
         SseEmitter emitter = new SseEmitter(SSE_EMITTER_TIMEOUT);
         boolean hasKb = StringUtils.hasText(knowledgeBase);
@@ -277,7 +302,7 @@ public class ChatServiceImpl implements ChatService {
             CompletableFuture<Flux<String>> futureFlux;
             final List<CitationItemDTO> citations;
             if (hasKb) {
-                List<Document> docs = knowledgeBaseService.search(knowledgeBase, message, 5, 0.5);
+                List<Document> docs = retrieveRagDocs(knowledgeBase, message, 5, 0.5, hybrid, rewrite);
                 String context = knowledgeBaseService.buildContext(docs);
                 String ragPrompt = """
                         请严格基于下面的【知识库资料】回答用户问题。
@@ -396,6 +421,26 @@ public class ChatServiceImpl implements ChatService {
     public Result<List<ChatHistoryMessage>> getHistory(String sessionKey) {
         log.info("查询会话历史: sessionKey={}", sessionKey);
         return Result.success(chatHistoryService.load(sessionKey));
+    }
+
+    /**
+     * RAG 检索入口：纯向量 / Hybrid / 改写；增强失败自动降级纯向量。
+     */
+    private List<Document> retrieveRagDocs(String knowledgeBase, String message, int topK, double threshold,
+                                           boolean hybrid, boolean rewrite) {
+        if (!hybrid && !rewrite) {
+            return knowledgeBaseService.search(knowledgeBase, message, topK, threshold);
+        }
+        RetrievalMode mode = rewrite ? RetrievalMode.HYBRID_QUERY_REWRITE : RetrievalMode.HYBRID;
+        try {
+            RetrieveResult result = hybridRetriever.retrieve(knowledgeBase, message, mode, topK);
+            log.info("RAG增强检索: sessionId=?, mode={}, degraded={}, hits={}",
+                    result.getMode(), result.isDegraded(), result.getDocuments().size());
+            return result.getDocuments();
+        } catch (Exception e) {
+            log.warn("RAG增强检索失败，降级纯向量: mode={}, err={}", mode, e.getMessage());
+            return knowledgeBaseService.search(knowledgeBase, message, topK, threshold);
+        }
     }
 
     /**

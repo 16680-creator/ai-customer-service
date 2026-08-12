@@ -68,9 +68,9 @@ class SiliconFlowRerankServiceTest {
                           "id": "rerank-123",
                           "model": "BAAI/bge-reranker-v2-m3",
                           "results": [
-                            {"index": 2, "relevance_score": 0.95, "document": "doc2: 售后保障说明"},
-                            {"index": 0, "relevance_score": 0.88, "document": "doc0: 退货政策说明"},
-                            {"index": 1, "relevance_score": 0.72, "document": "doc1: 物流时效说明"}
+                            {"index": 2, "relevance_score": 0.95, "document": {"text": "doc2: 售后保障说明"}},
+                            {"index": 0, "relevance_score": 0.88, "document": {"text": "doc0: 退货政策说明"}},
+                            {"index": 1, "relevance_score": 0.72, "document": {"text": "doc1: 物流时效说明"}}
                           ]
                         }
                         """, MediaType.APPLICATION_JSON));
@@ -163,9 +163,9 @@ class SiliconFlowRerankServiceTest {
                 .andRespond(withSuccess("""
                         {
                           "results": [
-                            {"index": 0, "relevance_score": 0.95, "document": "doc0"},
-                            {"index": 1, "relevance_score": 0.65, "document": "doc1"},
-                            {"index": 2, "relevance_score": 0.80, "document": "doc2"}
+                            {"index": 0, "relevance_score": 0.95, "document": {"text": "doc0"}},
+                            {"index": 1, "relevance_score": 0.65, "document": {"text": "doc1"}},
+                            {"index": 2, "relevance_score": 0.80, "document": {"text": "doc2"}}
                           ]
                         }
                         """, MediaType.APPLICATION_JSON));

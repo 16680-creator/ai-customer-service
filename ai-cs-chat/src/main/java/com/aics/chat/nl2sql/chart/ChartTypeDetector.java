@@ -1,4 +1,4 @@
-﻿package com.aics.chat.nl2sql.chart;
+package com.aics.chat.nl2sql.chart;
 
 import java.util.HashSet;
 import java.util.List;

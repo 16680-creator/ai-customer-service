@@ -125,6 +125,13 @@
             <artifactId>resilience4j-timelimiter</artifactId>
         </dependency>
 
+        <!-- Neo4j 图数据库驱动（GraphRAG US4，storage=neo4j 时启用） -->
+        <dependency>
+            <groupId>org.neo4j.driver</groupId>
+            <artifactId>neo4j-java-driver</artifactId>
+            <version>5.19.0</version>
+        </dependency>
+
         <!-- JDBC + MySQL：AI 智能问数（NL2SQL）只读数据源 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -143,6 +150,27 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <profiles>
+        <!-- RAG 评估 CI 门禁（003-rag-advanced-features US1）：
+             mvn -pl ai-cs-chat test -Peval 仅运行 golden 集评估，失败即构建失败 -->
+        <profile>
+            <id>eval</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <includes>
+                                <include>**/RagEvaluationTest.java</include>
+                            </includes>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
     <build>
         <plugins>

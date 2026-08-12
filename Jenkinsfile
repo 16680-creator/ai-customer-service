@@ -34,6 +34,17 @@ pipeline {
             }
         }
 
+        stage('RAG 评估门禁') {
+            when { expression { !params.SKIP_TESTS } }
+            steps {
+                echo "运行 RAG golden 集评估门禁（003-rag-advanced-features）"
+                sh """
+                    cd ${PROJECT_DIR}
+                    mvn -pl ai-cs-chat -am test -Peval -B
+                """
+            }
+        }
+
         stage('构建镜像') {
             when { expression { params.DEPLOY_MODE != 'deploy-only' && params.DEPLOY_MODE != 'infra-only' } }
             steps {

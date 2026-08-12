@@ -19,6 +19,8 @@ const routes = [
   { path: '/order/:orderNo', name: 'OrderDetail', component: () => import('../views/OrderDetailView.vue') },
   { path: '/mock-pay', name: 'MockPay', component: () => import('../views/MockCashierView.vue') },
   { path: '/rag-kb', name: 'VectorKb', component: () => import('../views/VectorKbView.vue') },
+  { path: '/chat-dashboard', name: 'ChatDashboard', component: () => import('../views/ChatDashboardView.vue') },
+  { path: '/knowledge-ops', name: 'KnowledgeOps', component: () => import('../views/KnowledgeOpsView.vue') },
 ]
 
 const router = createRouter({

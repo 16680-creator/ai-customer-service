@@ -85,10 +85,12 @@ public class ChatController {
     public Result<ChatRagResponseDTO> chatWithRag(@RequestParam("sessionId") @NotBlank(message = "会话ID不能为空") String sessionId,
                                                   @RequestParam("message") @NotBlank(message = "消息内容不能为空") String message,
                                                   @RequestParam("knowledgeBase") @NotBlank(message = "知识库标识不能为空") String knowledgeBase,
+                                                  @RequestParam(value = "hybrid", defaultValue = "false") boolean hybrid,
+                                                  @RequestParam(value = "rewrite", defaultValue = "false") boolean rewrite,
                                                   @RequestHeader(value = "X-User-Id", required = false) Long userId) {
         try {
             ChatUserContext.setUserId(userId);
-            return chatService.chatWithRag(sessionId, message, knowledgeBase);
+            return chatService.chatWithRag(sessionId, message, knowledgeBase, hybrid, rewrite);
         } finally {
             ChatUserContext.clear();
         }
@@ -131,10 +133,12 @@ public class ChatController {
     public SseEmitter chatStreamSse(@RequestParam("sessionId") @NotBlank(message = "会话ID不能为空") String sessionId,
                                     @RequestParam("message") @NotBlank(message = "消息内容不能为空") String message,
                                     @RequestParam(value = "knowledgeBase", required = false) String knowledgeBase,
+                                    @RequestParam(value = "hybrid", defaultValue = "false") boolean hybrid,
+                                    @RequestParam(value = "rewrite", defaultValue = "false") boolean rewrite,
                                     @RequestHeader(value = "X-User-Id", required = false) Long userId) {
         try {
             ChatUserContext.setUserId(userId);
-            return chatService.chatStreamSse(sessionId, message, knowledgeBase);
+            return chatService.chatStreamSse(sessionId, message, knowledgeBase, hybrid, rewrite);
         } finally {
             ChatUserContext.clear();
         }

@@ -33,6 +33,15 @@ public interface ChatService {
     Result<ChatRagResponseDTO> chatWithRag(String sessionId, String message, String knowledgeBase);
 
     /**
+     * RAG 对话（支持 Hybrid / 查询改写增强）
+     *
+     * @param hybrid  是否启用 ES+向量混合检索
+     * @param rewrite 是否启用查询改写/HyDE
+     */
+    Result<ChatRagResponseDTO> chatWithRag(String sessionId, String message, String knowledgeBase,
+                                           boolean hybrid, boolean rewrite);
+
+    /**
      * 流式对话
      *
      * @param sessionId 会话ID
@@ -50,6 +59,12 @@ public interface ChatService {
      * @return SSE 发射器，逐 token 推送 {@code data: {"content":"..."}} 事件
      */
     SseEmitter chatStreamSse(String sessionId, String message, String knowledgeBase);
+
+    /**
+     * SSE 流式对话（支持 Hybrid / 查询改写增强）
+     */
+    SseEmitter chatStreamSse(String sessionId, String message, String knowledgeBase,
+                             boolean hybrid, boolean rewrite);
 
     /**
      * 查询会话历史（历史回看）

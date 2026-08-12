@@ -1,4 +1,4 @@
-# AI 智能客服平台（AI Customer Service Platform）
+﻿# AI 智能客服平台（AI Customer Service Platform）
 
 ---
 
@@ -93,11 +93,11 @@ chat / knowledge / search / message / notify / user / order / product → common
 详见 [specs/README.md](specs/README.md)。
 
 <!-- SPECKIT START -->
-当前活动功能：RAG 检索质量升级五件套
-- feature-id: `002-rag-quality-upgrade`
-- 分支: `002-rag-quality-upgrade`
-- 实施计划: [specs/002-rag-quality-upgrade/plan.md](specs/002-rag-quality-upgrade/plan.md)
-- 功能规格: [specs/002-rag-quality-upgrade/spec.md](specs/002-rag-quality-upgrade/spec.md)
+当前活动功能：RAG 进阶六件套
+- feature-id: `003-rag-advanced-features`
+- 分支: `003-rag-advanced-features`
+- 实施计划: [specs/003-rag-advanced-features/plan.md](specs/003-rag-advanced-features/plan.md)
+- 功能规格: [specs/003-rag-advanced-features/spec.md](specs/003-rag-advanced-features/spec.md)
 <!-- SPECKIT END -->
 
 ---

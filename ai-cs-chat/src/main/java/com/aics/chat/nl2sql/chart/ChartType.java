@@ -1,4 +1,4 @@
-﻿package com.aics.chat.nl2sql.chart;
+package com.aics.chat.nl2sql.chart;
 
 /**
  * 图表类型枚举。

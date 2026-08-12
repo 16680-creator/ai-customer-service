@@ -71,4 +71,31 @@ export const payApi = createClient(SERVICES.pay)
 export const mqApi = createClient(SERVICES.mq)
 export const ragApi = createClient(SERVICES.rag)
 
+// ===== RAG 进阶（003-rag-advanced-features）=====
+export const chartApi = {
+  /** 问数图表：查询结果 -> 自然语言结论 + ECharts 配置 */
+  generate: (question, rows) => chatApi.post('/chart', { question, rows }),
+}
+
+export const opsApi = {
+  /** 提问聚类 + 缺口分析 */
+  cluster: (period, questions, gapHitRateThreshold) =>
+    knowledgeApi.post('/ops/cluster', { period, questions, gapHitRateThreshold }),
+  /** 收录 FAQ */
+  adoptFaq: (payload) => knowledgeApi.post('/ops/faq', payload),
+}
+
+export const ragEvalApi = {
+  /** 运行 RAG 评估 */
+  run: (payload) => ragApi.post('/eval/run', payload),
+}
+
+export const graphApi = {
+  /** 新增三元组 */
+  addTriple: (payload) => ragApi.post('/graph/triple', payload),
+  /** 多跳查询 */
+  query: (entity, depth, knowledgeBase) =>
+    ragApi.get('/graph/query', { params: { entity, depth, knowledgeBase } }),
+}
+
 export default SERVICES
