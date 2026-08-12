@@ -1,6 +1,7 @@
 package com.aics.chat.controller;
 
 import com.aics.chat.dto.ChatHistoryMessage;
+import com.aics.chat.dto.ChatRagResponseDTO;
 import com.aics.chat.service.ChatService;
 import com.aics.chat.util.ChatUserContext;
 import com.aics.common.result.Result;
@@ -43,10 +44,10 @@ public class ChatController {
 
     @Operation(summary = "RAG对话")
     @PostMapping("/rag")
-    public Result<String> chatWithRag(@RequestParam("sessionId") @NotBlank(message = "会话ID不能为空") String sessionId,
-                                      @RequestParam("message") @NotBlank(message = "消息内容不能为空") String message,
-                                      @RequestParam("knowledgeBase") @NotBlank(message = "知识库标识不能为空") String knowledgeBase,
-                                      @RequestHeader(value = "X-User-Id", required = false) Long userId) {
+    public Result<ChatRagResponseDTO> chatWithRag(@RequestParam("sessionId") @NotBlank(message = "会话ID不能为空") String sessionId,
+                                                  @RequestParam("message") @NotBlank(message = "消息内容不能为空") String message,
+                                                  @RequestParam("knowledgeBase") @NotBlank(message = "知识库标识不能为空") String knowledgeBase,
+                                                  @RequestHeader(value = "X-User-Id", required = false) Long userId) {
         try {
             ChatUserContext.setUserId(userId);
             return chatService.chatWithRag(sessionId, message, knowledgeBase);

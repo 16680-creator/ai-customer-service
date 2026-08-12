@@ -1,6 +1,7 @@
 package com.aics.chat.service;
 
 import com.aics.chat.dto.ChatHistoryMessage;
+import com.aics.chat.dto.ChatRagResponseDTO;
 import com.aics.common.result.Result;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -27,9 +28,9 @@ public interface ChatService {
      * @param sessionId 会话ID
      * @param message   用户消息
      * @param knowledgeBase 知识库标识
-     * @return AI 回复
+     * @return AI 回复 + 引用来源列表
      */
-    Result<String> chatWithRag(String sessionId, String message, String knowledgeBase);
+    Result<ChatRagResponseDTO> chatWithRag(String sessionId, String message, String knowledgeBase);
 
     /**
      * 流式对话

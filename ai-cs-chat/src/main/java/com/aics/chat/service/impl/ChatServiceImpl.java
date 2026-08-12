@@ -1,6 +1,8 @@
 package com.aics.chat.service.impl;
 
 import com.aics.chat.dto.ChatHistoryMessage;
+import com.aics.chat.dto.ChatRagResponseDTO;
+import com.aics.chat.dto.CitationItemDTO;
 import com.aics.chat.service.ChatHistoryService;
 import com.aics.chat.service.ChatService;
 import com.aics.chat.service.KnowledgeBaseService;
@@ -152,7 +154,7 @@ public class ChatServiceImpl implements ChatService {
     }
 
     @Override
-    public Result<String> chatWithRag(String sessionId, String message, String knowledgeBase) {
+    public Result<ChatRagResponseDTO> chatWithRag(String sessionId, String message, String knowledgeBase) {
         log.info("RAG对话请求: sessionId={}, knowledgeBase={}", sessionId, knowledgeBase);
 
         try {
@@ -178,8 +180,11 @@ public class ChatServiceImpl implements ChatService {
             String response = resilientAiService.callRagChat(ragPrompt).get();
             response = cleanResponse(response);
 
-            log.info("RAG对话完成: sessionId={}, 检索命中{}条", sessionId, docs.size());
-            return Result.success(response);
+            // 从检索结果构建引用溯源列表（documentId/title/page/score/content）
+            List<CitationItemDTO> citations = buildCitations(docs);
+
+            log.info("RAG对话完成: sessionId={}, 检索命中{}条, 引用{}条", sessionId, docs.size(), citations.size());
+            return Result.success(new ChatRagResponseDTO(response, citations));
         } catch (ExecutionException e) {
             Throwable cause = e.getCause();
             log.error("RAG对话异常: sessionId={}, cause={}", sessionId, cause != null ? cause.getMessage() : e.getMessage());
@@ -226,6 +231,7 @@ public class ChatServiceImpl implements ChatService {
 
             // 2. 通过 ResilientAiService 弹性获取流式 Flux
             CompletableFuture<Flux<String>> futureFlux;
+            final List<CitationItemDTO> citations;
             if (hasKb) {
                 List<Document> docs = knowledgeBaseService.search(knowledgeBase, message, 5, 0.5);
                 String context = knowledgeBaseService.buildContext(docs);
@@ -242,8 +248,11 @@ public class ChatServiceImpl implements ChatService {
                         %s
                         """.formatted(context.isBlank() ? "（未检索到相关资料）" : context, message);
                 futureFlux = resilientAiService.callSseRagStream(ragPrompt);
+                // 缓存引用溯源，完成事件时随 done 一起推送
+                citations = buildCitations(docs);
             } else {
                 futureFlux = resilientAiService.callSseStream(streamHistory);
+                citations = List.of();
             }
 
             // 等待 Flux 就绪（受 TimeLimiter 保护，不会无限等待）
@@ -288,7 +297,12 @@ public class ChatServiceImpl implements ChatService {
                         try {
                             chatHistoryService.append(sessionId, "assistant", response);
                             streamHistory.add(new AssistantMessage(response));
-                            emitter.send(SseEmitter.event().data(Map.of("done", true, "content", response)));
+                            // done 事件携带回答正文 + 引用溯源列表
+                            Map<String, Object> doneEvent = new HashMap<>();
+                            doneEvent.put("done", true);
+                            doneEvent.put("content", response);
+                            doneEvent.put("citations", citations);
+                            emitter.send(SseEmitter.event().data(doneEvent));
                         } catch (Exception e) {
                             log.warn("SSE完成事件发送失败: sessionId={}, err={}", sessionId, e.getMessage());
                         }
@@ -331,6 +345,49 @@ public class ChatServiceImpl implements ChatService {
     public Result<List<ChatHistoryMessage>> getHistory(String sessionKey) {
         log.info("查询会话历史: sessionKey={}", sessionKey);
         return Result.success(chatHistoryService.load(sessionKey));
+    }
+
+    /**
+     * 从 RAG 检索结果构建引用溯源列表。
+     *
+     * <p>字段来源：documentId/title 来自入库时写入的 metadata；
+     * page 来自 metadata 的 {@code page_number}（PagePdfDocumentReader 写入）；
+     * score 为检索相似度；content 为命中片段原文。</p>
+     */
+    private List<CitationItemDTO> buildCitations(List<Document> docs) {
+        List<CitationItemDTO> citations = new ArrayList<>(docs.size());
+        for (Document doc : docs) {
+            Map<String, Object> meta = doc.getMetadata();
+            CitationItemDTO item = new CitationItemDTO();
+
+            // documentId：入库时写入的是 chunk.getId() 字符串，可转 Long 时转（UUID 等非数字忽略）
+            Object docId = meta.get("documentId");
+            if (docId != null) {
+                try {
+                    item.setDocumentId(Long.valueOf(String.valueOf(docId)));
+                } catch (NumberFormatException ignore) {
+                    // 非数字 ID 不设置
+                }
+            }
+
+            Object title = meta.get("title");
+            if (title != null) {
+                item.setTitle(String.valueOf(title));
+            }
+
+            Object page = meta.get("page_number");
+            if (page instanceof Number pageNum) {
+                item.setPage(pageNum.intValue());
+            }
+
+            if (doc.getScore() != null) {
+                item.setScore(doc.getScore().doubleValue());
+            }
+
+            item.setContent(doc.getText());
+            citations.add(item);
+        }
+        return citations;
     }
 
     /**
