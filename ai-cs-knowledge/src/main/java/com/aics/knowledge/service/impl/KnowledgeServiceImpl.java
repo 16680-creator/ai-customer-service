@@ -5,8 +5,8 @@ import com.aics.common.result.Result;
 import com.aics.common.result.ResultCode;
 import com.aics.knowledge.entity.KnowledgeDocument;
 import com.aics.knowledge.mapper.KnowledgeMapper;
+import com.aics.knowledge.mq.KnowledgeSyncProducer;
 import com.aics.knowledge.service.KnowledgeService;
-import com.aics.knowledge.service.KnowledgeVectorService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +16,9 @@ import org.springframework.util.StringUtils;
 
 /**
  * 知识库服务实现
+ *
+ * <p>DB 操作完成后通过 RocketMQ 异步同步到搜索服务（Chroma 向量库），
+ * 解耦 DB 事务与向量化操作。</p>
  */
 @Slf4j
 @Service
@@ -23,7 +26,7 @@ import org.springframework.util.StringUtils;
 public class KnowledgeServiceImpl implements KnowledgeService {
 
     private final KnowledgeMapper knowledgeMapper;
-    private final KnowledgeVectorService knowledgeVectorService;
+    private final KnowledgeSyncProducer knowledgeSyncProducer;
 
     @Override
     public Result<Void> createDocument(KnowledgeDocument document) {
@@ -31,8 +34,8 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         document.setStatus(0);
         knowledgeMapper.insert(document);
         log.info("知识文档创建成功: id={}", document.getId());
-        // 打通：文档创建后自动向量化入库（Chroma），供 RAG 对话检索
-        knowledgeVectorService.vectorize(document);
+        // 发送 RocketMQ 消息异步向量化入库（Chroma），解耦 DB 事务与向量操作
+        knowledgeSyncProducer.send("CREATE", document);
         return Result.success();
     }
 
@@ -66,14 +69,21 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         log.info("更新知识文档: id={}", document.getId());
         knowledgeMapper.updateById(document);
         log.info("知识文档更新成功: id={}", document.getId());
-        // 打通：更新后重新向量化，保证 RAG 检索到最新内容
-        knowledgeVectorService.vectorize(document);
+        // 发送 RocketMQ 消息异步重新向量化，保证 RAG 检索到最新内容
+        knowledgeSyncProducer.send("UPDATE", document);
         return Result.success();
     }
 
     @Override
     public Result<Void> deleteDocument(Long id) {
         log.info("删除知识文档: id={}", id);
+        // 先查询文档，用于发送 DELETE 同步消息（含 documentId）
+        KnowledgeDocument document = knowledgeMapper.selectById(id);
+        if (document != null) {
+            knowledgeSyncProducer.send("DELETE", document);
+        } else {
+            log.warn("知识文档不存在，直接执行 DB 删除: id={}", id);
+        }
         knowledgeMapper.deleteById(id);
         log.info("知识文档删除成功: id={}", id);
         return Result.success();

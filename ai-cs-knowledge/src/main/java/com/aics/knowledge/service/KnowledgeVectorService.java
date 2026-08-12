@@ -51,4 +51,24 @@ public class KnowledgeVectorService {
             return 0;
         }
     }
+
+    /**
+     * 按文档 ID 删除向量片段（通常由 DELETE 同步消息触发）
+     *
+     * @param documentId 文档 ID
+     * @return 删除是否成功
+     */
+    public boolean deleteByDocumentId(Long documentId) {
+        if (documentId == null) {
+            return false;
+        }
+        try {
+            vectorStore.delete("documentId == '" + documentId + "'");
+            log.info("按 documentId 删除向量: documentId={}", documentId);
+            return true;
+        } catch (Exception e) {
+            log.error("按 documentId 删除向量失败: documentId={}, err={}", documentId, e.getMessage());
+            return false;
+        }
+    }
 }
