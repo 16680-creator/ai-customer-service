@@ -42,34 +42,36 @@ public final class MultiQueryMerger {
         Map<String, Double> scoreMap = new LinkedHashMap<>();
         // docId -> 文档（保留第一次出现）
         Map<String, Document> docMap = new LinkedHashMap<>();
-        int k = rrfK <= 0 ? 60 : rrfK;
+        int k = rrfK <= 0 ? 60 : rrfK;   // 平滑常数兜底
 
-        for (List<Document> list : results) {
+        for (List<Document> list : results) {   // 遍历每一路检索结果
             if (list == null) {
                 continue;
             }
-            int rank = 1;
+            int rank = 1;                        // 每路从第 1 名开始计排名
             for (Document doc : list) {
                 if (doc == null) {
                     continue;
                 }
                 String id = docId(doc);
+                // RRF 核心公式：每路贡献 1/(k + rank)，跨路累加；排名越靠前贡献越大
                 scoreMap.merge(id, 1.0 / (k + rank), Double::sum);
-                docMap.putIfAbsent(id, doc);
+                docMap.putIfAbsent(id, doc);     // 同一文档多路出现只保留一次（去重）
                 rank++;
             }
         }
 
+        // 按 RRF 总分降序排列文档 ID
         List<String> sortedIds = new ArrayList<>(scoreMap.keySet());
         sortedIds.sort(Comparator.comparingDouble(scoreMap::get).reversed());
 
         List<Document> merged = new ArrayList<>();
         for (String id : sortedIds) {
             if (merged.size() >= topK) {
-                break;
+                break;   // 取 Top-N
             }
             Document doc = docMap.get(id);
-            doc.getMetadata().put("rrfScore", scoreMap.get(id));
+            doc.getMetadata().put("rrfScore", scoreMap.get(id));   // 融合分写入元数据，供排序/调试
             merged.add(doc);
         }
         return merged;

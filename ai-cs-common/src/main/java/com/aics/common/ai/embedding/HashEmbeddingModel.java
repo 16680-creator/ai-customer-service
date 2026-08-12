@@ -37,14 +37,15 @@ public class HashEmbeddingModel implements EmbeddingModel {
 
     @Override
     public float[] embed(String text) {
-        float[] vector = new float[DIMENSIONS];
-        for (String token : extractTokens(text)) {
+        float[] vector = new float[DIMENSIONS];   // 固定维度向量（L2 归一化后做余弦相似度）
+        for (String token : extractTokens(text)) {   // 提取英文单词/中文二元字符组等特征 token
+            // 双哈希投影到固定维度（java hashCode + FNV-1a），减少碰撞、保证同文本同向量
             int h1 = Math.floorMod(token.hashCode(), DIMENSIONS);
             int h2 = Math.floorMod(fnv1a(token), DIMENSIONS);
-            vector[h1] += 1.0f;
+            vector[h1] += 1.0f;   // 特征哈希累加（词袋式）
             vector[h2] += 1.0f;
         }
-        normalize(vector);
+        normalize(vector);   // L2 归一化，使相似度计算有可比性
         return vector;
     }
 

@@ -49,25 +49,25 @@ public class RetrievalMetrics {
             m.retrievedCount = retrievedIds.size();
         }
         if (expectedIds == null || expectedIds.isEmpty()) {
-            return m;
+            return m;   // 无期望文档：比率为 0（调用方决定是否计入汇总）
         }
         m.expectedCount = expectedIds.size();
 
-        int k = Math.min(topK, retrievedIds == null ? 0 : retrievedIds.size());
+        int k = Math.min(topK, retrievedIds == null ? 0 : retrievedIds.size());   // 只看前 topK 条
         int hitCount = 0;
-        int firstHitRank = -1;
+        int firstHitRank = -1;   // 首个命中期望文档的排名（1 起）
         for (int i = 0; i < k; i++) {
             String id = retrievedIds.get(i);
             if (expectedIds.contains(id)) {
                 hitCount++;
                 if (firstHitRank < 0) {
-                    firstHitRank = i + 1;
+                    firstHitRank = i + 1;   // 记录第一个命中的排名
                 }
             }
         }
-        m.recallAtK = (double) hitCount / expectedIds.size();
-        m.hitRate = hitCount > 0 ? 1.0 : 0.0;
-        m.mrr = firstHitRank > 0 ? 1.0 / firstHitRank : 0.0;
+        m.recallAtK = (double) hitCount / expectedIds.size();   // Recall@k = 命中数 / 期望数
+        m.hitRate = hitCount > 0 ? 1.0 : 0.0;                    // 至少命中一条 = 1
+        m.mrr = firstHitRank > 0 ? 1.0 / firstHitRank : 0.0;     // MRR = 1 / 首个命中排名
         return m;
     }
 }

@@ -59,28 +59,29 @@ public class HybridRetriever {
      * @return 检索结果（含实际模式与降级信息）
      */
     public RetrieveResult retrieve(String knowledgeBase, String query, RetrievalMode mode, int topK) {
-        int k = topK <= 0 ? 5 : topK;
-        switch (mode) {
-            case HYBRID -> {
+        int k = topK <= 0 ? 5 : topK;   // Top-K 兜底：非法值用默认 5
+        switch (mode) {                  // 策略模式：按枚举分派到不同检索实现
+            case HYBRID -> {             // Hybrid = ES 关键词 + 向量语义 + RRF 融合
                 if (!properties.isHybridEnabled()) {
+                    // 全局开关默认关闭（Nacos aics.rag.hybrid-enabled），保证存量纯向量行为不变
                     return vector(knowledgeBase, query, k, "hybrid 全局未启用");
                 }
                 return hybrid(knowledgeBase, query, k);
             }
-            case HYBRID_QUERY_REWRITE -> {
+            case HYBRID_QUERY_REWRITE -> {   // 混合 + LLM 改写/HyDE
                 if (!properties.isRewriteEnabled()) {
                     return vector(knowledgeBase, query, k, "rewrite 全局未启用");
                 }
                 return rewriteHybrid(knowledgeBase, query, k);
             }
-            case GRAPH_RAG -> {
+            case GRAPH_RAG -> {              // GraphRAG：图谱优先，未命中降级
                 if (!properties.isGraphEnabled()) {
                     return vector(knowledgeBase, query, k, "graph 全局未启用");
                 }
                 return graph(knowledgeBase, query, k);
             }
             default -> {
-                return vector(knowledgeBase, query, k, null);
+                return vector(knowledgeBase, query, k, null);   // VECTOR：存量默认路径
             }
         }
     }
@@ -92,6 +93,7 @@ public class HybridRetriever {
      * 在 Chroma 中做余弦相似度 Top-K 检索，并按 knowledgeBase 元数据过滤。</p>
      */
     private RetrieveResult vector(String knowledgeBase, String query, int topK, String degradeReason) {
+        // 底层：问题经 bge-m3 向量化 -> Chroma 余弦相似度 Top-K 检索 -> 按 knowledgeBase 元数据过滤
         List<Document> docs = knowledgeBaseService.search(knowledgeBase, query, topK, 0.0);
         return buildResult(query, docs, RetrievalMode.VECTOR.name(), degradeReason);
     }
@@ -105,34 +107,38 @@ public class HybridRetriever {
      */
     private RetrieveResult hybrid(String knowledgeBase, String query, int topK) {
         try {
+            // 跨服务调用：Feign 调 ai-cs-search /search/hybrid（ES 与向量在搜索服务内完成 RRF 融合）
             Result<ChatHybridPageVO> result = searchFeignClient.hybridSearch(knowledgeBase, query, 1, topK);
             if (result == null || !result.isSuccess() || result.getData() == null
                     || result.getData().getRecords() == null) {
+                // 搜索服务返回异常/空 -> 降级纯向量，回答不中断
                 return vector(knowledgeBase, query, topK, "搜索服务无数据");
             }
             List<Document> docs = new ArrayList<>();
+            // 把搜索服务的混合结果转成 Spring AI Document（统一检索结果的数据形态）
             for (ChatHybridSearchResult r : result.getData().getRecords()) {
                 Map<String, Object> meta = new LinkedHashMap<>();
-                meta.put("knowledgeBase", knowledgeBase);
+                meta.put("knowledgeBase", knowledgeBase);   // 保留知识库归属（后续引用溯源/过滤用）
                 if (r.getDocumentId() != null) {
-                    meta.put("documentId", r.getDocumentId());
+                    meta.put("documentId", r.getDocumentId());   // 文档 ID：溯源与删除定位
                 }
                 if (r.getTitle() != null) {
-                    meta.put("title", r.getTitle());
+                    meta.put("title", r.getTitle());             // 标题：前端引用卡片展示
                 }
                 if (r.getPage() != null) {
-                    meta.put("page_number", r.getPage());
+                    meta.put("page_number", r.getPage());        // 页码：PDF 分页溯源
                 }
                 Document doc = Document.builder()
                         .id(r.getDocumentId() != null ? r.getDocumentId() : "hybrid-" + docs.size())
                         .text(r.getContent() == null ? "" : r.getContent())
                         .metadata(meta)
-                        .score(r.getScore())
+                        .score(r.getScore())   // RRF 融合分写入 score，供排序/展示
                         .build();
                 docs.add(doc);
             }
             return buildResult(query, docs, RetrievalMode.HYBRID.name(), null);
         } catch (Exception e) {
+            // 任何异常（服务不可达/超时）都降级，保证核心对话可用性
             log.warn("混合检索失败，降级纯向量: kb={}, query={}, err={}", knowledgeBase, query, e.getMessage());
             return vector(knowledgeBase, query, topK, "搜索服务不可用");
         }

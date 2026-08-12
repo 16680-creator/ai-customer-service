@@ -59,12 +59,16 @@ public class RagEvalServiceImpl implements RagEvaluator {
         int llmSum = 0;
 
         for (GoldenCase c : cases) {
+            // 知识库优先级：请求指定 > 用例自带 > 默认
             String caseKb = StringUtils.hasText(kb) ? kb : (StringUtils.hasText(c.getKnowledgeBase()) ? c.getKnowledgeBase() : "default");
+            // 1) 检索：拿到命中文档（检索失败时 retrieveSafely 返回空，不中断评估）
             List<Document> docs = retrieveSafely(dataSource, caseKb, c.getQuestion(), topK);
+            // 2) 提取命中文档 ID（优先元数据 documentId，否则用文档自带 ID）
             List<String> retrievedIds = docs.stream()
                     .map(d -> String.valueOf(d.getMetadata().getOrDefault("documentId", d.getId())))
                     .toList();
             List<String> expectedIds = c.getExpectedDocumentIds() == null ? List.of() : c.getExpectedDocumentIds();
+            // 3) 与期望文档比对，计算 Recall@k / MRR / HitRate
             RetrievalMetrics metrics = RetrievalMetrics.compute(retrievedIds, expectedIds, topK);
 
             RagEvalCaseResult result = new RagEvalCaseResult();
@@ -73,16 +77,17 @@ public class RagEvalServiceImpl implements RagEvaluator {
             result.setRetrievedDocumentIds(retrievedIds);
             result.setMetrics(metrics);
 
+            // 4) 只累计"含期望文档"的用例，避免无期望用例稀释命中率
             if (!expectedIds.isEmpty()) {
                 recallSum += metrics.getRecallAtK();
                 mrrSum += metrics.getMrr();
                 hitSum += metrics.getHitRate();
                 counted++;
             }
-            // LLM 打分（可选）
+            // 5) LLM-as-Judge 打分（可选：仅有参考答案的用例才打分）
             if (StringUtils.hasText(c.getReferenceAnswer())) {
                 Integer score = answerJudge.score(c.getQuestion(), buildAnswerPlaceholder(c), c.getReferenceAnswer());
-                if (score != null) {
+                if (score != null) {   // Judge 失败返回 null，不记入均分
                     result.setLlmScore(score);
                     llmSum += score;
                     llmCount++;

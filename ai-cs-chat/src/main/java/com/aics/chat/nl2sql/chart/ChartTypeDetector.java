@@ -25,6 +25,7 @@ public final class ChartTypeDetector {
     }
 
     public static ChartType detect(List<Map<String, Object>> rows) {
+        // 空数据或单行：没有分布维度，不生成图表
         if (rows == null || rows.isEmpty() || rows.size() < 2) {
             return ChartType.NONE;
         }
@@ -32,11 +33,11 @@ public final class ChartTypeDetector {
         if (first == null || first.isEmpty()) {
             return ChartType.NONE;
         }
-        // 1. 时间列
+        // 1. 含时间列（date/time/month/月份等）-> 折线图看趋势
         if (hasTimeColumn(first)) {
             return ChartType.LINE;
         }
-        // 2. 分类维度
+        // 2. 含分类列（非数值）-> 类别少用饼图看占比，多则柱状图
         String categoryKey = findCategoryColumn(rows);
         if (categoryKey != null) {
             Set<Object> distinct = new HashSet<>();
@@ -45,7 +46,7 @@ public final class ChartTypeDetector {
             }
             return distinct.size() <= PIE_MAX_CATEGORIES ? ChartType.PIE : ChartType.BAR;
         }
-        // 3. 全数值 → BAR
+        // 3. 全数值列 -> 柱状图对比
         return ChartType.BAR;
     }
 

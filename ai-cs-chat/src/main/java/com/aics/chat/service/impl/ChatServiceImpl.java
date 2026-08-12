@@ -124,9 +124,9 @@ public class ChatServiceImpl implements ChatService {
      * 保留最近的 KEEP_RECENT_SIZE 条消息
      */
     private List<Message> compressHistory(List<Message> history) {
-        int splitIndex = history.size() - KEEP_RECENT_SIZE;
-        List<Message> oldMessages = history.subList(0, splitIndex);
-        List<Message> recentMessages = new ArrayList<>(history.subList(splitIndex, history.size()));
+        int splitIndex = history.size() - KEEP_RECENT_SIZE;   // 切分点：保留最近 KEEP_RECENT_SIZE 条
+        List<Message> oldMessages = history.subList(0, splitIndex);      // 旧消息 -> 交给 LLM 压缩
+        List<Message> recentMessages = new ArrayList<>(history.subList(splitIndex, history.size()));  // 最近消息原样保留
 
         // 拼接旧消息为文本
         StringBuilder conversation = new StringBuilder();
@@ -137,6 +137,7 @@ public class ChatServiceImpl implements ChatService {
 
         try {
             // 通过 ResilientAiService 调用 AI 生成摘要（带超时/重试/熔断）
+            // 调 LLM 压缩旧消息为摘要（经 ResilientAiService 获得超时/重试/熔断保护）
             String summary = resilientAiService.callSummary(
                     new Prompt("请将以下对话历史压缩为简洁的摘要，保留关键信息（用户名、订单号、重要决定等），"
                             + "用1-3句话概括，作为后续对话的上下文参考：\n\n" + conversation)
@@ -145,12 +146,13 @@ public class ChatServiceImpl implements ChatService {
             summary = cleanResponse(summary);
             log.info("会话历史压缩完成: {}条消息 -> 摘要({}字)", oldMessages.size(), summary.length());
 
-            // 构建压缩后的历史：摘要 + 最近消息
+            // 构建压缩后的历史：摘要(SystemMessage) + 最近消息
             List<Message> compressed = new ArrayList<>();
             compressed.add(new SystemMessage("以下是之前对话的摘要，请参考：\n" + summary));
             compressed.addAll(recentMessages);
             return compressed;
         } catch (Exception e) {
+            // 压缩失败不阻塞对话：回退为"截断模式"（只保留最近消息）
             log.warn("会话压缩失败，回退为截断模式", e);
             return recentMessages;
         }
@@ -220,6 +222,7 @@ public class ChatServiceImpl implements ChatService {
         try {
             // 检索：纯向量 / Hybrid / 改写（增强失败自动降级纯向量）
             List<Document> docs = retrieveRagDocs(knowledgeBase, message, 5, 0.5, hybrid, rewrite);
+            // 把命中的知识片段拼成【知识库资料】上下文，注入 Prompt
             String context = knowledgeBaseService.buildContext(docs);
 
             // 构建 RAG Prompt
@@ -236,11 +239,11 @@ public class ChatServiceImpl implements ChatService {
                     %s
                     """.formatted(context.isBlank() ? "（未检索到相关资料）" : context, message);
 
-            // 通过 ResilientAiService 弹性调用 LLM
+            // 通过 ResilientAiService 弹性调用 LLM（超时/重试/熔断/降级）
             String response = resilientAiService.callRagChat(ragPrompt).get();
-            response = cleanResponse(response);
+            response = cleanResponse(response);   // 去掉模型思考过程标签，只留正式回答
 
-            // 从检索结果构建引用溯源列表（documentId/title/page/score/content）
+            // 从检索结果构建引用溯源列表（documentId/title/page/score/content），随回答返回前端
             List<CitationItemDTO> citations = buildCitations(docs);
 
             log.info("RAG对话完成: sessionId={}, 检索命中{}条, 引用{}条", sessionId, docs.size(), citations.size());
@@ -359,8 +362,9 @@ public class ChatServiceImpl implements ChatService {
                                 emitter.complete();
                                 return;
                             }
-                            full.append(chunk);
+                            full.append(chunk);   // 累积完整回复，供流结束后入库
                             try {
+                                // 逐 token 推送给前端（打字机效果）
                                 emitter.send(SseEmitter.event().data(Map.of("content", chunk)));
                             } catch (Exception e) {
                                 log.warn("SSE发送失败: sessionId={}, err={}", sessionId, e.getMessage());
@@ -377,9 +381,9 @@ public class ChatServiceImpl implements ChatService {
                         emitter.completeWithError(error);
                     },
                     () -> {
-                        String response = cleanResponse(full.toString());
+                        String response = cleanResponse(full.toString());   // 流结束：清洗思考标签
                         try {
-                            chatHistoryService.append(sessionId, "assistant", response);
+                            chatHistoryService.append(sessionId, "assistant", response);   // 落库历史
                             streamHistory.add(new AssistantMessage(response));
                             // done 事件仅携带引用溯源列表（正文已逐 token 推送，不再重复携带）
                             Map<String, Object> doneEvent = new HashMap<>();

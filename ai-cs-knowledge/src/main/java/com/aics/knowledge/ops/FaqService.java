@@ -46,18 +46,18 @@ public class FaqService {
         faq.setAnswer(suggestion.getAnswer().trim());
         faq.setKnowledgeBase(StringUtils.hasText(suggestion.getKnowledgeBase())
                 ? suggestion.getKnowledgeBase() : "faq");
-        faq.setTopicId(suggestion.getClusterTopicId());
+        faq.setTopicId(suggestion.getClusterTopicId());   // 关联来源聚类主题
         faq.setStatus("DRAFT");
-        faqMapper.insert(faq);
+        faqMapper.insert(faq);   // 1) 写 FAQ 表
         log.info("FAQ 已收录: id={}, question={}", faq.getId(), faq.getQuestion());
 
-        // 创建知识文档（FAQ 作为知识文档入库 → RocketMQ 异步向量化）
+        // 2) 创建知识文档：FAQ 作为知识文档入库 -> KnowledgeService 发 RocketMQ -> 异步向量化到 Chroma
         KnowledgeDocument doc = new KnowledgeDocument();
         doc.setTitle("FAQ-" + faq.getQuestion());
         doc.setContent(faq.getQuestion() + "\n" + faq.getAnswer());
         doc.setDocType("markdown");
         doc.setTags("faq," + faq.getKnowledgeBase());
-        knowledgeService.createDocument(doc);
+        knowledgeService.createDocument(doc);   // 复用知识文档增量同步链路
 
         return Map.of("faqId", faq.getId(), "vectorized", true);
     }

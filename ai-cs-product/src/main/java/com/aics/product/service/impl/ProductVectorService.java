@@ -48,16 +48,18 @@ public class ProductVectorService {
      * 索引商品（创建/更新时调用；相同商品 ID 重复索引会覆盖）
      */
     public void indexProduct(Product product) {
+        // 把商品名称/描述/图片描述拼成一段检索文本
         String text = buildSearchText(product);
         if (!StringUtils.hasText(text)) {
             log.warn("商品无可索引文本，跳过: id={}", product.getId());
             return;
         }
+        // 文档 ID = 商品 ID（同 ID 重复索引会覆盖，天然幂等）
         Document document = new Document(
                 String.valueOf(product.getId()),
                 text,
                 Map.of(METADATA_PRODUCT_ID, product.getId(), "name", product.getName()));
-        vectorStore.add(List.of(document));
+        vectorStore.add(List.of(document));   // 向量化并写入向量库（相似商品检索的数据来源）
         log.info("商品向量索引成功: id={}, text={}", product.getId(), text);
     }
 
@@ -77,6 +79,7 @@ public class ProductVectorService {
             throw new BusinessException(ResultCode.BAD_REQUEST, "检索文本不能为空");
         }
         try {
+            // 以文搜图：把用户文本向量化后与商品向量做余弦相似度 Top-K 检索
             List<Document> documents = vectorStore.similaritySearch(
                     SearchRequest.builder().query(text).topK(topK).build());
             return documents.stream()

@@ -47,17 +47,18 @@ public class QuestionClusterService {
             return report;
         }
         double gapThreshold = gapHitRateThreshold == null
-                ? properties.getGapHitRateThreshold() : gapHitRateThreshold;
+                ? properties.getGapHitRateThreshold() : gapHitRateThreshold;   // 缺口阈值（默认 0.4）
 
-        List<ClusterTopic> topics = embeddingClusterService.cluster(questions);
+        List<ClusterTopic> topics = embeddingClusterService.cluster(questions);   // 1) 向量贪心聚类
         List<ClusterTopic> gaps = new ArrayList<>();
         for (ClusterTopic topic : topics) {
+            // 2) 逐主题做知识库缺口检测（用代表问题测检索命中率）
             Double rate = gapDetector.hitRate(topic, "knowledge");
             if (rate != null) {
                 topic.setHitRate(rate);
-                topic.setGapFlag(rate < gapThreshold);
+                topic.setGapFlag(rate < gapThreshold);   // 低命中 = 知识库缺口
                 if (topic.isGapFlag()) {
-                    gaps.add(topic);
+                    gaps.add(topic);   // 3) 收集缺口主题，供运营看板优先处理
                 }
             }
         }

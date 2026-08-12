@@ -42,10 +42,11 @@ public class KnowledgeGapDetector {
         }
         int hit = 0;
         int total = 0;
-        String kb = knowledgeBase == null ? "knowledge" : knowledgeBase;
+        String kb = knowledgeBase == null ? "knowledge" : knowledgeBase;   // 默认检索 knowledge 库
         for (String q : topic.getRepresentativeQuestions()) {
             total++;
             try {
+                // 用代表问题在知识向量库检索：Top-K 非空即算"命中"
                 SearchRequest request = SearchRequest.builder()
                         .query(q)
                         .topK(properties.getGapTopK())
@@ -56,14 +57,15 @@ public class KnowledgeGapDetector {
                     hit++;
                 }
             } catch (Exception e) {
-                log.warn("缺口检测检索失败: query={}, err={}", q, e.getMessage());
+                log.warn("缺口检测检索失败: query={}, err={}", q, e.getMessage());   // 检索异常不计入分母
             }
         }
         if (total == 0) {
             return null;
         }
-        double rate = (double) hit / total;
+        double rate = (double) hit / total;   // 命中率 = 命中代表问题数 / 总代表问题数
         topic.setHitRate(rate);
+        // 命中率低于阈值 -> 标记为"知识库缺口"（用户常问但知识库答不上来）
         topic.setGapFlag(rate < properties.getGapHitRateThreshold());
         return rate;
     }

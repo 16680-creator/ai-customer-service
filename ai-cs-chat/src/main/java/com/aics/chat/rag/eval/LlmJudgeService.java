@@ -38,6 +38,7 @@ public class LlmJudgeService implements RagAnswerJudge {
             return null;
         }
         try {
+            // 提示词明确评分维度 + 只输出数字，降低模型自由发挥导致的解析失败
             String prompt = """
                     你是一名 RAG 回答质量评估员。请根据参考答案对 AI 客服的回答打分（1-5 分，5 为最佳）。
                     评分维度：准确性（是否与参考答案一致、有无编造）、完整性（是否覆盖要点）、简洁性。
@@ -51,16 +52,16 @@ public class LlmJudgeService implements RagAnswerJudge {
                             "你是严谨的 RAG 质量评估员，只输出 1-5 的整数分数。")
                     .user(prompt)
                     .call()
-                    .content();
+                    .content();   // 复用 DeepSeek ChatClient 打分
             if (!StringUtils.hasText(content)) {
                 return null;
             }
             Matcher m = NUMBER_PATTERN.matcher(content);
             if (m.find()) {
-                int score = Math.round(Float.parseFloat(m.group()));
-                return Math.max(1, Math.min(5, score));
+                int score = Math.round(Float.parseFloat(m.group()));   // 解析输出中的首个数字
+                return Math.max(1, Math.min(5, score));                // 钳制到 1-5 分区间
             }
-            return null;
+            return null;   // 解析失败返回 null（调用方降级）
         } catch (Exception e) {
             log.warn("LLM Judge 打分失败，降级返回 null: err={}", e.getMessage());
             return null;

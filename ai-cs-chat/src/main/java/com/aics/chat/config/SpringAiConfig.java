@@ -113,7 +113,7 @@ public class SpringAiConfig {
      * @return 硅基流动 BAAI/bge-m3 EmbeddingModel Bean
      */
     @Bean
-    @Primary
+    @Primary   // 优先注入本 Bean（向量库/检索统一用 bge-m3，保证向量空间一致）
     public EmbeddingModel siliconFlowEmbeddingModel() {
         log.info("========================================");
         log.info("创建硅基流动 EmbeddingModel");

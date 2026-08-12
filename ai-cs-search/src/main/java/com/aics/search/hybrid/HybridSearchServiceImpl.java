@@ -49,13 +49,15 @@ public class HybridSearchServiceImpl implements HybridSearchService {
     @Override
     public List<HybridSearchResult> hybridSearch(String knowledgeBase, String query, int topK) {
         log.info("混合检索开始: knowledgeBase={}, query={}, topK={}", knowledgeBase, query, topK);
-        List<RankedItem> esItems = esSearch(knowledgeBase, query);
-        List<RankedItem> vectorItems = vectorSearch(knowledgeBase, query);
+        List<RankedItem> esItems = esSearch(knowledgeBase, query);       // 路 1：ES 关键词(BM25) Top-20
+        List<RankedItem> vectorItems = vectorSearch(knowledgeBase, query); // 路 2：向量语义 Top-20
 
+        // 双路都空：直接返回空
         if (esItems.isEmpty() && vectorItems.isEmpty()) {
             log.warn("混合检索两路均无结果: knowledgeBase={}, query={}", knowledgeBase, query);
             return Collections.emptyList();
         }
+        // 单路降级：ES 挂 -> 只给向量结果；向量挂 -> 只给 ES 结果（搜索不整体失效）
         if (esItems.isEmpty()) {
             log.info("ES 路无结果/异常，降级为仅向量结果: knowledgeBase={}, 命中={}", knowledgeBase, vectorItems.size());
             return toResults(vectorItems);
@@ -65,6 +67,7 @@ public class HybridSearchServiceImpl implements HybridSearchService {
             return toResults(esItems);
         }
 
+        // 双路正常：RRF 倒数排名融合（只看排名不看分数，跨量纲）
         List<RankedItem> merged = RrfMerger.merge(esItems, vectorItems, topK, RRF_K);
         log.info("混合检索完成: knowledgeBase={}, 融合结果={} 条", knowledgeBase, merged.size());
         return toResults(merged);

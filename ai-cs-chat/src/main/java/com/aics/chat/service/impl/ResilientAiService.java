@@ -87,17 +87,18 @@ public class ResilientAiService {
     @Retry(name = "chatService", fallbackMethod = "fallbackChat")
     @CircuitBreaker(name = "chatService", fallbackMethod = "fallbackChat")
     public CompletableFuture<String> callChat(List<Message> messages) {
+        // supplyAsync 在独立线程执行阻塞的 LLM 调用，便于 TimeLimiter 通过 Future.get(timeout) 实现超时
         return CompletableFuture.supplyAsync(() -> {
             try {
                 log.debug("弹性调用 LLM (非流式), messages={}", messages.size());
                 String response = chatClient.prompt()
-                        .messages(messages)
+                        .messages(messages)   // 多轮消息直接透传给模型（含历史/系统提示）
                         .call()
                         .content();
                 log.debug("LLM 非流式调用成功, responseLength={}", response.length());
                 return response;
             } catch (Exception e) {
-                throw new CompletionException(e);
+                throw new CompletionException(e);   // 包装为 CompletionException，供外层 Future.get 解包
             }
         });
     }
@@ -153,6 +154,7 @@ public class ResilientAiService {
     @TimeLimiter(name = "sseChatService", fallbackMethod = "fallbackSseStream")
     @CircuitBreaker(name = "sseChatService", fallbackMethod = "fallbackSseStream")
     public CompletableFuture<Flux<String>> callSseStream(List<Message> messages) {
+        // 流式：返回 Flux<String>（逐 token）；TimeLimiter 只限制"首 token 到达"时间
         return CompletableFuture.supplyAsync(() -> {
             try {
                 log.debug("弹性调用 LLM (SSE 流式), messages={}", messages.size());

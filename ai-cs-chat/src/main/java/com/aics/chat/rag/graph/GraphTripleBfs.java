@@ -38,29 +38,31 @@ public final class GraphTripleBfs {
             return Collections.emptyList();
         }
         List<GraphTriple> result = new ArrayList<>();
-        Set<String> visitedEntities = new LinkedHashSet<>();
-        Set<Long> visitedTripleIds = new LinkedHashSet<>();
-        visitedEntities.add(entity.trim());
+        Set<String> visitedEntities = new LinkedHashSet<>();   // 已访问实体，防循环
+        Set<Long> visitedTripleIds = new LinkedHashSet<>();    // 已用三元组，防重复
+        visitedEntities.add(entity.trim());                    // 起点入队
 
-        List<String> frontier = new ArrayList<>(visitedEntities);
+        List<String> frontier = new ArrayList<>(visitedEntities);   // 当前层待访问实体
         int currentDepth = 0;
-        while (!frontier.isEmpty() && currentDepth <= depth) {
-            List<String> next = new ArrayList<>();
+        while (!frontier.isEmpty() && currentDepth <= depth) {   // BFS：逐层扩散
+            List<String> next = new ArrayList<>();               // 下一层实体
             for (String current : frontier) {
                 for (GraphTriple t : allTriples) {
+                    // 三元组双向可走：current 是 subject 或 object 都算相连
                     boolean matches = current.equals(t.getSubject()) || current.equals(t.getObject());
                     if (!matches || visitedTripleIds.contains(t.getId())) {
                         continue;
                     }
                     visitedTripleIds.add(t.getId());
                     result.add(t);
+                    // 找到相邻实体：current 在 subject 侧则邻接 object，反之亦然
                     String neighbor = current.equals(t.getSubject()) ? t.getObject() : t.getSubject();
-                    if (visitedEntities.add(neighbor)) {
+                    if (visitedEntities.add(neighbor)) {   // 新实体才入下一层，防 A->B->A 死循环
                         next.add(neighbor);
                     }
                 }
             }
-            frontier = next;
+            frontier = next;       // 进入下一层
             currentDepth++;
         }
         return result;

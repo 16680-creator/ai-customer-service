@@ -39,15 +39,15 @@ public class InMemoryGraphStore implements GraphStore {
 
     @Override
     public synchronized GraphTriple add(GraphTriple triple) {
-        validate(triple);
-        GraphTriple copy = new GraphTriple();
-        copy.setId(idSequence.getAndIncrement());
+        validate(triple);                          // 校验 subject/predicate/object 非空、长度合规
+        GraphTriple copy = new GraphTriple();      // 复制一份，避免外部对象被后续修改影响
+        copy.setId(idSequence.getAndIncrement());  // 进程内自增 ID（Neo4j 版语义一致）
         copy.setSubject(triple.getSubject().trim());
         copy.setPredicate(triple.getPredicate().trim());
         copy.setObject(triple.getObject().trim());
         copy.setKnowledgeBase(triple.getKnowledgeBase());
         copy.setSourceDocumentId(triple.getSourceDocumentId());
-        triples.put(copy.getId(), copy);
+        triples.put(copy.getId(), copy);           // 写入内存 Map
         log.info("图谱新增三元组: id={}, {} -> {} -> {}", copy.getId(),
                 copy.getSubject(), copy.getPredicate(), copy.getObject());
         return copy;

@@ -46,14 +46,15 @@ public class EmbeddingClusterService {
 
         for (QuestionItem q : questions) {
             if (q == null || !StringUtils.hasText(q.getText())) {
-                continue;
+                continue;   // 跳过空文本
             }
-            float[] vector = embed(q.getText());
+            float[] vector = embed(q.getText());   // bge-m3 向量化（失败返回 null）
             if (vector == null) {
-                continue;
+                continue;   // 向量化失败跳过该条，不中断聚类
             }
             int bestIndex = -1;
             double bestSimilarity = 0;
+            // 贪心：找与当前向量最相似的主题质心
             for (int i = 0; i < centroids.size(); i++) {
                 double sim = cosine(vector, centroids.get(i));
                 if (sim > bestSimilarity) {
@@ -61,11 +62,12 @@ public class EmbeddingClusterService {
                     bestIndex = i;
                 }
             }
+            // 相似度达到阈值 -> 归入已有主题并更新质心；否则新建主题
             if (bestIndex >= 0 && bestSimilarity >= properties.getSimilarityThreshold()) {
                 ClusterTopic topic = topics.get(bestIndex);
                 topic.getQuestionIds().add(q.getId());
                 topic.setCount(topic.getCount() + 1);
-                // 更新质心
+                // 更新质心：增量平均（新向量按成员数加权）
                 centroids.set(bestIndex, average(centroids.get(bestIndex), vector, topic.getCount()));
             } else {
                 ClusterTopic topic = new ClusterTopic();
@@ -73,7 +75,7 @@ public class EmbeddingClusterService {
                 topic.setQuestionIds(new ArrayList<>(List.of(q.getId())));
                 topic.setCount(1);
                 topics.add(topic);
-                centroids.add(vector);
+                centroids.add(vector);   // 新主题的质心 = 当前向量
             }
         }
         // 代表问题：取成员数最多的主题，代表问题即主题名（高频问题文本）

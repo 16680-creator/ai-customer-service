@@ -41,13 +41,13 @@ public final class EChartsOptionBuilder {
 
     private static Map<String, Object> pie(List<Map<String, Object>> rows) {
         List<Map<String, Object>> data = new ArrayList<>();
-        String nameKey = firstKey(rows);
-        String valueKey = firstNumericKey(rows, nameKey);
+        String nameKey = firstKey(rows);                 // 第一列作为分类名（如"手机"）
+        String valueKey = firstNumericKey(rows, nameKey); // 第一个数值列作为值
         for (Map<String, Object> row : rows) {
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("name", String.valueOf(row.get(nameKey)));
             item.put("value", numericValue(row.get(valueKey)));
-            data.add(item);
+            data.add(item);   // 组装 ECharts pie 的 data 数组
         }
         Map<String, Object> series = new LinkedHashMap<>();
         series.put("type", "pie");

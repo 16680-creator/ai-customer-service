@@ -47,11 +47,12 @@ public class QueryRewriteService {
     public RewriteResult rewrite(String question) {
         RewriteResult result = new RewriteResult();
         result.setOriginalQuery(question);
-        result.setSubQueries(new ArrayList<>());
+        result.setSubQueries(new ArrayList<>());   // 初始化为空，调用方无需判空
         if (!StringUtils.hasText(question)) {
-            return result;
+            return result;                         // 空问题直接返回，不发 LLM 请求
         }
         try {
+            // 提示词要求 LLM 只输出 JSON：子查询数组 + HyDE 假设文档，便于程序化解析
             String prompt = """
                     请把下面的用户问题改写成 %d 个更精确、适合知识库检索的子查询，并生成一条假设性的标准答案文档（HyDE），
                     用于提升检索召回。
@@ -64,13 +65,14 @@ public class QueryRewriteService {
                             "你是检索查询优化专家，只输出指定 JSON。")
                     .user(prompt)
                     .call()
-                    .content();
-            result.setSubQueries(parseSubQueries(content));
-            result.setHydeDocument(parseHyde(content));
+                    .content();   // 同步调用 DeepSeek（经 ChatClient）
+            result.setSubQueries(parseSubQueries(content));   // 解析并去重子查询
+            result.setHydeDocument(parseHyde(content));       // 提取 HyDE 假设文档
             log.info("查询改写完成: question={}, subQueries={}, hyde={}",
                     question, result.getSubQueries().size(),
                     StringUtils.hasText(result.getHydeDocument()));
         } catch (Exception e) {
+            // 任何异常（超时/非法 JSON）降级：返回空列表，调用方用原始问题检索
             log.warn("查询改写失败，降级为原始问题: question={}, err={}", question, e.getMessage());
             result.setSubQueries(List.of());
             result.setHydeDocument(null);

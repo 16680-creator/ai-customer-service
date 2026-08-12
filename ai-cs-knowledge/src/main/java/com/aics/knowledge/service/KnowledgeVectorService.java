@@ -57,14 +57,15 @@ public class KnowledgeVectorService {
         }
         try {
             // 按 Token 切分（默认配置），适配 bge-m3 的上下文长度限制
+            // 1) 切块：按 Token 切分（适配 bge-m3 上下文窗口），长文档变成多个可独立检索的小片段
             List<Document> chunks = new TokenTextSplitter().split(new Document(doc.getContent()));
-            // 为每个分块附加元数据：knowledgeBase 用于检索过滤，documentId/title 用于溯源
+            // 2) 为每个分块附加元数据：knowledgeBase 用于检索过滤，documentId/title 用于溯源
             chunks.forEach(chunk -> {
                 chunk.getMetadata().put("knowledgeBase", KNOWLEDGE_BASE);
                 chunk.getMetadata().put("documentId", doc.getId());
                 chunk.getMetadata().put("title", doc.getTitle());
             });
-            // add 内部会对每个 chunk 调用 EmbeddingModel 生成向量并写入 Chroma
+            // 3) add 内部会对每个 chunk 调用 EmbeddingModel 生成向量并写入 Chroma（入库）
             vectorStore.add(chunks);
             log.info("文档向量化完成: id={}, title={}, chunks={}", doc.getId(), doc.getTitle(), chunks.size());
             return chunks.size();
