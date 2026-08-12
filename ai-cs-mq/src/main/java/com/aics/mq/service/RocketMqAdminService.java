@@ -56,6 +56,7 @@ public class RocketMqAdminService {
     }
 
     /** 概览：集群/Broker 数、Topic 数、消费组数、总堆积 */
+    /** MQ 集群总览（broker 数/主题数/消费组数等） */
     public Map<String, Object> overview() {
         DefaultMQAdminExt admin = createAdmin();
         try {
@@ -117,6 +118,7 @@ public class RocketMqAdminService {
     }
 
     /** Topic 列表（含队列数与消息量） */
+    /** 列出全部 Topic（供排查消息链路） */
     public List<Map<String, Object>> topics() {
         DefaultMQAdminExt admin = createAdmin();
         try {
@@ -175,6 +177,7 @@ public class RocketMqAdminService {
     }
 
     /** Topic 详情（队列分布） */
+    /** Topic 详情（队列数/消息数/最近更新时间） */
     public Map<String, Object> topicDetail(String topic) {
         DefaultMQAdminExt admin = createAdmin();
         try {
@@ -200,6 +203,7 @@ public class RocketMqAdminService {
     }
 
     /** 消费组列表（含消费 TPS 与堆积） */
+    /** 列出全部消费组（供排查消费进度） */
     public List<Map<String, Object>> groups() {
         DefaultMQAdminExt admin = createAdmin();
         try {
@@ -258,6 +262,7 @@ public class RocketMqAdminService {
     }
 
     /** 消费组详情（队列级 offset / 堆积） */
+    /** 消费组详情（消费进度/堆积量——AI 客服消息链路排障关键指标） */
     public Map<String, Object> groupDetail(String group) {
         DefaultMQAdminExt admin = createAdmin();
         try {

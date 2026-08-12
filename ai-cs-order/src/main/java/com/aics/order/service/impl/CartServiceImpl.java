@@ -32,6 +32,7 @@ public class CartServiceImpl implements CartService {
     private final RestTemplate restTemplate;
 
     @Override
+    /** 查询购物车列表（含商品信息与选中状态，供结算试算使用） */
     public CartVO getCartList(Long userId) {
         List<CartItem> items = cartItemMapper.selectList(
                 new LambdaQueryWrapper<CartItem>()
@@ -49,6 +50,11 @@ public class CartServiceImpl implements CartService {
     }
 
     @Override
+    /**
+     * 加购：校验库存与重复条目。
+     * <p><b>学习要点</b>：同商品已存在则累加数量并重新校验库存上限，
+     * 这是"幂等加购"的关键（AI 客服"帮我加购"工具即调用本方法）。</p>
+     */
     public CartVO addToCart(Long userId, Long productId, Integer quantity) {
         if (quantity == null || quantity <= 0) {
             throw new IllegalArgumentException("数量必须大于0");
@@ -106,6 +112,7 @@ public class CartServiceImpl implements CartService {
     }
 
     @Override
+    /** 修改购物车条目数量（再次校验库存，数量为 0 视为删除） */
     public CartVO updateQuantity(Long userId, Long cartItemId, Integer quantity) {
         if (quantity == null || quantity <= 0) {
             throw new IllegalArgumentException("数量必须大于0");
@@ -130,6 +137,7 @@ public class CartServiceImpl implements CartService {
     }
 
     @Override
+    /** 删除购物车条目（校验归属，防止删他人条目） */
     public void deleteCartItem(Long userId, Long cartItemId) {
         CartItem cartItem = cartItemMapper.selectById(cartItemId);
         if (cartItem == null || !cartItem.getUserId().equals(userId)) {
@@ -139,6 +147,7 @@ public class CartServiceImpl implements CartService {
     }
 
     @Override
+    /** 勾选/取消勾选购物车条目（只有勾选条目参与结算试算） */
     public void selectCartItems(Long userId, List<Long> cartItemIds, Boolean selected) {
         cartItemMapper.update(null,
                 new LambdaUpdateWrapper<CartItem>()

@@ -23,6 +23,11 @@ public class PayTransactionServiceImpl implements PayTransactionService {
     private final PayTransactionMapper payTransactionMapper;
 
     @Override
+    /**
+     * 创建/更新待支付流水：同一订单重复发起支付时更新而非重复建单（幂等）。
+     * <p><b>学习要点</b>：支付单（PayTransaction）是支付领域的核心实体，
+     * 记录订单号/金额/渠道/状态，是对账与补偿的原始依据。</p>
+     */
     public PayTransaction createOrUpdatePending(String orderNo, Long userId, String paymentMethod, BigDecimal payAmount) {
         PayTransaction tx = getByOrderNo(orderNo);
         if (tx == null) {
@@ -44,6 +49,7 @@ public class PayTransactionServiceImpl implements PayTransactionService {
     }
 
     @Override
+    /** 支付成功：更新状态并记录第三方交易号；必须校验金额一致防篡改 */
     public boolean markSuccess(String orderNo, String tradeNo, BigDecimal amount) {
         PayTransaction tx = getByOrderNo(orderNo);
         if (tx == null || STATUS_SUCCESS.equals(tx.getStatus())) {
@@ -64,6 +70,7 @@ public class PayTransactionServiceImpl implements PayTransactionService {
     }
 
     @Override
+    /** 关闭支付单（订单超时未支付/主动取消时调用） */
     public boolean markClosed(String orderNo) {
         PayTransaction tx = getByOrderNo(orderNo);
         if (tx == null || !STATUS_PENDING.equals(tx.getStatus())) {
@@ -75,6 +82,7 @@ public class PayTransactionServiceImpl implements PayTransactionService {
     }
 
     @Override
+    /** 标记退款中（发起退款后调用） */
     public boolean markRefunding(String orderNo) {
         PayTransaction tx = getByOrderNo(orderNo);
         if (tx == null || (!STATUS_SUCCESS.equals(tx.getStatus()) && !STATUS_PENDING.equals(tx.getStatus()))) {
@@ -86,6 +94,7 @@ public class PayTransactionServiceImpl implements PayTransactionService {
     }
 
     @Override
+    /** 标记已退款（退款回调/确认后调用） */
     public boolean markRefunded(String orderNo) {
         PayTransaction tx = getByOrderNo(orderNo);
         if (tx == null) {
@@ -98,6 +107,7 @@ public class PayTransactionServiceImpl implements PayTransactionService {
     }
 
     @Override
+    /** 按订单号查询支付单（供订单服务/对账使用） */
     public PayTransaction getByOrderNo(String orderNo) {
         return payTransactionMapper.selectOne(
                 new LambdaQueryWrapper<PayTransaction>().eq(PayTransaction::getOrderNo, orderNo));

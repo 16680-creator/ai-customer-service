@@ -39,6 +39,10 @@ public class FileStorageService {
      * @param directory 目录（如 product/earphone），为空时按日期分目录
      * @return 可访问的文件 URL
      */
+    /**
+     * 上传文件（本地磁盘或 MinIO），返回可访问 URL。
+     * <p><b>学习要点</b>：文件名做 UUID 化避免冲突与路径穿越，目录按业务隔离。</p>
+     */
     public String upload(MultipartFile file, String directory) {
         String originalName = file.getOriginalFilename() == null ? "file" : file.getOriginalFilename();
         String ext = "";
@@ -68,6 +72,7 @@ public class FileStorageService {
      *
      * @param url 文件 URL
      */
+    /** 按 URL 删除文件（解析出存储路径后删除） */
     public void delete(String url) {
         if (!StringUtils.hasText(url)) {
             return;

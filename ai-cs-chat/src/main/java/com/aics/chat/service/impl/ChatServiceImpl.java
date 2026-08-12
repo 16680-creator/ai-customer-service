@@ -49,6 +49,17 @@ import java.util.regex.Pattern;
  *       订阅后逐 token 推送给 {@link SseEmitter}；流结束推送 done 事件（含完整回复 + citations）。</li>
  *   <li>异常友好化：把 Resilience4j 抛出的超时/熔断异常转成用户可读提示。</li>
  * </ul>
+
+ * <h3>学习要点（技术：SSE 流式 / RAG 多轮 / 历史压缩 / 工具调用）</h3>
+ * <ul>
+ *   <li><b>SSE 流式</b>：Flux 逐 token 推送给 SseEmitter（打字机效果）；RAG 模式先检索再流式，
+ *       结束后用 done 事件补发引用溯源。流一旦开始不可重放，因此流式不配重试。</li>
+ *   <li><b>多轮记忆</b>：历史存 Redis 热缓存 + RocketMQ到MySQL（ai-cs-message），
+ *       超 20 条用 LLM 压缩为摘要（保留最近 10 条），避免上下文爆炸。</li>
+ *   <li><b>用户身份注入</b>：网关把 X-User-Id 透传进来，写入 SystemMessage，
+ *       让订单查询等工具在异步线程中也能拿到当前用户（ThreadLocal 在异步不可用）。</li>
+ *   <li><b>思考标签过滤</b>：cleanResponse 去掉模型输出中的 &lt;think&gt; 过程，只留正式回答。</li>
+ * </ul>
  */
 @Slf4j
 @Service

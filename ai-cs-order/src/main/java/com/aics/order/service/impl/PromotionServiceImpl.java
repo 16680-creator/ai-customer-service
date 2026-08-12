@@ -31,6 +31,11 @@ public class PromotionServiceImpl implements PromotionService {
     private final CouponMapper couponMapper;
 
     @Override
+    /**
+     * 结算试算：商品合计 -> 满减/优惠券抵扣 -> 应付金额。
+     * <p><b>学习要点</b>：促销规则（满减、优惠券）统一在此计算，
+     * 下单时必须用同一套规则保证"试算价 == 实付价"。</p>
+     */
     public PriceCalcBO calculatePrice(BigDecimal totalAmount, Long userId, Long couponId) {
         PriceCalcBO bo = new PriceCalcBO();
         bo.setTotalAmount(totalAmount);
@@ -52,6 +57,7 @@ public class PromotionServiceImpl implements PromotionService {
     }
 
     @Override
+    /** 查询用户可用优惠券（按订单金额过滤门槛，AI 客服"有哪些券能用"工具的服务端） */
     public List<CouponAvailability> getAvailableCoupons(Long userId, BigDecimal orderAmount) {
         List<Coupon> coupons = couponMapper.selectList(
                 new LambdaQueryWrapper<Coupon>()

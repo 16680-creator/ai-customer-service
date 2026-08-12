@@ -14,6 +14,17 @@ import java.math.BigDecimal;
  *   <li>UnionpayChannel：银联云闪付二维码</li>
  * </ul>
  */
+/**
+ * 支付渠道接口 —— 定义所有支付渠道的统一契约。
+ *
+ * <h3>学习要点（技术：策略模式）</h3>
+ * <ul>
+ *   <li>每种支付方式（支付宝/微信/银联）实现本接口，业务层只面向接口编程。</li>
+ *   <li>统一的方法集：创建支付、查询结果、关闭订单、解析回调、退款——
+ *       把各渠道差异（签名/字段/报文）封装在实现内部。</li>
+ *   <li>由 {@link com.aics.pay.channel.PayChannelFactory} 按支付方式分派。</li>
+ * </ul>
+ */
 public interface PayChannel {
 
     /** 渠道查单/通知：待支付 */

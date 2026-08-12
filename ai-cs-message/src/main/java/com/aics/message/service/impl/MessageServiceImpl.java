@@ -26,6 +26,14 @@ import java.util.List;
  * </ul>
  * 关键协作：依赖 {@link ChatMessageMapper}、{@link ChatSessionMapper} 完成数据访问。
  * </p>
+
+ * <h3>学习要点（技术：异步落库 / 缓存一致性）</h3>
+ * <ul>
+ *   <li><b>写入路径</b>：AI 对话在 chat 服务发 RocketMQ，本服务消费者落 MySQL，
+ *       与对话主流程解耦；chat 侧另有 Redis 热缓存加速历史读取。</li>
+ *   <li><b>双维度查询</b>：支持 sessionId（DB 主键）与跨服务 sessionKey 两种查询，
+ *       兼容 chat 的字符串会话标识。</li>
+ * </ul>
  */
 @Slf4j
 @Service

@@ -37,6 +37,15 @@ import java.util.Map;
  * 2. 相似度检索是按"片段"匹配的，块越小越精准；
  * 3. 分块后每个片段可独立检索、独立溯源。
  * </pre>
+
+ * <h3>学习要点（技术：两阶段检索 / Rerank / 优雅降级）</h3>
+ * <ul>
+ *   <li><b>入库</b>：文档经过 TokenTextSplitter 切块、bge-m3 向量化后写入 Chroma（带元数据）。</li>
+ *   <li><b>检索</b>：宽召回 Top-20（低阈值）到 Rerank 精排（bge-reranker，按分数过滤）再到 Top-N。</li>
+ *   <li><b>为什么两阶段</b>：向量相似度粗排便宜但精度一般，Rerank 用交叉编码器精排更准；
+ *       先粗后精兼顾性能与精度。</li>
+ *   <li><b>降级</b>：Rerank 服务不可用时回退为纯向量排序，回答不中断。</li>
+ * </ul>
  */
 @Slf4j
 @Service

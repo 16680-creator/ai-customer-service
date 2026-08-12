@@ -27,6 +27,12 @@ public class OrderTimeoutScheduler {
 
     /** 每 5 分钟扫描一次，启动 1 分钟后首次执行 */
     @Scheduled(fixedDelay = 300000, initialDelay = 60000)
+    /**
+     * 定时扫描超时未支付订单并关闭。
+     * <p><b>学习要点（技术：定时任务 + 状态补偿）</b>：@Scheduled 定时扫描 DB 兜底
+     * 未被 RocketMQ 延迟消息关闭的订单；关闭需回滚库存并保证幂等（重复扫描不重复扣）。
+     * 延迟消息与定时扫描双保险，防止单点失效。</p>
+     */
     public void scanExpiredOrders() {
         log.info("定时任务：扫描超时未支付订单...");
         List<Order> expired = orderMapper.selectList(

@@ -37,6 +37,12 @@ public class JwtUtil {
      * @param expirationMillis 过期时间（毫秒）
      * @return token 字符串
      */
+    /**
+     * 生成 JWT：载荷含主体(subject)与自定义声明(claims)，HS256 签名。
+     * <p><b>学习要点（技术：JWT 结构）</b>：JWT = Header.Payload.Signature；
+     * 签名用 secret 保证不可伪造，过期时间由 expirationMillis 控制。
+     * 用户登录成功后签发，见 ai-cs-user UserServiceImpl。</p>
+     */
     public static String generateToken(String subject, Map<String, Object> claims, String secret, long expirationMillis) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + expirationMillis);
@@ -69,6 +75,7 @@ public class JwtUtil {
      * @param secret 密钥
      * @return Claims
      */
+    /** 解析 JWT：校验签名与过期时间，返回载荷（claims）；非法/过期抛异常 */
     public static Claims parseToken(String token, String secret) {
         SecretKey key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         return Jwts.parser()
@@ -116,6 +123,7 @@ public class JwtUtil {
      * @param secret 密钥
      * @return 是否有效
      */
+    /** 校验 JWT 是否有效（签名正确且未过期），供网关过滤器使用 */
     public static boolean validateToken(String token, String secret) {
         try {
             parseToken(token, secret);
@@ -147,6 +155,7 @@ public class JwtUtil {
      * @param thresholdMillis 阈值（毫秒）
      * @return 是否即将过期
      */
+    /** 判断 Token 是否即将过期（供前端刷新 Token 使用） */
     public static boolean isTokenExpiringSoon(String token, String secret, long thresholdMillis) {
         try {
             Claims claims = parseToken(token, secret);

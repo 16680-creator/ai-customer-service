@@ -67,11 +67,17 @@ public class WechatNativeChannel implements PayChannel {
     private String gateway;
 
     @Override
+    /** 返回本渠道标识（与 PaymentMethod 枚举对应） */
     public String getMethod() {
         return "WECHAT";
     }
 
     @Override
+    /**
+     * 创建微信 Native 支付：生成预支付单并返回支付二维码链接。
+     * <p><b>学习要点</b>：金额单位换算——微信接口用"分"，业务用"元"，
+     * 必须经 yuanToFen 转换，避免精度丢失。</p>
+     */
     public PayResult createPayment(PayContext context) {
         ensureConfigured();
         NativePayService service = new NativePayService.Builder().config(config()).build();
@@ -101,6 +107,7 @@ public class WechatNativeChannel implements PayChannel {
     }
 
     @Override
+    /** 主动查询微信侧支付结果（轮询/对账用） */
     public String queryPayment(String orderNo) {
         ensureConfigured();
         NativePayService service = new NativePayService.Builder().config(config()).build();
@@ -132,6 +139,11 @@ public class WechatNativeChannel implements PayChannel {
     }
 
     @Override
+    /**
+     * 解析微信回调报文：验签 + 校验金额/订单号，返回业务结果。
+     * <p><b>学习要点</b>：回调不可信，必须验签且核对订单号与金额，
+     * 处理需幂等（重复回调不重复生效）。</p>
+     */
     public NotifyResult parseNotify(NotifyContext context) {
         ensureConfigured();
         RSAAutoCertificateConfig config = config();
@@ -160,6 +172,7 @@ public class WechatNativeChannel implements PayChannel {
     }
 
     @Override
+    /** 发起退款（部分/全额），返回退款结果 */
     public RefundResult refund(String orderNo, BigDecimal refundAmount) {
         ensureConfigured();
         RefundService refundService = new RefundService.Builder().config(config()).build();
@@ -206,6 +219,7 @@ public class WechatNativeChannel implements PayChannel {
     }
 
     /** 元 → 分（微信金额单位为分，四舍五入） */
+    /** 元转分：BigDecimal 避免浮点误差，如 1.23 元 = 123 分 */
     public static int yuanToFen(BigDecimal yuan) {
         if (yuan == null) {
             return 0;
