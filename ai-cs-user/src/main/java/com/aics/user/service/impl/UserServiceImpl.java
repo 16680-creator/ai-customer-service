@@ -38,6 +38,12 @@ public class UserServiceImpl implements UserService {
     private long jwtExpireHours;
 
     @Override
+    /**
+     * 用户注册。
+     *
+     * <p><b>学习要点</b>：密码绝不存明文——用 BCrypt 哈希后存储；
+     * 注册成功后即可用账号密码登录换取 JWT。</p>
+     */
     public Result<Void> register(User user) {
         log.info("用户注册: username={}", user.getUsername());
 
@@ -59,6 +65,13 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    /**
+     * 用户登录。
+     *
+     * <p><b>学习要点（技术：JWT 登录流程）</b>：校验账号密码（比对 BCrypt 哈希）→
+     * 用 JwtUtil 签发 Token（载荷含 userId、过期时间）→ 返回给前端；
+     * 前端后续请求携带 Token，由网关校验并透传 X-User-Id（见 ai-cs-gateway AuthFilter）。</p>
+     */
     public Result<LoginVO> login(LoginRequest request) {
         String username = request.getUsername();
         log.info("用户登录: username={}", username);

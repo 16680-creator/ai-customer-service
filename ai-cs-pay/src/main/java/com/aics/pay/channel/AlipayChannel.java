@@ -39,6 +39,17 @@ import java.util.Map;
  * 如需"电脑网站支付"（跳转支付宝收银台），可把 precreate 换成 alipay.trade.page.pay，
  * payType 改为 REDIRECT 即可。
  */
+/**
+ * 支付宝支付渠道实现。
+ *
+ * <h3>学习要点（技术：支付渠道对接）</h3>
+ * <ul>
+ *   <li>实现 {@link com.aics.pay.channel.PayChannel} 接口：统一下单参数构造、
+ *       签名、回调验签、结果查询。</li>
+ *   <li>渠道差异（签名算法/字段名）被封装在渠道内部，业务层无感。</li>
+ * </ul>
+ */
+
 @Slf4j
 @Component
 public class AlipayChannel implements PayChannel {

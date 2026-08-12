@@ -56,6 +56,18 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    /**
+     * 创建订单：由购物车条目生成订单，应用优惠券并计算应付金额。
+     *
+     * <p><b>学习要点</b>：下单是典型"多步骤写操作"——校验购物车 → 计算商品合计 →
+     * 应用优惠/满减 → 生成订单与订单项 → 清空已下单购物车。AI 客服的"帮我下单"工具即调用本方法。</p>
+     *
+     * @param userId        用户 ID
+     * @param cartItemIds   选中的购物车条目 ID
+     * @param couponId      优惠券 ID（可空）
+     * @param paymentMethod 支付方式（见 ai-cs-common PaymentMethod）
+     * @return 创建后的订单 VO
+     */
     public OrderVO createOrder(Long userId, List<Long> cartItemIds, Long couponId, String paymentMethod) {
         // 1. 获取购物车商品
         List<CartItem> cartItems = cartItemMapper.selectBatchIds(cartItemIds);
@@ -153,6 +165,12 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    /**
+     * 按用户查询订单列表（AI 客服"我的订单"工具的服务端）。
+     *
+     * @param userId 用户 ID（由网关 X-User-Id 透传，保证只能查自己的订单——数据权限）
+     * @return 该用户订单列表，按创建时间倒序
+     */
     public List<OrderVO> listOrders(Long userId) {
         log.info("查询用户订单列表: userId={}", userId);
         List<Order> orders = orderMapper.selectList(
@@ -163,6 +181,13 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    /**
+     * 查询订单详情（AI 客服"按订单号查单"工具的服务端）。
+     *
+     * @param userId  用户 ID（校验订单归属，防止越权查他人订单）
+     * @param orderNo 订单号
+     * @return 订单详情（含商品、金额、物流信息）
+     */
     public OrderVO getOrderDetail(Long userId, String orderNo) {
         Order order = orderMapper.selectOne(
                 new LambdaQueryWrapper<Order>()
@@ -176,6 +201,11 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    /**
+     * 取消订单：仅未发货/未支付订单可取消，取消后释放库存。
+     *
+     * <p><b>学习要点</b>：取消是状态机迁移 + 库存补偿，必须保证幂等（重复取消不报错）。</p>
+     */
     public void cancelOrder(Long userId, String orderNo) {
         Order order = orderMapper.selectOne(
                 new LambdaQueryWrapper<Order>()

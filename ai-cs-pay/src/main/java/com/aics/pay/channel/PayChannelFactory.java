@@ -16,6 +16,15 @@ import java.util.stream.Collectors;
  * <p>Spring 会自动注入所有 {@link PayChannel} 实现（按 getMethod() 建索引），
  * 因此"新增一种支付方式 = 新增一个实现类"，对业务代码零侵入。
  */
+/**
+ * 支付渠道工厂 —— 按支付方式返回对应渠道实现。
+ *
+ * <h3>学习要点（技术：工厂 + 策略模式）</h3>
+ * <ul>
+ *   <li>业务方只要支付方式枚举，工厂返回策略实现，新增渠道不改调用方。</li>
+ * </ul>
+ */
+
 @Slf4j
 @Component
 public class PayChannelFactory {

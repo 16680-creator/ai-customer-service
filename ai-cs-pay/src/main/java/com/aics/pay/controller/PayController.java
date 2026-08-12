@@ -27,6 +27,16 @@ import java.util.Map;
  *
  * <p>订单信息通过 {@link OrderPayClient} 从订单服务获取；支付状态变更由订单服务落库。
  */
+/**
+ * 支付控制器 —— 发起支付、查询支付结果。
+ *
+ * <h3>学习要点（技术：支付编排）</h3>
+ * <ul>
+ *   <li>根据支付方式经 {@link com.aics.pay.channel.PayChannelFactory} 选渠道
+ *       （支付宝/微信/银联），返回拉起支付的参数。</li>
+ * </ul>
+ */
+
 @Slf4j
 @Tag(name = "支付", description = "支付下单/查询/关单/补偿（独立支付服务）")
 @RestController
