@@ -121,13 +121,12 @@ deploy/nacos/configs/
 └── ai-cs-search.yml                     ← 修改：新增 spring.elasticsearch.uris + aics.hybrid.* 配置
 
 learning-docs/05-AI集成/                 ← 文档交付（用户指定目录）
-└── 02-RAG全栈实战/
-    ├── 03-RAG向量检索实战.md             ← 更新：两阶段检索链路（召回+Rerank）
-    ├── 04-RAG进阶实战-Rerank重排序.md    ← 新增
-    ├── 05-混合检索实战-ES-BM25与向量RRF融合.md ← 新增
-    ├── 06-引用溯源实战-带出处回答.md      ← 新增
-    ├── 07-文档格式扩展实战-Tika多格式解析.md ← 新增
-    └── 08-知识库增量同步实战-RocketMQ驱动向量化.md ← 新增
+├── 10-RAG向量检索实战.md                 ← 更新：两阶段检索链路（召回+Rerank）
+├── 14-RAG进阶实战-Rerank重排序.md        ← 新增
+├── 15-混合检索实战-ES-BM25与向量RRF融合.md ← 新增
+├── 16-引用溯源实战-带出处回答.md          ← 新增
+├── 17-文档格式扩展实战-Tika多格式解析.md   ← 新增
+└── 18-知识库增量同步实战-RocketMQ驱动向量化.md ← 新增
 ```
 
 ### 包结构映射表（宪法第16-1条）
