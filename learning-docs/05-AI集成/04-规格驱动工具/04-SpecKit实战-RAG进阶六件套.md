@@ -152,6 +152,42 @@
 
 ---
 
+
+
+---
+
+## 八、运行期 E2E 验证（2026-08-12 补充）
+
+在真实基础设施（远程 MySQL/Redis/Chroma 123.60.31.79 + 本地 Nacos/RocketMQ）上重启
+chat(8083)/knowledge(8082) 新 jar，逐项实测：
+
+| 能力 | 接口 | 实测结果 |
+|------|------|---------|
+| US1 评估 | POST /rag/eval/run | ✅ 加载 golden 集（20 条）→ 检索 → 指标(recall/mrr/hitRate) → LLM-Judge 均分 → 门禁判定；product-manual 库无数据时 hitRate=0、passed=false（行为正确） |
+| US2 Hybrid | GET /chat/retrieve/test?mode=HYBRID | ✅ 全局未启用时自动降级纯向量（degraded=true, reason=hybrid 全局未启用）；成功路径需 ai-cs-search+ES（本环境未部署，单测已覆盖） |
+| US3 改写/HyDE | GET /chat/retrieve/test?mode=HYBRID_QUERY_REWRITE | ✅ 临时开启开关后实测成功路径：LLM 改写→多查询+HyDE→向量检索→RRF 融合返回 5 条命中、未降级；关闭后自动降级 |
+| US4 GraphRAG | POST /rag/graph/triple + GET /rag/graph/query | ✅ 三元组入库（id 1/2）→ 多跳查询 depth=2 命中「退款政策→申请入口→审核时效」2 条 |
+| US5 图表 | POST /chat/chart | ✅ LLM 生成结论 + chartType=PIE 自动判定 + ECharts option 返回 |
+| US6 聚类 | POST /knowledge/ops/cluster | ✅ 24 条提问聚成 1 主题、占比正确、缺口检测（命中率 1.0、无缺口） |
+| US6 FAQ | POST /knowledge/ops/faq | ✅ 收录成功（faqId=1）→ 创建知识文档 → 触发向量化 |
+
+### E2E 过程中发现并修复的问题
+
+1. **Nacos 配置 BOM 污染**：publish 脚本把带 BOM 的 yml 上传，客户端解析失败导致
+   `spring.ai.openai.api-key` 未解析、服务启动失败。修复：去除所有配置源文件 BOM 后重发布。
+2. **knowledge jar 无主清单**：knowledge pom 未配置 boot repackage execution，
+   补上 `<goal>repackage</goal>` 后 jar 可运行。
+3. **knowledge 缺 RocketMQ 配置**：全量发布覆盖了 Nacos 中原有 `rocketmq.name-server`，
+   补回 `deploy/nacos/configs/ai-cs-knowledge.yml` 并重发布。
+4. **golden 集未打包进运行时 jar**：golden-set.json 原在 test resources，运行期 `/rag/eval/run`
+   找不到。修复：复制一份到 `src/main/resources/eval/golden-set.json`（测试仍走 test 资源）。
+5. **远程 MySQL 缺新表**：用 JDK 单文件程序执行 `rag-advanced-init.sql` 的 DDL（kb_faq / kb_graph_triple）。
+
+### 环境限制（已登记）
+
+- Hybrid 成功路径需 ai-cs-search 服务 + Elasticsearch（本环境未部署），降级路径已实测、成功路径由单测覆盖
+- GraphRAG 默认 InMemory 存储实测通过；Neo4j 版需 Neo4j 实例（单测基于 Mock 驱动）
+
 ## 六、后续待办（跟踪）
 
 ### 已完成（2026-08-12 续）
@@ -163,7 +199,7 @@
 
 ### 待办（依赖完整基础设施）
 
-- [ ] 运行期 E2E 验证：需启动 MySQL/Redis/Chroma/ES/Neo4j 后重启服务，实测检索/评估/图谱/聚类接口
+- [x] 运行期 E2E 验证：已在远程 MySQL/Redis/Chroma + 本地 Nacos/RocketMQ 实测 6 项能力（见第八节）；Hybrid 成功路径与 Neo4j 版受环境限制待补
 - [ ] 评估 golden 集生产样本（`deploy/eval/`）运营维护
 - [ ] GraphRAG 实体抽取 LLM 增强（当前为关键词子串匹配）
 - [ ] Neo4j 实例联调（当前单测基于 Mock 驱动）
