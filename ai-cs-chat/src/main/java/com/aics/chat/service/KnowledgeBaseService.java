@@ -55,9 +55,9 @@ public class KnowledgeBaseService {
     @Value("${aics.rag.recall-top-k:20}")
     private int recallTopK = 20;
 
-    /** 第一阶段宽召回的相似度阈值（配置 aics.rag.recall-threshold） */
-    @Value("${aics.rag.recall-threshold:0.5}")
-    private double recallThreshold = 0.5;
+    /** 第一阶段宽召回的相似度阈值（配置 aics.rag.recall-threshold，质量由 Rerank 精排把关） */
+    @Value("${aics.rag.recall-threshold:0.3}")
+    private double recallThreshold = 0.3;
 
     /**
      * 将文本内容写入知识库（入库）。

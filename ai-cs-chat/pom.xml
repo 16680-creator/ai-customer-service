@@ -125,6 +125,17 @@
             <artifactId>resilience4j-timelimiter</artifactId>
         </dependency>
 
+        <!-- JDBC + MySQL：AI 智能问数（NL2SQL）只读数据源 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jdbc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
         <!-- Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

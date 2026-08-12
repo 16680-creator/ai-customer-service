@@ -36,7 +36,7 @@
       <!-- 文件入库 -->
       <el-col :span="8">
         <el-card shadow="hover">
-          <template #header><span>文件入库（PDF/TXT）</span></template>
+          <template #header><span>文件入库（PDF/TXT/MD/Office/HTML）</span></template>
           <el-form label-width="90px">
             <el-form-item label="知识库标识">
               <el-input v-model="uploadKbName" placeholder="如 product-manual" />
@@ -46,7 +46,7 @@
                 :auto-upload="false"
                 :limit="1"
                 :on-change="handleFileChange"
-                accept=".pdf,.txt"
+                accept=".pdf,.txt,.md,.markdown,.docx,.xlsx,.html,.htm"
               >
                 <el-button type="primary" plain>选择文件</el-button>
               </el-upload>

@@ -22,4 +22,16 @@ aics:
   # RAG two-stage retrieval
   rag:
     recall-top-k: 20
-    recall-threshold: 0.5
+    # 宽召回阈值：只保证召回率，质量交给 Rerank 精排(min-score 0.7)把关
+    recall-threshold: 0.3
+
+  # AI 智能问数（NL2SQL）：只读数据源，供 executeReadOnlyQuery 工具按库执行 SELECT
+  nl2sql:
+    username: root
+    password: ${DB_PASSWORD}
+    urls:
+      user: jdbc:mysql://123.60.31.79:3306/user_db?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+      product: jdbc:mysql://123.60.31.79:3306/product_db?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+      order: jdbc:mysql://123.60.31.79:3306/ai_customer_service?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+      chat: jdbc:mysql://123.60.31.79:3306/chat_db?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+      knowledge: jdbc:mysql://123.60.31.79:3306/knowledge_db?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true

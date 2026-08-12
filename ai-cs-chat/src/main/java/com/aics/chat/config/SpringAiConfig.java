@@ -2,6 +2,7 @@ package com.aics.chat.config;
 
 import com.aics.chat.rag.rerank.RerankProperties;
 import com.aics.chat.service.OrderQueryService;
+import com.aics.chat.nl2sql.Nl2SqlQueryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
@@ -74,6 +75,34 @@ public class SpringAiConfig {
     private String embeddingModel;
 
     /**
+     * 数据库表结构参考（智能问数时供 LLM 组装 SQL）。
+     * 精简格式：表名(列名 类型)。与远程 MySQL 实际结构一致。
+     */
+    private static final String DB_SCHEMA = """
+            数据库表结构参考（编写 SQL 时必须使用真实表名/列名）：
+            【user 用户库】
+            sys_user(id, username, password, nickname, phone, email, avatar, status, role, create_time, update_time, deleted) 系统用户
+            sys_role(id, role_code, role_name, description, status) 角色
+            sys_user_role(id, user_id, role_id) 用户角色关联
+            【product 商品库】
+            product(id, name, description, price, stock, category_id, image, status, sales, create_time, update_time, deleted) 商品
+            product_category(id, name, parent_id, sort, description, create_time, update_time) 商品分类
+            【order 订单支付库】
+            orders(id, order_no, user_id, total_amount, discount_amount, pay_amount, full_reduction_amount, coupon_amount, coupon_id, payment_method, status, pay_time, cancel_time, expire_time, create_time, update_time) 订单，status枚举如 PENDING_PAY/PAID/CANCELLED
+            order_item(id, order_id, order_no, product_id, product_name, product_price, quantity, subtotal) 订单项
+            cart_item(id, user_id, product_id, product_name, product_price, quantity, selected, create_time, update_time) 购物车
+            coupon(id, user_id, coupon_name, amount, min_order_amount, status, expire_time, use_time, order_no, create_time) 优惠券
+            full_reduction_rule(id, rule_name, threshold_amount, reduction_amount, start_time, end_time, enabled) 满减规则
+            pay_transaction(id, order_no, user_id, payment_method, trade_no, pay_amount, status, notify_count, pay_time, refund_time, create_time, update_time) 支付流水
+            【chat 对话消息库】
+            chat_session(id, user_id, agent_id, channel, status, title, create_time, update_time, deleted) 会话
+            chat_message(id, session_id, sender_type, sender_id, content, content_type, metadata, create_time, session_key, role) 消息
+            【knowledge 知识库】
+            kb_document(id, title, content, doc_type, source_url, summary, tags, category_id, status, create_by, create_time, update_time, deleted) 知识文档
+            kb_category(id, name, parent_id, sort_order, description) 知识分类
+            """;
+
+    /**
      * 自定义 EmbeddingModel：使用硅基流动 API（DeepSeek 不支持 /v1/embeddings）。
      * @Primary 确保 ChromaVectorStore 等注入点优先使用此 Bean。
      *
@@ -104,17 +133,20 @@ public class SpringAiConfig {
     /**
      * 注册 ToolCallbackProvider，用于注册 @Tool 注解的方法。
      *
-     * <p>把 {@link OrderQueryService} 作为工具对象注册，Spring AI 会扫描其上
-     * {@link org.springframework.ai.tool.annotation.Tool} 注解的方法（如订单查询），
+     * <p>把 {@link OrderQueryService}（订单查询）与 {@link Nl2SqlQueryService}
+     * （AI 智能问数）作为工具对象注册，Spring AI 会扫描其上
+     * {@link org.springframework.ai.tool.annotation.Tool} 注解的方法，
      * 包装成 {@code ToolCallback} 暴露给 LLM；当 LLM 决定调用工具时，会回调到这些方法。</p>
      *
      * @param orderQueryService 订单查询服务（含 {@code @Tool} 方法）
+     * @param nl2SqlQueryService AI 智能问数服务（含 {@code @Tool} 方法）
      * @return 工具回调提供者
      */
     @Bean
-    public ToolCallbackProvider orderToolCallbackProvider(OrderQueryService orderQueryService) {
+    public ToolCallbackProvider toolCallbackProvider(OrderQueryService orderQueryService,
+                                                     Nl2SqlQueryService nl2SqlQueryService) {
         return MethodToolCallbackProvider.builder()
-                .toolObjects(orderQueryService)
+                .toolObjects(orderQueryService, nl2SqlQueryService)
                 .build();
     }
 
@@ -144,19 +176,19 @@ public class SpringAiConfig {
      * <p>ChatClient 是业务层调用 LLM 的统一入口，此处配置三项默认值：</p>
      * <ul>
      *   <li>{@code defaultSystem}：系统提示词，约束 AI 的身份、能力范围与回答风格
-     *       （禁止透露底层模型名、识别当前用户、订单工具调用规则等）。</li>
-     *   <li>{@code defaultToolCallbacks}：默认携带订单查询工具回调。</li>
+     *       （禁止透露底层模型名、识别当前用户、订单查询/智能问数工具调用规则、数据库 schema 等）。</li>
+     *   <li>{@code defaultToolCallbacks}：默认携带订单查询 + 智能问数工具回调。</li>
      *   <li>{@code defaultAdvisors}：默认携带 {@link QuestionAnswerAdvisor}，
      *       让所有 ChatClient 调用都自动走 RAG 检索增强。</li>
      * </ul>
      *
-     * @param chatModel                 OpenAiChatModel（DeepSeek 兼容），由 starter 自动装配
-     * @param orderToolCallbackProvider 工具回调
-     * @param ragAdvisor                RAG 顾问
+     * @param chatModel          OpenAiChatModel（DeepSeek 兼容），由 starter 自动装配
+     * @param toolCallbackProvider 工具回调（订单查询 + 智能问数）
+     * @param ragAdvisor         RAG 顾问
      * @return 配置好默认值的 ChatClient
      */
     @Bean
-    public ChatClient chatClient(OpenAiChatModel chatModel, ToolCallbackProvider orderToolCallbackProvider,
+    public ChatClient chatClient(OpenAiChatModel chatModel, ToolCallbackProvider toolCallbackProvider,
                                  QuestionAnswerAdvisor ragAdvisor) {
         return ChatClient.builder(chatModel)
                 .defaultSystem("""
@@ -173,10 +205,18 @@ public class SpringAiConfig {
                         - 当前登录用户已由系统自动识别，无需向用户索要用户ID；用户询问“我的订单/订单列表”时直接调用 queryOrdersByUserId 查询
                           - 查询时可以通过订单号精确查询，也可以通过当前用户ID查询名下所有订单
                         - 查询结果要包含订单状态、商品信息、金额、物流等关键信息，用简洁易懂的格式展示
-                        
+                        - 数据查询（智能问数）：当用户想了解平台数据（如订单统计、商品销量、用户数量、优惠券使用情况等），
+                          使用 executeReadOnlyQuery 工具查询数据库。规则：
+                          * 必须根据问题涉及的业务先选对 database（user=用户库、product=商品库、order=订单支付库、chat=对话消息库、knowledge=知识库）
+                          * 组装合法 SELECT 语句，可带 WHERE / ORDER BY / GROUP BY / 聚合函数（COUNT/SUM/AVG）
+                          * 日期字段用 create_time / pay_time 等，订单金额字段用 pay_amount，订单状态用 status 过滤
+                          * 查询出数据后用自然语言向用户汇报结论，可附带表格或关键数字
+                          * 若多次尝试仍失败（SQL 语法错误/表列名不存在），如实告知用户"暂时无法查询该数据"，不要编造数字
+                         
                         回答风格：简洁、准确、有亲和力，适当使用emoji增加友好感。
-                        """)
-                .defaultToolCallbacks(orderToolCallbackProvider)
+                        
+                        """ + DB_SCHEMA)
+                .defaultToolCallbacks(toolCallbackProvider)
                 .defaultAdvisors(ragAdvisor)
                 .build();
     }

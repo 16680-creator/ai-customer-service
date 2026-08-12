@@ -275,6 +275,8 @@ initApp()
 async function sendMessage() {
   const text = inputMessage.value.trim()
   if (!text) return
+  // 流式输出期间禁止重复发送（按钮 loading 挡不住 Enter 键，需显式防重入）
+  if (sending.value) return
   if (chatMode.value === 'rag' && !knowledgeBase.value.trim()) {
     return ElMessage.warning('RAG 模式请先填写知识库标识')
   }
@@ -340,8 +342,10 @@ async function sendMessage() {
     if (streamError) throw new Error(streamError)
     if (!assistant.content) assistant.content = '(无回复)'
   } catch (e) {
-    assistant.content = '❌ 错误: ' + (e.message || '请求失败')
-    ElMessage.error('对话请求失败: ' + (e.message || ''))
+    // 区分"连接被中止"（页面刷新/重复发送导致浏览器中断 fetch）与真实业务错误
+    const aborted = e?.name === 'AbortError' || e?.message?.includes('Failed to fetch')
+    assistant.content = aborted ? '⚠️ 连接中断，回复未完成，请重试。' : ('❌ 错误: ' + (e.message || '请求失败'))
+    ElMessage.error(aborted ? '对话连接中断，请重试' : '对话请求失败: ' + (e.message || ''))
   } finally {
     sending.value = false
     await scrollToBottom()

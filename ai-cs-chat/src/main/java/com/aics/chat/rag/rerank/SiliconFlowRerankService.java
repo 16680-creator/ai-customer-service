@@ -134,9 +134,10 @@ public class SiliconFlowRerankService implements RerankService {
     }
 
     /**
-     * Rerank API 响应体（只取 results，其余字段忽略）。
+     * Rerank API 响应体（忽略未知字段如 meta，只取 results）。
      */
     @Data
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)
     public static class RerankResponse {
         private String id;
         private String model;

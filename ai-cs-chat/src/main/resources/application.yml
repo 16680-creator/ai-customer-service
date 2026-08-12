@@ -5,9 +5,11 @@ spring:
   application:
     name: ai-cs-chat
   # 彻底排除 Embedding 自动配置（与 @SpringBootApplication.exclude 双保险）
+  # 以及 JDBC 主数据源自动配置（chat 无业务主库，数据源由 Nl2SqlDataSourceConfig 手动创建）
   autoconfigure:
     exclude:
       - org.springframework.ai.model.openai.autoconfigure.OpenAiEmbeddingAutoConfiguration
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
   cloud:
     nacos:
       discovery:
