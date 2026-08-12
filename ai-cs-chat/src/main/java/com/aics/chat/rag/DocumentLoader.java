@@ -6,6 +6,7 @@ import org.springframework.ai.document.Document;
 import org.springframework.ai.reader.TextReader;
 import org.springframework.ai.reader.pdf.PagePdfDocumentReader;
 import org.springframework.ai.reader.pdf.config.PdfDocumentReaderConfig;
+import org.springframework.ai.reader.tika.TikaDocumentReader;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 
@@ -62,6 +63,23 @@ public class DocumentLoader {
             return documents;
         } catch (Exception e) {
             log.error("文本文档加载失败: {}", resource.getFilename(), e);
+            return new ArrayList<>();
+        }
+    }
+
+    /**
+     * 加载 Tika 支持的文档（docx/xlsx/html/htm 等）
+     *
+     * @param resource 文档文件资源
+     * @return 文档列表
+     */
+    public List<Document> loadTika(Resource resource) {
+        log.info("加载Tika文档: {}", resource.getFilename());
+        try {
+            TikaDocumentReader reader = new TikaDocumentReader(resource);
+            return reader.get();
+        } catch (Exception e) {
+            log.error("Tika文档加载失败: {}", resource.getFilename(), e);
             return new ArrayList<>();
         }
     }

@@ -46,6 +46,12 @@
             <artifactId>spring-ai-pdf-document-reader</artifactId>
         </dependency>
 
+        <!-- Spring AI Tika Document Reader（docx/xlsx/html 等格式解析） -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-tika-document-reader</artifactId>
+        </dependency>
+
         <!-- Spring AI 向量存储（VectorStore 抽象 + 内存版 SimpleVectorStore）
              生产环境可切换为 ES/Milvus/Redis 等实现，见 VectorStoreConfig 注释 -->
         <dependency>
@@ -117,6 +123,13 @@
         <dependency>
             <groupId>io.github.resilience4j</groupId>
             <artifactId>resilience4j-timelimiter</artifactId>
+        </dependency>
+
+        <!-- Test -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 
