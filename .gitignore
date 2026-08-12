@@ -43,6 +43,9 @@ tools/elasticsearch/
 tools/rocketmq/
 # Nacos 运行数据（derby/raft，含敏感配置快照，切 MySQL 后废弃）
 tools/nacos/data/
+# 组件安装包（体积大，超出 GitHub 限制，需单独下载）
+tools/nacos-server-2.3.2.zip
+tools/rocketmq-all-5.1.4-bin-release.zip
 
 # Codex 临时文件
 .codex-tmp/
