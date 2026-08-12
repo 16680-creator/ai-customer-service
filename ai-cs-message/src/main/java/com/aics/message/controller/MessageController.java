@@ -117,4 +117,17 @@ public class MessageController {
         List<ChatSession> sessions = messageService.getUserSessions(userId);
         return Result.success(sessions);
     }
+
+    /**
+     * 删除会话：逻辑删除会话记录，同时物理删除其下所有消息。
+     *
+     * @param sessionId 会话ID
+     * @return 空结果包装
+     */
+    @Operation(summary = "删除会话（含其下消息）")
+    @DeleteMapping("/session/{sessionId}")
+    public Result<Void> deleteSession(@PathVariable("sessionId") Long sessionId) {
+        messageService.deleteSession(sessionId);
+        return Result.success();
+    }
 }

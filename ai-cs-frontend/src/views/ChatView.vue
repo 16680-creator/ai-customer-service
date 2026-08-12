@@ -15,10 +15,13 @@
               v-for="s in sessions"
               :key="s.id"
               :class="['session-item', { active: currentSession === s.id }]"
-              @click="currentSession = s.id"
+              @click="switchSession(s.id)"
             >
               <el-icon><ChatDotSquare /></el-icon>
               <span class="session-title">{{ s.title }}</span>
+              <el-tooltip content="删除会话" placement="top">
+                <el-icon class="session-delete" @click.stop="handleDeleteSession(s)"><Delete /></el-icon>
+              </el-tooltip>
             </div>
             <el-empty v-if="sessions.length === 0" description="暂无会话" :image-size="60" />
           </div>
@@ -29,7 +32,7 @@
       <el-col :span="18">
         <el-card shadow="hover" class="chat-card">
           <div class="chat-messages" ref="messagesRef">
-            <div v-for="(msg, i) in messages" :key="i" :class="['msg-row', msg.role]">
+            <div v-for="(msg, i) in currentMessages" :key="i" :class="['msg-row', msg.role]">
               <el-avatar :size="36" :style="{ background: msg.role === 'user' ? '#409eff' : '#67c23a' }">
                 {{ msg.role === 'user' ? '我' : 'AI' }}
               </el-avatar>
@@ -71,7 +74,7 @@
                 </div>
               </div>
             </div>
-            <el-empty v-if="messages.length === 0" description="开始和 AI 对话吧" :image-size="120" />
+            <el-empty v-if="currentMessages.length === 0" description="开始和 AI 对话吧" :image-size="120" />
           </div>
 
           <div class="chat-mode-bar">
@@ -113,28 +116,160 @@
 </template>
 
 <script setup>
-import { ref, nextTick } from 'vue'
-import { getToken } from '../utils/auth'
-import { ElMessage } from 'element-plus'
-import { Plus, Promotion, Document } from '@element-plus/icons-vue'
+import { ref, watch, nextTick } from 'vue'
+import { getToken, getUser } from '../utils/auth'
+import { chatApi, messageApi } from '../api'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Plus, Promotion, Document, Delete } from '@element-plus/icons-vue'
 
 const GATEWAY = import.meta.env.VITE_GATEWAY || 'http://localhost:8080'
 
-const sessions = ref([{ id: 'session-1', title: '默认会话' }])
-const currentSession = ref('session-1')
-const messages = ref([])
+/** 获取当前登录用户 ID */
+function getUserId() {
+  const user = getUser()
+  return user ? user.userId : null
+}
+
+const sessions = ref([])
+const currentSession = ref('')
+// 按会话ID隔离消息存储（key=sessionId, value=消息数组）
+const sessionMessages = ref({})
+// 当前会话的消息列表（与 sessionMessages 中对应数组引用一致）
+const currentMessages = ref([])
 const inputMessage = ref('')
 const sending = ref(false)
 const messagesRef = ref(null)
 const chatMode = ref('normal')
 const knowledgeBase = ref('')
 
-function newSession() {
-  const id = 'session-' + Date.now()
-  sessions.value.push({ id, title: '新会话 ' + sessions.value.length })
-  currentSession.value = id
-  messages.value = []
+// 将当前显示切换到指定会话的消息数组
+function switchToMessages(sessionId) {
+  if (!sessionMessages.value[sessionId]) {
+    sessionMessages.value = { ...sessionMessages.value, [sessionId]: [] }
+  }
+  currentMessages.value = sessionMessages.value[sessionId]
 }
+
+// 从后端加载会话历史并填充到当前消息数组
+async function loadHistory() {
+  const sessionKey = currentSession.value
+  if (!sessionKey) return
+  // 已有消息内容则跳过（避免重复加载）
+  if (sessionMessages.value[sessionKey] && sessionMessages.value[sessionKey].length > 0) return
+  try {
+    const resp = await chatApi.get('/history', { params: { sessionKey } })
+    if (resp.data && resp.data.code === 200 && resp.data.data && resp.data.data.length > 0) {
+      const list = resp.data.data.map(m => ({ role: m.role, content: m.content }))
+      // 保持数组引用不变，仅替换内容
+      const arr = sessionMessages.value[sessionKey]
+      arr.length = 0
+      arr.push(...list)
+    }
+  } catch (e) {
+    // 后端不可用时静默降级
+    console.warn('加载历史会话失败:', e.message)
+  }
+}
+
+// 从后端加载用户的所有会话列表
+async function loadSessions() {
+  const userId = getUserId()
+  if (!userId) return
+  try {
+    const resp = await messageApi.get('/sessions', { params: { userId } })
+    if (resp.data && resp.data.code === 200 && resp.data.data && resp.data.data.length > 0) {
+      sessions.value = resp.data.data.map(s => ({
+        id: String(s.id),
+        title: s.title || '默认会话'
+      }))
+    }
+  } catch (e) {
+    console.warn('加载会话列表失败:', e.message)
+  }
+}
+
+// 切换会话（左侧列表点击）
+function switchSession(id) {
+  currentSession.value = id
+  switchToMessages(id)
+  loadHistory()
+}
+
+// 新建会话（持久化到后端）
+async function newSession() {
+  const userId = getUserId()
+  if (!userId) {
+    ElMessage.warning('请先登录')
+    return
+  }
+  try {
+    const title = '新会话 ' + (sessions.value.length + 1)
+    const resp = await messageApi.post('/session', null, { params: { userId, title } })
+    if (resp.data && resp.data.code === 200 && resp.data.data) {
+      const session = resp.data.data
+      sessions.value.push({ id: String(session.id), title: session.title })
+      switchSession(String(session.id))
+    }
+  } catch (e) {
+    ElMessage.error('创建会话失败: ' + (e.message || ''))
+  }
+}
+
+// 删除会话（含其下所有消息）
+async function handleDeleteSession(session) {
+  try {
+    await ElMessageBox.confirm(
+      `确定删除会话「${session.title}」吗？该会话下的所有消息也会被删除，且不可恢复。`,
+      '删除确认',
+      { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' }
+    )
+  } catch {
+    return // 用户取消
+  }
+  try {
+    const resp = await messageApi.delete(`/session/${session.id}`)
+    if (resp.data && resp.data.code === 200) {
+      // 从列表移除
+      sessions.value = sessions.value.filter(s => s.id !== session.id)
+      delete sessionMessages.value[session.id]
+      // 删除的是当前会话：切换到剩余会话或清空
+      if (currentSession.value === session.id) {
+        if (sessions.value.length > 0) {
+          switchSession(sessions.value[0].id)
+        } else {
+          currentSession.value = ''
+          currentMessages.value = []
+        }
+      }
+      ElMessage.success('会话已删除')
+    }
+  } catch (e) {
+    ElMessage.error('删除会话失败: ' + (e.message || ''))
+  }
+}
+
+// 初始化：加载会话列表，无会话时创建默认会话
+async function initApp() {
+  await loadSessions()
+  if (sessions.value.length > 0) {
+    // 切换到最近会话（列表已按 updateTime 倒序，第一个就是最新）
+    switchSession(sessions.value[0].id)
+  } else {
+    // 还没有任何会话，自动创建一个
+    await newSession()
+  }
+}
+
+// 监听 currentSession 变化
+watch(currentSession, (newId) => {
+  if (newId) {
+    switchToMessages(newId)
+    loadHistory()
+  }
+})
+
+// 页面初始化
+initApp()
 
 // 真正的流式对话（SSE）：fetch + ReadableStream 解析，逐 token 追加（打字机效果）
 async function sendMessage() {
@@ -144,14 +279,14 @@ async function sendMessage() {
     return ElMessage.warning('RAG 模式请先填写知识库标识')
   }
 
-  messages.value.push({ role: 'user', content: text })
+  currentMessages.value.push({ role: 'user', content: text })
   inputMessage.value = ''
   sending.value = true
   await scrollToBottom()
 
   // 预置空回复气泡，流式填充
   const assistant = { role: 'assistant', content: '' }
-  messages.value.push(assistant)
+  currentMessages.value.push(assistant)
   await scrollToBottom()
 
   try {
@@ -185,7 +320,8 @@ async function sendMessage() {
           if (!data) continue
           let obj
           try { obj = JSON.parse(data) } catch { continue }
-          if (obj.content) {
+          // done 事件仅携带 citations，不带 content；content 已逐 token 累积，跳过避免重复追加
+          if (obj.content && !obj.done) {
             assistant.content += obj.content
             assistant.citations = assistant.citations || []
             await scrollToBottom()
@@ -231,7 +367,13 @@ async function scrollToBottom() {
 }
 .session-item:hover { background: #f0f2f5; }
 .session-item.active { background: #ecf5ff; color: #409eff; font-weight: 500; }
-.session-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.session-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.session-delete {
+  visibility: hidden; color: #f56c6c; font-size: 14px; cursor: pointer;
+  transition: opacity 0.2s;
+}
+.session-item:hover .session-delete { visibility: visible; }
+.session-delete:hover { opacity: 0.8; }
 
 .chat-card { height: 100%; display: flex; flex-direction: column; }
 .chat-card :deep(.el-card__body) { flex: 1; display: flex; flex-direction: column; padding: 0; overflow: hidden; }

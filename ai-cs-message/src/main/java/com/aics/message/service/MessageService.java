@@ -57,4 +57,11 @@ public interface MessageService {
      * @return 会话列表
      */
     List<ChatSession> getUserSessions(Long userId);
+
+    /**
+     * 删除会话（逻辑删除会话记录，物理删除其下所有消息）
+     *
+     * @param sessionId 会话ID
+     */
+    void deleteSession(Long sessionId);
 }

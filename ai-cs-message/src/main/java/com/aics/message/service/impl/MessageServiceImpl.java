@@ -129,4 +129,28 @@ public class MessageServiceImpl implements MessageService {
                 .orderByDesc(ChatSession::getUpdateTime);
         return chatSessionMapper.selectList(wrapper);
     }
+
+    /**
+     * 删除会话：逻辑删除 chat_session 记录，物理删除其下所有消息。
+     * <p>
+     * 消息表无逻辑删除字段，因此直接物理删除；
+     * 会话通过 {@code @TableLogic} 自动转为 UPDATE deleted=1。
+     * 删除条件同时覆盖 session_id 与 session_key 两个维度，
+     * 兼容历史遗留（仅 session_key 有值）的消息记录。
+     * </p>
+     */
+    @Override
+    public void deleteSession(Long sessionId) {
+        log.info("删除会话: sessionId={}", sessionId);
+        // 1. 删除会话下所有消息（物理删除）
+        LambdaQueryWrapper<ChatMessage> msgWrapper = new LambdaQueryWrapper<>();
+        msgWrapper.eq(ChatMessage::getSessionId, sessionId)
+                .or()
+                .eq(ChatMessage::getSessionKey, String.valueOf(sessionId));
+        int deletedMsg = chatMessageMapper.delete(msgWrapper);
+        // 2. 逻辑删除会话
+        int deletedSession = chatSessionMapper.deleteById(sessionId);
+        log.info("会话删除完成: sessionId={}, deletedMsg={}, deletedSession={}",
+                sessionId, deletedMsg, deletedSession);
+    }
 }
