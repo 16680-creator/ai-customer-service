@@ -132,6 +132,7 @@ public interface RerankService {
 public class SiliconFlowRerankService implements RerankService {
 
     private final RerankProperties properties;
+    private final RestClient.Builder restClientBuilder;   // Spring Boot 自动配置注入，clone 后使用
 
     @Override
     public Mono<List<RerankResultItem>> rerank(String query, List<Document> documents, int topN) {
@@ -142,6 +143,7 @@ public class SiliconFlowRerankService implements RerankService {
             return Mono.empty();
         }
         return Mono.fromCallable(() -> doRerank(query, documents, topN))
+                .subscribeOn(Schedulers.boundedElastic())  // fromCallable 在订阅线程同步执行，必须切到弹性线程池，timeout 计时器才生效
                 .timeout(Duration.ofMillis(properties.getTimeoutMs()))
                 .onErrorResume(e -> {
                     log.warn("Rerank调用失败，降级为向量相似度排序: {}", e.getMessage());
@@ -153,10 +155,11 @@ public class SiliconFlowRerankService implements RerankService {
      * 同步调用 Rerank API 并解析结果。
      */
     private List<RerankResultItem> doRerank(String query, List<Document> documents, int topN) {
-        RestClient restClient = RestClient.builder()
+        // 复用注入的 RestClient.Builder（Spring Boot 自动配置提供），clone 后设置 baseUrl，
+        // 避免污染共享 builder；不再每次 new RestClient，提升复用率
+        RestClient restClient = restClientBuilder.clone()
                 .baseUrl(properties.getBaseUrl())
                 .defaultHeader("Authorization", "Bearer " + properties.getApiKey())
-                .requestFactory(clientHttpRequestFactory())
                 .build();
 
         RerankRequest request = new RerankRequest();
@@ -185,17 +188,6 @@ public class SiliconFlowRerankService implements RerankService {
         log.info("Rerank完成: 输入{}条, 过滤后{}条, 耗时配置={}ms",
                 documents.size(), items.size(), properties.getTimeoutMs());
         return items;
-    }
-
-    /**
-     * 构造带连接/读取超时的请求工厂。
-     */
-    private ClientHttpRequestFactory clientHttpRequestFactory() {
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        int timeout = (int) properties.getTimeoutMs();
-        factory.setConnectTimeout(timeout);
-        factory.setReadTimeout(timeout);
-        return factory;
     }
 
     /**
@@ -235,7 +227,7 @@ public class SiliconFlowRerankService implements RerankService {
 | `.onErrorResume(e -> Mono.empty())` | 任何异常（超时/网络/4xx/5xx）都降级为空，不抛给上层 |
 | `Math.min(topN, documents.size())` | top_n 不能大于候选数，避免 API 报错 |
 | `filter(r -> r.getRelevanceScore() >= minScore)` | 精排后仍按分数阈值过滤，宁缺毋滥（合规要求） |
-| `SimpleClientHttpRequestFactory` 双超时 | 连接超时 + 读取超时都设上，防止 RestClient 默认无限等待 |
+| `restClientBuilder.clone()` 复用 | 注入的 `RestClient.Builder` clone 后使用，避免每次 new，也不污染共享 builder |
 
 ### 3. 结果条目（RerankResultItem）
 
@@ -419,7 +411,8 @@ curl "http://localhost:8083/rag/knowledge-base/search?knowledgeBase=product-manu
 客服场景下合规价值远大于延迟成本。若延迟敏感，可降 `recall-top-k` 到 10。
 
 **Q3：RestClient 是每次调用都 new 吗？**
-当前实现每次调用都构建（简单直接）。高频场景可改为缓存 `RestClient` 实例（`RestClient.Builder` 注入 Spring 容器）。
+不是。当前实现通过构造器注入 `RestClient.Builder`（Spring Boot 自动配置提供），在 `doRerank` 中
+`restClientBuilder.clone().baseUrl(...)` 复用并构建，避免污染共享 builder，也避免每次 new 的开销。
 
 **Q4：换其他 Rerank 服务商（如 Cohere / Jina）怎么办？**
 实现一个新的 `RerankService` 实现类即可，两阶段编排代码（`KnowledgeBaseService`）一行不用改——这就是接口抽象的价值。

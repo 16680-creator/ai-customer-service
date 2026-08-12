@@ -24,7 +24,7 @@
 
 | 角色 | 类 / Bean | 说明 |
 |------|-----------|------|
-| 向量化模型 | `EmbeddingModel`（SPRING_AI 自动装配） | 本地用 HashEmbedding，生产可换 OpenAI |
+| 向量化模型 | `EmbeddingModel`（@Primary `siliconFlowEmbeddingModel`，见 SpringAiConfig） | 硅基流动 BAAI/bge-m3（DeepSeek 不支持 /v1/embeddings） |
 | 向量存储 | `ChromaVectorStore`（starter 自动装配） | 当前 Chroma（持久化），曾用内存版 `SimpleVectorStore`，生产可选 ES/Qdrant/Milvus |
 | 检索+上下文 | `KnowledgeBaseService` | 分块、入库、语义检索、拼装上下文 |
 | RAG 助手 | `SpringAiConfig.ragAdvisor` | `QuestionAnswerAdvisor`，让所有对话自动带检索 |
@@ -77,7 +77,8 @@ public class VectorStoreConfig {
 </dependency>
 ```
 
-连接配置（**统一收口到 Nacos**，`dataId: ai-cs-chat.yml`，对应源文件 `deploy/nacos/configs/ai-cs-chat.yml`）：
+连接配置（本项目写在 `ai-cs-chat/src/main/resources/application.yml` 的 `spring.ai.vectorstore.chroma.*`，
+可由 Nacos `ai-cs-chat.yml`（源文件 `tools/nacos-config/ai-cs-chat.yml`）覆盖）：
 ```yaml
 spring:
   ai:
@@ -85,15 +86,13 @@ spring:
       chroma:
         initialize-schema: true         # 首次启动自动建集合
         collection-name: aics-knowledge # 向量集合名
-        tenant-name: default_tenant     # Chroma v2 tenant（Spring AI 1.1.x 新增，须与远端 Chroma 一致）
-        database-name: default          # Chroma v2 database（Spring AI 1.1.x 新增）
         client:
-          host: ${aics.mysql.host:localhost}   # 复用 MySQL 主机（在 aics-shared.yml 定义），保证同机部署一致
-          port: ${CHROMA_PORT:8000}            # Chroma 服务端口
+          host: http://${aics.mysql.host:localhost}   # 复用 MySQL 主机（在 aics-shared.yml 定义），保证同机部署一致
+          port: ${CHROMA_PORT:8000}                # Chroma 服务端口
 ```
 
-> 本地 `application.yml` 只保留同样的占位符做兜底。改 Chroma 地址只需改 Nacos 一处，
-> 发布脚本：`powershell -ExecutionPolicy Bypass -File deploy/nacos/publish-to-nacos.ps1`。
+> 本地 `application.yml` 已含上述占位符做兜底；改 Chroma 地址优先改 Nacos 的 `ai-cs-chat.yml`
+> （源文件 `tools/nacos-config/ai-cs-chat.yml`），无需发布脚本。
 
 ### Chroma v2 API 兼容性说明（Spring AI 1.0.0 → 1.1.4）
 
@@ -159,8 +158,9 @@ public int addText(String knowledgeBase, String text) {
     // 1. 把原始文本包成一个 Document
     // 2. 打上知识库归属 metadata（knowledgeBase 字段），检索时按它过滤
     // 3. TokenTextSplitter 按 token 数把长文本切成小块，便于精准检索
-    // 4. vectorStore.add(chunks) 内部会调用 EmbeddingModel 把每块转成向量后存储
-    return addChunks(knowledgeBase, List.of(new Document(text)));
+    // 4. addChunks 内部会调用 EmbeddingModel 把每块转成向量后存储
+    List<Document> chunks = new TokenTextSplitter().split(new Document(text));
+    return addChunks(knowledgeBase, chunks);
 }
 ```
 
@@ -226,7 +226,7 @@ public String buildContext(List<Document> docs) {
     // 把命中的文档片段拼接成一段可读文本，作为大模型的"参考资料"
     StringBuilder sb = new StringBuilder();
     for (int i = 0; i < docs.size(); i++) {
-        sb.append("【片段").append(i + 1).append("】\n");
+        sb.append("【资料").append(i + 1).append("】");
         sb.append(docs.get(i).getText()).append("\n\n");
     }
     return sb.toString().trim();
@@ -249,7 +249,7 @@ public String buildContext(List<Document> docs) {
 public QuestionAnswerAdvisor ragAdvisor(VectorStore vectorStore) {
     return QuestionAnswerAdvisor.builder(vectorStore)
             .searchRequest(SearchRequest.builder()
-                    .similarityThreshold(0.5d)  // 相似度低于0.5视为无相关内容
+                    .similarityThreshold(0.3d)  // 相似度低于0.3视为无相关内容
                     .topK(5)                    // 返回最相关5条
                     .build())
             .build();
@@ -334,7 +334,7 @@ public Result<String> chatWithRag(String sessionId, String message, String knowl
 
 ## 八、本地快速验证（跑通完整链路）
 
-当前默认用 **Chroma**（持久化向量库）+ `HashEmbeddingModel`（本地方言），不依赖外部 Embedding 服务，但**需先启动 Chroma**：
+当前默认用 **Chroma**（持久化向量库）+ 硅基流动 **BAAI/bge-m3** Embedding（经 SiliconFlow API），需先启动 Chroma 并配置 Embedding 服务的 API Key：
 
 ```bash
 # 0. 启动 Chroma（任选其一）
@@ -364,9 +364,10 @@ curl "http://localhost:8083/rag/knowledge-base/search?knowledgeBase=product-manu
 
 ## 九、常见问题
 
-**Q1：为什么本地用 HashEmbeddingModel？**
-生产应该用语义更强的模型（OpenAI/通义等），但本地图"零依赖、秒启动"，用 `HashEmbeddingModel`
-（词袋哈希向量，中文也能用，只是语义精度一般）。切换成 OpenAI 只需在配置里替换 `EmbeddingModel` Bean。
+**Q1：本项目 Embedding 用的是什么？**
+本项目用 **硅基流动 BAAI/bge-m3**（`SpringAiConfig` 中 `@Primary siliconFlowEmbeddingModel`），
+因为 DeepSeek 不支持 `/v1/embeddings`，故单独接 SiliconFlow 的 Embedding 服务。生产也可换 OpenAI/通义
+等语义更强的模型，只需替换 `EmbeddingModel` Bean（并改 `aics.embedding.model` 配置）。
 
 **Q2：`QuestionAnswerAdvisor` 找不到？**
 Spring AI 版本差异导致包名不同。本项目 `1.1.4`（与 `1.0.0` 一致）在 `...advisor.vectorstore`
@@ -385,7 +386,7 @@ Chroma 是持久化服务，数据落盘，应用重启不丢（除非删容器/
 
 **Q6：Chroma 报 410 / “API is deprecated“？**
 远端 Chroma 只支持 v2 API。Spring AI `1.0.0` 走 v1 API 会报 410，本项目已升级到 `1.1.4`（支持 v2）。
-若仍报错，确认 `spring.ai.vectorstore.chroma` 的 `tenant-name` / `database-name` 与远端实例一致。
+若仍报错，确认 `spring.ai.vectorstore.chroma.client.host/port` 与远端 Chroma 实例一致，且 host 已加 `http://` 前缀。
 
 ---
 
@@ -394,7 +395,7 @@ Chroma 是持久化服务，数据落盘，应用重启不丢（除非删容器/
 | 环节 | Chroma（当前） | 内存版（本地零依赖） | 生产可选 |
 |------|---------------|-------------------|---------|
 | 存储 | `ChromaVectorStore` | `SimpleVectorStore` | ES / Qdrant / Milvus |
-| 向量模型 | `HashEmbeddingModel` | `HashEmbeddingModel` | OpenAI/通义 Embedding |
+| 向量模型 | 硅基流动 BAAI/bge-m3（SiliconFlow） | 硅基流动 BAAI/bge-m3 | OpenAI/通义 Embedding |
 | 依赖 | `spring-ai-starter-vector-store-chroma` | 无 | 对应 store starter |
 | 持久化 | 落盘，重启不丢 | 内存，重启即清 | 持久化 |
 | 代码改动 | 自动装配，无需改 | 手写 Bean | 仅换依赖+配置 |
@@ -404,10 +405,7 @@ Chroma 是持久化服务，数据落盘，应用重启不丢（除非删容器/
 2. **集合存在判断 bug 已修复**：1.0.0 对集合不存在的错误消息做字符串比对时写的是
    `“does not exists“`，而 Chroma 实际返回 `“does not exist“`，导致集合明明已创建仍误报 404。
    该 bug 在 1.1.4 已修复。
-3. **新增 `tenant-name` / `database-name` 配置**：对应 Chroma v2 的 tenant/database 概念，
-   必须与远端 Chroma 实例一致（默认 `default_tenant` / `default`）。本项目的 Nacos 配置与本地
-   兜底 `application.yml` 均已补充这两个字段。
-4. **版本与兼容性**：父 POM `spring-ai.version` 已由 `1.0.0` 改为 `1.1.4`；实测
+3. **版本与兼容性**：父 POM `spring-ai.version` 已由 `1.0.0` 改为 `1.1.4`；实测
    Spring AI `1.1.4` + Spring Boot `3.2.5` 编译通过，无需升级 Boot。
 
 ---

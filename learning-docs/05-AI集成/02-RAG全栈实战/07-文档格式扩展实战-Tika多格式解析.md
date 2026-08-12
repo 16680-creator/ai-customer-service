@@ -213,8 +213,11 @@ private boolean isTika(MultipartFile file) {
 `TikaDocumentReader` 开箱即用，无强制配置项。如要限制解析资源可自行配置 Tika 的超时等参数
 （本项目未启用，保持默认）。
 
-### 2. 文件上传大小限制（application.yml）
+### 2. 文件上传大小限制
 
+> 本项目 `ai-cs-chat` 的 `application.yml` **未单独配置** `spring.servlet.multipart.*`，
+> 因此沿用 Spring Boot 默认值（单文件 1MB / 单次请求 10MB）。办公文档（尤其带图表的 xlsx/pptx）
+> 体积常超过 1MB，上传会失败；如需放大，请在 `application.yml` 追加：
 ```yaml
 spring:
   servlet:
@@ -222,9 +225,6 @@ spring:
       max-file-size: 20MB        # 单个文件上限（Office 文件通常较大）
       max-request-size: 50MB     # 单次请求总大小
 ```
-
-> 办公文档（尤其带图表的 xlsx/pptx）体积不小，默认 1MB 上限会导致上传失败，
-> 建议按实际资料大小调整。
 
 ### 3. 依赖版本
 

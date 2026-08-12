@@ -88,9 +88,10 @@ openspec/changes/chat-history-persistence/
 spring:
   data:
     redis:
-      host: ${REDIS_HOST:localhost}
+      host: ${REDIS_HOST:127.0.0.1}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
 ```
 
 ### 3. 新增的 Java 类

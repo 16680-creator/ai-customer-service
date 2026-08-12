@@ -400,10 +400,9 @@ rocketmq:
 
 本地兜底 `application.yml`：
 
-```yaml
-rocketmq:
-  name-server: ${ROCKETMQ_NAME_SERVER:127.0.0.1:9876}
-```
+> 本项目 `ai-cs-knowledge` 的 `application.yml` **不含 `rocketmq` 段**，仅通过
+> `spring.config.import` 引入 Nacos 配置（`optional:nacos:aics-shared.yml` 与 `optional:nacos:ai-cs-knowledge.yml`）；
+> `name-server` 由 `aics-shared.yml` 提供，`producer.group` 由 `ai-cs-knowledge.yml` 提供。
 
 ### 2. 消费端关键参数
 

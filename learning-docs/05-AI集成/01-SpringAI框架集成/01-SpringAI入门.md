@@ -12,7 +12,7 @@ Spring AI = Spring 生态的 AI 开发框架
 
 它提供统一的 API 来对接各种 LLM：
   • OpenAI（GPT-4）
-  • MiniMax（本项目使用）
+  • DeepSeek（本项目使用）
   • 通义千问、文心一言
   • Ollama（本地模型）
 
@@ -29,16 +29,16 @@ spring:
   ai:
     openai:
       api-key: ${OPENAI_API_KEY:你的密钥}
-      base-url: ${OPENAI_BASE_URL:https://api.minimaxi.com}  # MiniMax 的 API 地址
+      base-url: ${OPENAI_BASE_URL:https://api.deepseek.com}  # DeepSeek 的 API 地址
       chat:
         options:
-          model: ${OPENAI_MODEL:MiniMax-M3}   # 模型名称
+          model: ${OPENAI_MODEL:deepseek-chat}   # 模型名称
           temperature: 0.7                     # 随机性（0=确定，1=创意）
           max-tokens: 2048                     # 最大回复长度
 ```
 
 **关键理解**：
-- Spring AI 用 OpenAI 兼容协议，所以 MiniMax、通义等都能用 `spring-ai-starter-model-openai`
+- Spring AI 用 OpenAI 兼容协议，所以 DeepSeek、通义等都能用 `spring-ai-starter-model-openai`
 - `base-url` 指向不同厂商的 API 地址即可
 - `api-key` 从环境变量读取（安全！不要硬编码）
 
@@ -79,7 +79,7 @@ spring:
 
 ```java
 @RestController
-@RequestMapping("/api/chat")
+@RequestMapping("/chat")
 public class ChatController {
 
     @Autowired
@@ -120,20 +120,19 @@ String reply = chatClient.prompt()
 ### 4.3 流式输出（SSE）
 
 ```java
-@GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-public Flux<String> chatStream(@RequestParam String message) {
-    ChatClient chatClient = chatClientBuilder.build();
-    
-    return chatClient.prompt()
-        .user(message)
-        .stream()              // 流式调用
-        .content();            // 返回 Flux<String>，逐字输出
+@PostMapping(value = "/stream/sse", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+public SseEmitter chatStreamSse(@RequestParam String message) {
+    SseEmitter emitter = new SseEmitter(SSE_EMITTER_TIMEOUT);
+    // 订阅 chatClient.prompt().user(message).stream().content() 返回的 Flux<String>
+    // 逐段通过 emitter.send(...) 推送给前端；超时由 SSE_EMITTER_TIMEOUT（5 分钟）控制
+    // （见 ChatController：超时 onTimeout 兜底，避免 SSE 连接挂起）
+    return emitter;
 }
 ```
 
 前端接收 SSE：
 ```javascript
-const eventSource = new EventSource(`/api/chat/stream?message=${encodeURIComponent(msg)}`);
+const eventSource = new EventSource(`/chat/stream/sse?message=${encodeURIComponent(msg)}`);
 eventSource.onmessage = (event) => {
     // event.data 是每次返回的一小段文字
     appendToChat(event.data);
@@ -287,7 +286,7 @@ String prompt = """
 ## 八、动手练习
 
 1. 配置好 API Key，启动 `ai-cs-chat`
-2. 用 Postman 调用：`POST http://localhost:8083/api/chat/send?sessionId=1&message=你好`
+2. 用 Postman 调用：`POST http://localhost:8083/chat/send?sessionId=1&message=你好`
 3. 修改 temperature 为 0 和 1，对比回复差异
 4. 写一个带 System Prompt 的客服对话
 5. 实现流式输出接口，前端用 SSE 接收

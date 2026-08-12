@@ -70,9 +70,8 @@ public class DocumentLoader {
 |------|-----------|------|
 | PDF | PagePdfDocumentReader | spring-ai-pdf-document-reader |
 | TXT | TextReader | spring-ai-core（内置） |
-| HTML | JsoupDocumentReader | spring-ai-jsoup-document-reader |
-| Word | — | 需自行解析 |
-| Markdown | — | 可用 TextReader |
+| HTML/Word/Excel | TikaDocumentReader | spring-ai-tika-document-reader |
+| Markdown | TextReader | spring-ai-core（内置） |
 
 ---
 

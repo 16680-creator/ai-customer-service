@@ -203,10 +203,10 @@ T1 → T2 → T3 ─┬─→ T4 ──→ T6
 resilience4j:
   timelimiter:
     instances:
-      chatService:        # 非流式：30s 超时
+      chatService:        # 非流式：30s 超时（chat / chatWithRag / compressHistory）
         timeout-duration: 30s
         cancel-running-future: true
-      sseChatService:     # 流式：60s 超时
+      sseChatService:     # 流式：60s 超时（首次 token 到达限制）
         timeout-duration: 60s
         cancel-running-future: true
   retry:
@@ -218,23 +218,46 @@ resilience4j:
         retry-exceptions:
           - java.net.SocketTimeoutException
           - java.net.ConnectException
+          - org.springframework.web.client.ResourceAccessException
           - java.util.concurrent.TimeoutException
+        ignore-exceptions:           # 业务异常不重试（避免无效调用）
+          - com.aics.common.exception.BusinessException
+          - java.lang.IllegalArgumentException
   circuitbreaker:
     instances:
       chatService:        # 非流式熔断器
+        sliding-window-type: COUNT_BASED
         sliding-window-size: 10
+        minimum-number-of-calls: 3
         failure-rate-threshold: 50
         wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+        record-exceptions:
+          - java.util.concurrent.TimeoutException
+          - org.springframework.web.client.ResourceAccessException
+          - java.net.SocketTimeoutException
+        ignore-exceptions:
+          - com.aics.common.exception.BusinessException
+          - java.lang.IllegalArgumentException
       sseChatService:     # 流式熔断器（独立实例）
+        sliding-window-type: COUNT_BASED
         sliding-window-size: 10
+        minimum-number-of-calls: 3
         failure-rate-threshold: 50
         wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+        record-exceptions:
+          - java.util.concurrent.TimeoutException
+          - org.springframework.web.client.ResourceAccessException
 ```
 
 **配置设计要点**：
 - **两个独立熔断器实例**：非流式和流式互不影响，一个熔断另一个还能用
-- **重试只配网络异常**：`BusinessException` 等业务异常不重试，避免无效调用
+- **重试只针对网络/超时类异常**：`retry-exceptions` 列出 SocketTimeout/Connect/ResourceAccess/Timeout，
+  业务异常（`BusinessException` / `IllegalArgumentException`）通过 `ignore-exceptions` 显式不重试，避免无效调用
 - **流式不配重试**：SSE Flux 是一次性的，重试会导致重复消费
+- **熔断器用 COUNT_BASED 滑窗**：`minimum-number-of-calls: 3` + `permitted-number-of-calls-in-half-open-state: 3`，
+  半开态放行 3 个探针；`record-exceptions` / `ignore-exceptions` 精确界定哪些异常算失败
 
 #### T3：创建 ResilientAiService ✅
 
@@ -278,6 +301,9 @@ public class ResilientAiService {
 **关键设计决策**：
 - **为什么返回 CompletableFuture？** `@TimeLimiter` 通过 `Future.get(timeout)` 实现超时，要求方法返回 `Future` 类型
 - **为什么用包装层而非直接改 ChatServiceImpl？** 分离关注点，弹性逻辑与业务逻辑解耦
+- **ResilientAiService 还提供 RAG / 摘要 / 流式 RAG 的重载**：`callRagChat`、`callSummary`、`callSseRagStream`
+  （及对应 `fallbackSummary`），均复用相同的 `@TimeLimiter + @Retry + @CircuitBreaker` 注解组合，
+  只是底层 `ChatClient` 调用方式不同（带 RAG Advisor / 摘要提示 / 流式）。
 
 #### T4：改造 ChatServiceImpl ✅
 

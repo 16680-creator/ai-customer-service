@@ -394,15 +394,14 @@ spring:
           port: 8000
 ```
 
-### 3. 索引与文档写入（ES 侧需先建索引、同步数据）
+### 3. 索引与文档写入（ES 侧无需手动建索引）
+
+> 本项目 ES 索引**无需手动创建**：首次写入文档时由 `SearchServiceImpl.createEsIndexIfNeeded(...)`
+> 自动幂等建好，mappings 含 `documentId / title / content / summary / tags / knowledgeBase / docType / page`
+> 等字段（`SearchController.createIndex` 在 Chroma 模式下为空实现，调用只会返回成功、并不建 ES 索引）。
 
 ```bash
-# 创建索引（mappings 含 title/content/knowledgeBase/page/docType 字段）
-curl -X POST "http://localhost:8084/search/index/product-manual" \
-  -H "Content-Type: application/json" \
-  -d '{"properties":{"title":{"type":"text"},"content":{"type":"text"},"knowledgeBase":{"type":"keyword"},"page":{"type":"integer"},"docType":{"type":"keyword"}}}'
-
-# 写入文档（_id 建议用 documentId，与 Chroma 路对齐）
+# 直接写入文档即可，ES 索引会在首次写入时自动创建（_id 建议用 documentId，与 Chroma 路对齐）
 curl -X POST "http://localhost:8084/search/document/product-manual" \
   -H "Content-Type: application/json" \
   -d '{"_id":"1001","title":"退货政策","content":"我们支持15天无理由退货，运费由买家承担。","knowledgeBase":"product-manual","docType":"txt"}'
