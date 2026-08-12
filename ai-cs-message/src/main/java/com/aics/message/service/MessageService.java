@@ -7,6 +7,14 @@ import java.util.List;
 
 /**
  * 消息服务接口
+ * <p>
+ * 所属模块：ai-cs-message。
+ * 职责：定义会话与聊天消息的核心业务能力，包括消息保存、会话创建、
+ * 历史消息查询（按 sessionId 或 sessionKey）以及用户会话列表查询。
+ * 实现类：{@link com.aics.message.service.impl.MessageServiceImpl}。
+ * 调用方：{@link com.aics.message.controller.MessageController}（同步查询/创建）
+ * 与 {@link com.aics.message.consumer.ChatMessageConsumer}（异步消费落库）。
+ * </p>
  */
 public interface MessageService {
 

@@ -32,6 +32,33 @@ import java.util.concurrent.CompletionException;
  *                                       ├── [@CircuitBreaker] 熔断保护
  *                                       └── [@Fallback]    降级响应
  * </pre>
+ *
+ * <h3>为什么所有方法都返回 CompletableFuture</h3>
+ * <p>Resilience4j 的 {@link TimeLimiter} 通过 {@link java.util.concurrent.Future#get(long, TimeUnit)}
+ * 实现超时：把同步阻塞调用包成 {@link CompletableFuture}（在 {@code supplyAsync} 内执行真正的 LLM 调用），
+ * {@code @TimeLimiter} 在外层调度一个 watchdog，到期后 {@code cancel(true)} 中断 Future，抛出
+ * {@link java.util.concurrent.TimeoutException}。所以方法签名必须是 {@code CompletableFuture<...>}
+ * 才能被 TimeLimiter 切面拦截。</p>
+ *
+ * <h3>流式与非流式为何用独立实例（不同 name）</h3>
+ * <p>非流式方法用 {@code name = "chatService"}，流式方法用 {@code name = "sseChatService"}，
+ * 两套配置在 {@code application.yml} 中分别定义，超时阈值不同：</p>
+ * <ul>
+ *   <li>非流式 {@code chatService}：30s TimeLimiter —— 等待完整响应，超过即认为失败。</li>
+ *   <li>流式 {@code sseChatService}：60s TimeLimiter —— 只限制"首次 token 到达"的时间，
+ *       一旦开始流式返回就不再受 TimeLimiter 约束（流本身的超时由 SseEmitter 兜底）。</li>
+ * </ul>
+ * <p>流式不配 {@code @Retry}：因为流一旦开始推送就不可重放，重试会导致前端重复接收 token。</p>
+ *
+ * <h3>Retry 只配网络异常、忽略业务异常</h3>
+ * <p>{@code @Retry} 配置（见 application.yml 的 {@code resilience4j.retry.instances.chatService}）
+ * 只对网络类异常（如 {@code IOException}、连接超时）重试，业务异常（如 4xx 鉴权失败）不重试 ——
+ * 避免对注定失败的请求浪费配额。</p>
+ *
+ * <h3>降级（Fallback）</h3>
+ * <p>每个公开方法都有对应的 {@code fallbackMethod}：超时/熔断/重试耗尽时返回友好提示，
+ * 而不是把原始异常抛给用户。流式 fallback 返回 {@code Flux.just("[ERROR]" + msg)}，
+ * 由 {@link ChatServiceImpl} 在订阅时识别并以 error 事件推送给前端。</p>
  */
 @Slf4j
 @Service

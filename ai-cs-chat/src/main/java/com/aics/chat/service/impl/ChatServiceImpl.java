@@ -34,6 +34,17 @@ import java.util.regex.Pattern;
  * AI 对话服务实现
  *
  * <p>所有 LLM 调用均通过 {@link ResilientAiService} 执行，获得超时/重试/熔断/降级能力。</p>
+ *
+ * <h3>核心职责</h3>
+ * <ul>
+ *   <li>会话历史管理：从 {@link ChatHistoryService} 加载历史；超阈值时调用 LLM 压缩为摘要。</li>
+ *   <li>RAG 检索编排：调用 {@link KnowledgeBaseService#search} 拿到相关片段，
+ *       用 {@link KnowledgeBaseService#buildContext} 拼成【资料】上下文注入 Prompt。</li>
+ *   <li>引用溯源：从检索结果构建 {@link CitationItemDTO} 列表，随回答一起返回前端。</li>
+ *   <li>SSE 流式：通过 {@link ResilientAiService#callSseStream} 拿到 {@code Flux<String>}，
+ *       订阅后逐 token 推送给 {@link SseEmitter}；流结束推送 done 事件（含完整回复 + citations）。</li>
+ *   <li>异常友好化：把 Resilience4j 抛出的超时/熔断异常转成用户可读提示。</li>
+ * </ul>
  */
 @Slf4j
 @Service
@@ -116,6 +127,9 @@ public class ChatServiceImpl implements ChatService {
         }
     }
 
+    /**
+     * 普通同步对话：加载历史 → 追加用户消息 → 压缩历史（若超阈值）→ 调用 LLM → 清洗 → 落库。
+     */
     @Override
     public Result<String> chat(String sessionId, String message) {
         log.info("对话请求: sessionId={}, message={}", sessionId, message);
@@ -144,6 +158,7 @@ public class ChatServiceImpl implements ChatService {
             log.info("对话完成: sessionId={}, responseLength={}", sessionId, response.length());
             return Result.success(response);
         } catch (ExecutionException e) {
+            // CompletableFuture.get() 抛 ExecutionException，cause 才是真实异常
             Throwable cause = e.getCause();
             log.error("AI 服务调用异常: sessionId={}, cause={}", sessionId, cause != null ? cause.getMessage() : e.getMessage());
             throw new BusinessException(ResultCode.CHAT_AI_SERVICE_UNAVAILABLE, "AI服务调用失败: " + getFriendlyMessage(cause));
@@ -153,6 +168,9 @@ public class ChatServiceImpl implements ChatService {
         }
     }
 
+    /**
+     * RAG 对话：知识库检索 → 拼接【资料】上下文 → 调用 LLM → 构建引用溯源列表。
+     */
     @Override
     public Result<ChatRagResponseDTO> chatWithRag(String sessionId, String message, String knowledgeBase) {
         log.info("RAG对话请求: sessionId={}, knowledgeBase={}", sessionId, knowledgeBase);
@@ -195,11 +213,15 @@ public class ChatServiceImpl implements ChatService {
         }
     }
 
+    /**
+     * 流式对话占位接口实现：仅返回提示信息，引导调用方改用 SSE 端点。
+     */
     @Override
     public Result<Map<String, Object>> chatStream(String sessionId, String message) {
         log.info("流式对话请求: sessionId={}", sessionId);
 
         try {
+            // 该端点仅为占位：真正的流式响应需要 SSE 协议，请改用 /chat/stream/sse
             Map<String, Object> result = new HashMap<>();
             result.put("sessionId", sessionId);
             result.put("status", "streaming");
@@ -211,6 +233,10 @@ public class ChatServiceImpl implements ChatService {
         }
     }
 
+    /**
+     * SSE 流式对话：根据 knowledgeBase 是否为空，走 RAG 流式或普通流式；
+     * 订阅 Flux 逐 token 推送，流结束推送 done 事件（含完整回复 + citations）。
+     */
     @Override
     public SseEmitter chatStreamSse(String sessionId, String message, String knowledgeBase) {
         log.info("SSE流式对话请求: sessionId={}, knowledgeBase={}", sessionId, knowledgeBase);
@@ -230,6 +256,8 @@ public class ChatServiceImpl implements ChatService {
             final List<Message> streamHistory = history;
 
             // 2. 通过 ResilientAiService 弹性获取流式 Flux
+            //    hasKb=true 走 RAG 流式（同时检索知识库 + 缓存 citations 用于 done 事件）；
+            //    hasKb=false 走普通流式
             CompletableFuture<Flux<String>> futureFlux;
             final List<CitationItemDTO> citations;
             if (hasKb) {
@@ -259,6 +287,10 @@ public class ChatServiceImpl implements ChatService {
             Flux<String> flux = futureFlux.get();
 
             // 3. 订阅流：逐 token 通过 SSE 推送，结束后更新历史
+            //    - onNext：检查是否为降级错误标记 [ERROR]，是则推送 error 事件并结束；
+            //             否则把 chunk 累积到 full 并以 {"content":"..."} 推送给前端
+            //    - onError：推送 error 事件并以异常结束 emitter
+            //    - onComplete：把累积的 full 文本清洗后入库，推送 {"done":true,"content":"...","citations":[...]}
             StringBuilder full = new StringBuilder();
             flux.subscribe(
                     chunk -> {
@@ -310,6 +342,7 @@ public class ChatServiceImpl implements ChatService {
                     }
             );
         } catch (ExecutionException e) {
+            // futureFlux.get() 抛 ExecutionException，cause 是真实异常（如熔断/超时）
             Throwable cause = e.getCause();
             String errorMsg = getFriendlyMessage(cause);
             log.error("SSE流式初始化异常: sessionId={}, cause={}", sessionId, errorMsg);
@@ -341,6 +374,9 @@ public class ChatServiceImpl implements ChatService {
         return emitter;
     }
 
+    /**
+     * 查询会话历史（历史回看），直接委托 {@link ChatHistoryService#load}。
+     */
     @Override
     public Result<List<ChatHistoryMessage>> getHistory(String sessionKey) {
         log.info("查询会话历史: sessionKey={}", sessionKey);

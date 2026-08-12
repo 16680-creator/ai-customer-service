@@ -9,6 +9,15 @@ import java.io.Serializable;
  *
  * <p>由 ai-cs-knowledge 生产者投递到 RocketMQ topic=knowledge-doc-sync-topic，
  * ai-cs-knowledge 消费者（同模块内）消费后执行向量化/删除操作。</p>
+ *
+ * <p>设计说明：</p>
+ * <ul>
+ *   <li>消息体携带文档标题与内容，消费者无需回查数据库，降低 DB 压力</li>
+ *   <li>action 区分操作类型（CREATE/UPDATE/DELETE），同时作为 RocketMQ 的 tag 投递</li>
+ *   <li>knowledgeBase 字段固定为 "knowledge"，对应 Chroma 中向量分块的元数据，
+ *       与 ai-cs-chat 检索时使用的 knowledgeBase 参数一致</li>
+ *   <li>timestamp 用于消息时序参考（非强幂等依据）</li>
+ * </ul>
  */
 @Data
 public class KnowledgeSyncMessage implements Serializable {

@@ -6,6 +6,12 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 
 /**
  * 知识库服务接口
+ *
+ * <p>职责：定义知识文档 CRUD 业务方法，供
+ * {@link com.aics.knowledge.controller.KnowledgeController} 调用。</p>
+ *
+ * <p>实现见 {@link com.aics.knowledge.service.impl.KnowledgeServiceImpl}，
+ * DB 操作完成后会通过 RocketMQ 异步触发向量化（写 Chroma）。</p>
  */
 public interface KnowledgeService {
 

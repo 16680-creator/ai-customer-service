@@ -16,6 +16,18 @@ import java.util.List;
 /**
  * 文档加载器
  * 负责从不同格式的文件中加载文档内容，用于 RAG 检索增强生成
+ *
+ * <p>提供三种加载策略，由 {@link com.aics.chat.service.KnowledgeBaseService#addFile} 按文件后缀选择：</p>
+ * <ul>
+ *   <li>{@link #loadPdf} —— PDF，使用 {@link PagePdfDocumentReader} 按页读取，
+ *       每页生成一个 Document，metadata 带 {@code page_number}（用于引用溯源）。</li>
+ *   <li>{@link #loadText} —— 纯文本（.txt/.md 等），使用 {@link TextReader} 整篇读取。</li>
+ *   <li>{@link #loadTika} —— Office/HTML 等，使用 Apache Tika（{@link TikaDocumentReader}）
+ *       解析 .docx / .xlsx / .html / .htm 等富文档格式，提取正文文本。</li>
+ * </ul>
+ *
+ * <p>加载后的原始 Document 会由 {@link com.aics.chat.service.KnowledgeBaseService#addChunks}
+ * 进一步用 {@code TokenTextSplitter} 按 token 切分成更小的片段（chunk），再向量化入库。</p>
  */
 @Component
 public class DocumentLoader {

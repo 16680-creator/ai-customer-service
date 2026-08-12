@@ -23,7 +23,39 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.beans.factory.annotation.Value;
 
 /**
- * Spring AI 配置
+ * Spring AI 核心配置类 —— 装配对话、工具调用与 RAG 检索所需的 Bean。
+ *
+ * <h3>Bean 装配总览</h3>
+ * <ul>
+ *   <li>{@link #siliconFlowEmbeddingModel()}：向量模型（EmbeddingModel），{@code @Primary} 标注，
+ *       指向硅基流动 {@code https://api.siliconflow.cn}，模型 {@code BAAI/bge-m3}。</li>
+ *   <li>{@link #orderToolCallbackProvider(OrderQueryService)}：把 {@link OrderQueryService} 上
+ *       {@code @Tool} 标注的方法注册成 LLM 可调用的 Function Tool。</li>
+ *   <li>{@link #ragAdvisor(VectorStore)}：{@link QuestionAnswerAdvisor}，Spring AI 内置的 RAG 顾问，
+ *       在每次 ChatClient 调用时自动注入向量检索结果作为上下文。</li>
+ *   <li>{@link #chatClient(OpenAiChatModel, ToolCallbackProvider, QuestionAnswerAdvisor)}：
+ *       {@link ChatClient}，绑定默认系统提示、工具与 RAG Advisor，是业务层 LLM 调用的统一入口。</li>
+ * </ul>
+ *
+ * <h3>ChatModel 来源（OpenAI 兼容协议对接 DeepSeek）</h3>
+ * <p>{@link OpenAiChatModel} 由 Spring AI 的 {@code spring-ai-openai-spring-boot-starter} 自动装配，
+ * 配置项见 {@code application.yml} 的 {@code spring.ai.openai.*}：
+ * 通过把 {@code base-url} 指向 DeepSeek 的 OpenAI 兼容端点（{@code https://api.deepseek.com}）、
+ * 使用 DeepSeek 颁发的 API Key、模型名设为 {@code deepseek-chat}，即可让 Spring AI 用调用 OpenAI 的方式
+ * 调用 DeepSeek —— 因为 DeepSeek 实现了 OpenAI Chat Completions 协议，请求/响应格式完全兼容。</p>
+ *
+ * <h3>为什么 Embedding 单独走硅基流动</h3>
+ * <p>DeepSeek 官方不提供 {@code /v1/embeddings} 接口，无法用于文档向量化。
+ * 故本配置类手动装配一个指向硅基流动的 {@link OpenAiEmbeddingModel}：
+ * 硅基流动聚合了 BAAI 开源的 {@code bge-m3} 多语言向量模型（1024 维，中英文效果好，免费额度充足），
+ * 同样使用 OpenAI 兼容协议调用。{@code @Primary} 保证 {@link org.springframework.ai.vectorstore.VectorStore}
+ * 以及其他注入 {@link EmbeddingModel} 的位置优先使用此 Bean，而非 Spring Boot 自动装配的默认实例。
+ * 启动类 {@link com.aics.chat.ChatApplication} 已通过 {@code exclude = OpenAiEmbeddingAutoConfiguration.class}
+ * 关闭默认的 OpenAI Embedding 自动装配，避免冲突。</p>
+ *
+ * <h3>配置来源</h3>
+ * <p>Embedding 的 base-url / api-key / model 从 Nacos 读取（{@code aics.embedding.*}），
+ * 见类下 {@link Value} 字段；ChatModel 配置由 {@code spring.ai.openai.*} 装配，不在本类显式声明。</p>
  */
 @Configuration
 @EnableConfigurationProperties(RerankProperties.class)
@@ -44,6 +76,12 @@ public class SpringAiConfig {
     /**
      * 自定义 EmbeddingModel：使用硅基流动 API（DeepSeek 不支持 /v1/embeddings）。
      * @Primary 确保 ChromaVectorStore 等注入点优先使用此 Bean。
+     *
+     * <p>装配逻辑：用 {@link OpenAiApi} 指向硅基流动 base-url + apiKey，
+     * 然后构造 {@link OpenAiEmbeddingModel}（OpenAI 兼容协议），模型名 {@code BAAI/bge-m3}。
+     * {@link MetadataMode#EMBED} 表示按"用于向量化"的模式读取文档元数据（去掉无关字段，保留正文）。</p>
+     *
+     * @return 硅基流动 BAAI/bge-m3 EmbeddingModel Bean
      */
     @Bean
     @Primary
@@ -64,7 +102,14 @@ public class SpringAiConfig {
     }
 
     /**
-     * 注册 ToolCallbackProvider，用于注册 @Tool 注解的方法
+     * 注册 ToolCallbackProvider，用于注册 @Tool 注解的方法。
+     *
+     * <p>把 {@link OrderQueryService} 作为工具对象注册，Spring AI 会扫描其上
+     * {@link org.springframework.ai.tool.annotation.Tool} 注解的方法（如订单查询），
+     * 包装成 {@code ToolCallback} 暴露给 LLM；当 LLM 决定调用工具时，会回调到这些方法。</p>
+     *
+     * @param orderQueryService 订单查询服务（含 {@code @Tool} 方法）
+     * @return 工具回调提供者
      */
     @Bean
     public ToolCallbackProvider orderToolCallbackProvider(OrderQueryService orderQueryService) {
@@ -75,6 +120,13 @@ public class SpringAiConfig {
 
     /**
      * 注册 RAG 检索增强 Advisor。
+     *
+     * <p>{@link QuestionAnswerAdvisor} 会在每次 ChatClient 调用前自动：
+     * 把用户问题送入 {@link VectorStore} 做相似度检索，命中结果作为上下文拼到 Prompt 中。
+     * 这里配置 {@code similarityThreshold=0.3}（较低阈值，宽召回）+ {@code topK=5}。</p>
+     *
+     * @param vectorStore 向量库（Chroma）
+     * @return RAG 检索顾问
      */
     @Bean
     public QuestionAnswerAdvisor ragAdvisor(VectorStore vectorStore) {
@@ -87,7 +139,21 @@ public class SpringAiConfig {
     }
 
     /**
-     * 注册 ChatClient Bean
+     * 注册 ChatClient Bean。
+     *
+     * <p>ChatClient 是业务层调用 LLM 的统一入口，此处配置三项默认值：</p>
+     * <ul>
+     *   <li>{@code defaultSystem}：系统提示词，约束 AI 的身份、能力范围与回答风格
+     *       （禁止透露底层模型名、识别当前用户、订单工具调用规则等）。</li>
+     *   <li>{@code defaultToolCallbacks}：默认携带订单查询工具回调。</li>
+     *   <li>{@code defaultAdvisors}：默认携带 {@link QuestionAnswerAdvisor}，
+     *       让所有 ChatClient 调用都自动走 RAG 检索增强。</li>
+     * </ul>
+     *
+     * @param chatModel                 OpenAiChatModel（DeepSeek 兼容），由 starter 自动装配
+     * @param orderToolCallbackProvider 工具回调
+     * @param ragAdvisor                RAG 顾问
+     * @return 配置好默认值的 ChatClient
      */
     @Bean
     public ChatClient chatClient(OpenAiChatModel chatModel, ToolCallbackProvider orderToolCallbackProvider,

@@ -35,6 +35,10 @@ public class ChatHistoryServiceImpl implements ChatHistoryService {
     /** Redis key 前缀 */
     private static final String KEY_PREFIX = "chat:history:";
 
+    /**
+     * 加载会话历史：Redis LRANGE 优先；未命中时经 Feign 回源 ai-cs-message 并重建缓存；
+     * 任意环节失败均降级为空列表，保证对话主流程不中断。
+     */
     @Override
     public List<ChatHistoryMessage> load(String sessionKey) {
         String key = buildKey(sessionKey);
@@ -52,6 +56,10 @@ public class ChatHistoryServiceImpl implements ChatHistoryService {
         return fallbackToMessage(sessionKey, key);
     }
 
+    /**
+     * 追加一条会话消息：双写 Redis 热缓存（RPUSH）+ RocketMQ（最终落库 chat_message 表）。
+     * Redis 写失败不影响 MQ 投递；MQ 投递失败仅打 warn 日志，不抛异常（消息丢失风险由调用方承担）。
+     */
     @Override
     public void append(String sessionKey, String role, String content) {
         String key = buildKey(sessionKey);

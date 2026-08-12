@@ -17,6 +17,10 @@ public interface OrderFeignClient {
 
     /**
      * 查询订单详情
+     *
+     * @param userId  当前登录用户 ID（透传到下游做权限校验）
+     * @param orderNo 订单号
+     * @return 订单详情（包装在统一 Result 中）；下游服务不可用时返回降级 Result
      */
     @GetMapping("/order/{orderNo}")
     Result<OrderVO> getOrderDetail(@RequestHeader("X-User-Id") Long userId,
@@ -24,6 +28,9 @@ public interface OrderFeignClient {
 
     /**
      * 查询用户订单列表
+     *
+     * @param userId 当前登录用户 ID（透传到下游做权限校验，仅查本人订单）
+     * @return 该用户名下所有订单（包装在统一 Result 中）
      */
     @GetMapping("/order/list")
     Result<List<OrderVO>> listOrders(@RequestHeader("X-User-Id") Long userId);

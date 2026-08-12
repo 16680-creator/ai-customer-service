@@ -35,6 +35,27 @@ public class SiliconFlowRerankService implements RerankService {
      */
     private final RestClient.Builder restClientBuilder;
 
+    /**
+     * 异步执行 Rerank 调用，超时/异常时降级返回空 Mono。
+     *
+     * <p>实现要点：</p>
+     * <ul>
+     *   <li>{@code Mono.fromCallable(...)}：把同步阻塞的 HTTP 调用包装成 Mono，
+     *       callable 在订阅时才执行（冷源）。</li>
+     *   <li>{@code .subscribeOn(Schedulers.boundedElastic())}：把阻塞调用调度到弹性线程池执行，
+     *       避免占用 Reactor 主线程；<b>必须</b>显式 subscribeOn，否则 fromCallable 会在调用方线程同步执行，
+     *       导致后续 {@code .timeout()} 计时器要等阻塞调用返回后才启动，超时配置形同虚设。</li>
+     *   <li>{@code .timeout(Duration)}：超过 {@link RerankProperties#getTimeoutMs()} 即抛
+     *       {@code TimeoutException}。</li>
+     *   <li>{@code .onErrorResume(e -> Mono.empty())}：任何异常（超时、网络错误、解析失败）都降级为空 Mono，
+     *       调用方 {@code block()} 得到 {@code null} 后回退为向量相似度排序。</li>
+     * </ul>
+     *
+     * @param query     用户问题
+     * @param documents 第一阶段向量召回的文档列表
+     * @param topN      重排序后返回的条数（实际以配置的 topN/minScore 为准）
+     * @return 按相关度降序的重排序结果；异常/无 API Key 时为 empty（block 得到 null）
+     */
     @Override
     public Mono<List<RerankResultItem>> rerank(String query, List<Document> documents, int topN) {
         // 无 API Key 或无待重排文档时直接降级
@@ -56,6 +77,11 @@ public class SiliconFlowRerankService implements RerankService {
 
     /**
      * 同步调用 Rerank API 并解析结果。
+     *
+     * <p>这里通过 {@code restClientBuilder.clone()} 复用 Spring Boot 自动配置的构建器
+     * （共享消息转换器、拦截器等），再设置本次调用的 baseUrl 与 Authorization 头。
+     * 不直接 {@code new RestClient.Builder()} 是为了保留框架注入的默认能力；
+     * 不复用同一个 builder 实例是为了避免多线程下污染 builder 的状态。</p>
      */
     private List<RerankResultItem> doRerank(String query, List<Document> documents, int topN) {
         RestClient restClient = restClientBuilder.clone()

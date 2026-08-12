@@ -18,6 +18,9 @@ public interface MessageFeignClient {
     /**
      * 按 sessionKey 查询会话消息列表（message 返回 ChatMessage，
      * 用 chat 侧 DTO 反序列化，忽略多余字段）
+     *
+     * @param sessionKey 会话标识（chat 模块的字符串会话 ID）
+     * @return 该会话按时间升序的消息列表（包装在统一 Result 中）；下游异常时降级返回空列表
      */
     @GetMapping("/api/message/session-key/{sessionKey}/messages")
     Result<List<ChatHistoryMessage>> getMessagesBySessionKey(@PathVariable("sessionKey") String sessionKey);
