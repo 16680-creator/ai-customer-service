@@ -33,7 +33,43 @@
               <el-avatar :size="36" :style="{ background: msg.role === 'user' ? '#409eff' : '#67c23a' }">
                 {{ msg.role === 'user' ? '我' : 'AI' }}
               </el-avatar>
-              <div class="msg-bubble">{{ msg.content }}</div>
+              <div class="msg-bubble">
+                <div>{{ msg.content }}</div>
+                <!-- 引用溯源卡片：RAG 回答有 citations 时展示 -->
+                <div v-if="msg.citations && msg.citations.length > 0" class="citation-cards">
+                  <el-divider content-position="left">
+                    <el-tag size="small" type="info" effect="plain">引用来源 {{ msg.citations.length }} 条</el-tag>
+                  </el-divider>
+                  <div class="citation-list">
+                    <el-card
+                      v-for="(cit, ci) in msg.citations"
+                      :key="ci"
+                      shadow="never"
+                      class="citation-card"
+                    >
+                      <div class="citation-header">
+                        <el-icon :size="14"><Document /></el-icon>
+                        <span class="citation-title">{{ cit.title || '未命名文档' }}</span>
+                        <span v-if="cit.page" class="citation-page">P.{{ cit.page }}</span>
+                      </div>
+                      <div v-if="cit.score != null" class="citation-score">
+                        <span class="score-label">相关度</span>
+                        <el-progress
+                          :percentage="Math.round(cit.score * 100)"
+                          :stroke-width="6"
+                          size="small"
+                          :color="cit.score >= 0.7 ? '#67c23a' : cit.score >= 0.5 ? '#e6a23c' : '#f56c6c'"
+                        />
+                      </div>
+                      <div class="citation-content-preview">
+                        <el-text line-clamp="3" size="small" type="info">
+                          {{ cit.content }}
+                        </el-text>
+                      </div>
+                    </el-card>
+                  </div>
+                </div>
+              </div>
             </div>
             <el-empty v-if="messages.length === 0" description="开始和 AI 对话吧" :image-size="120" />
           </div>
@@ -80,7 +116,7 @@
 import { ref, nextTick } from 'vue'
 import { getToken } from '../utils/auth'
 import { ElMessage } from 'element-plus'
-import { Plus, Promotion } from '@element-plus/icons-vue'
+import { Plus, Promotion, Document } from '@element-plus/icons-vue'
 
 const GATEWAY = import.meta.env.VITE_GATEWAY || 'http://localhost:8080'
 
@@ -151,9 +187,16 @@ async function sendMessage() {
           try { obj = JSON.parse(data) } catch { continue }
           if (obj.content) {
             assistant.content += obj.content
+            assistant.citations = assistant.citations || []
             await scrollToBottom()
           }
+          if (obj.citations) {
+            assistant.citations = obj.citations
+          }
           if (obj.error) streamError = obj.error
+          if (obj.done) {
+            // done 事件：保留已累积的 citations（已在 obj.citations 中完整返回）
+          }
         }
       }
     }
@@ -211,4 +254,25 @@ async function scrollToBottom() {
   display: flex; align-items: center; padding: 10px 16px 0;
 }
 .chat-input { display: flex; padding: 16px; border-top: 1px solid #ebeef5; }
+
+/* 引用溯源卡片样式 */
+.citation-cards { margin-top: 12px; }
+.citation-list { display: flex; flex-direction: column; gap: 8px; }
+.citation-card { border: 1px solid #e8e8e8; border-radius: 8px; padding: 0; }
+.citation-card :deep(.el-card__body) { padding: 10px 14px; }
+.citation-header {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 13px; font-weight: 500; color: #303133; margin-bottom: 6px;
+}
+.citation-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.citation-page {
+  font-size: 11px; color: #909399; background: #f4f4f5;
+  padding: 1px 6px; border-radius: 4px; flex-shrink: 0;
+}
+.citation-score { margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.score-label { font-size: 12px; color: #909399; white-space: nowrap; }
+.citation-content-preview {
+  background: #fafafa; border-radius: 4px; padding: 6px 8px;
+  font-size: 12px; line-height: 1.5;
+}
 </style>
