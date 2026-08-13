@@ -69,7 +69,8 @@
 {
   "orderNo": "ORDxxx", "productId": 1001, "quantity": 1,
   "actionType": "EXCHANGE", "reason": "耳机损坏",
-  "runId": "uuid", "idempotencyKey": "uuid:EXCHANGE"
+  "runId": "uuid", "idempotencyKey": "uuid:EXCHANGE",
+  "evidenceSummary": "满足规则 ASR-001（15 天期限内）"
 }
 ```
 

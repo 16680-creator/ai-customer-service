@@ -40,4 +40,8 @@ public class AfterSaleApplyDTO {
     @NotBlank(message = "幂等键不能为空")
     @Size(max = 64, message = "幂等键最长64个字符")
     private String idempotencyKey;
+
+    @Schema(description = "证据/规则引用摘要（Agent 售后规则校验结果）", example = "满足规则 ASR-001（15 天期限内）")
+    @Size(max = 1024, message = "证据摘要最长1024个字符")
+    private String evidenceSummary;
 }

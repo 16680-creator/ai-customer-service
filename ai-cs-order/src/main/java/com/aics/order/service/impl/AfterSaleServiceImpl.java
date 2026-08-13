@@ -81,6 +81,7 @@ public class AfterSaleServiceImpl implements AfterSaleService {
         application.setQuantity(dto.getQuantity());
         application.setActionType(actionType.getCode());
         application.setReason(dto.getReason());
+        application.setEvidenceSummary(dto.getEvidenceSummary());
         application.setStatus(AfterSaleStatus.PENDING.getCode());
 
         int rows = afterSaleApplicationMapper.insert(application);

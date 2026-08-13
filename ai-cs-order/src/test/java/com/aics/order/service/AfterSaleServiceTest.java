@@ -72,6 +72,7 @@ class AfterSaleServiceTest {
         dto.setReason("耳机无法开机");
         dto.setRunId("run-001");
         dto.setIdempotencyKey("run-001-EXCHANGE");
+        dto.setEvidenceSummary("满足规则 ASR-001（15 天期限内）");
         return dto;
     }
 
@@ -207,6 +208,7 @@ class AfterSaleServiceTest {
         assertEquals("run-001", saved.getRunId());
         assertEquals(1001L, saved.getProductId());
         assertEquals("无线蓝牙耳机", saved.getProductName());
+        assertEquals("满足规则 ASR-001（15 天期限内）", saved.getEvidenceSummary());
     }
 
     @Test
