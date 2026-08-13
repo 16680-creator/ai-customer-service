@@ -26,9 +26,6 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @ConditionalOnProperty(name = "aics.ai.embedding.provider", havingValue = "openai")
 public class OpenAiEmbeddingConfig {
-@Configuration
-@ConditionalOnProperty(name = "aics.ai.embedding.provider", havingValue = "openai")
-public class OpenAiEmbeddingConfig {
 
     @Value("${spring.ai.openai.base-url:https://api.openai.com}")
     private String baseUrl;
