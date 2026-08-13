@@ -35,3 +35,5 @@
 | LLM 输出不稳定导致测试 flaky | 意图/情绪/总结全部有规则兜底路径；核心状态机与编排为确定性代码，单测不依赖 LLM |
 | 跨服务联调环境不完整 | 各模块契约先行（contracts/rest-api.md），单测 Mock Feign；全量构建验证编译与测试 |
 | 状态机与确认遗漏场景 | 状态迁移表集中管理 + 覆盖测试（含非法迁移拒绝） |
+| message/notify 用户隔离不足（裸 query userId，未读 X-User-Id） | 本轮：订单侧强校验 X-User-Id + 归属校验（覆盖 100%），轨迹/通知为内部 Feign 调用暂不隔离；后续安全迭代（3.2 安全网关）对齐 X-User-Id 透传 |
+| chat_session 转人工状态位未更新 | MVP 决策：转人工由 handoff_ticket 工单 + 通知事件承载，不改 chat_session 状态位（避免破坏现有 RocketMQ 消息链路）；坐席工作台迭代再接入 |
