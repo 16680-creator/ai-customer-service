@@ -8,6 +8,7 @@ import com.aics.product.entity.Product;
 import com.aics.product.entity.ProductCategory;
 import com.aics.product.mapper.ProductCategoryMapper;
 import com.aics.product.mapper.ProductMapper;
+import com.aics.product.service.ImageDescriptionService;
 import com.aics.product.service.ProductService;
 import com.aics.product.vo.ProductVO;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -34,6 +35,7 @@ public class ProductServiceImpl implements ProductService {
     private final ProductCategoryMapper categoryMapper;
     private final StringRedisTemplate stringRedisTemplate;
     private final ProductVectorService productVectorService;
+    private final ImageDescriptionService imageDescriptionService;
 
     @Override
     public ProductVO createProduct(ProductCreateDTO dto) {
@@ -57,6 +59,8 @@ public class ProductServiceImpl implements ProductService {
         product.setStock(dto.getStock());
         product.setCategoryId(dto.getCategoryId());
         product.setImage(dto.getImage());
+        // 图片非空时生成视觉描述并落库，供向量检索复用
+        fillImageDescription(product);
         product.setStatus(1);
         product.setSales(0);
         productMapper.insert(product);
@@ -131,6 +135,8 @@ public class ProductServiceImpl implements ProductService {
         }
         if (dto.getImage() != null) {
             product.setImage(dto.getImage());
+            // 图片变更时重新生成视觉描述
+            fillImageDescription(product);
         }
         if (dto.getStatus() != null) {
             product.setStatus(dto.getStatus());
@@ -154,6 +160,23 @@ public class ProductServiceImpl implements ProductService {
         // 删除商品向量索引
         productVectorService.removeProduct(id);
         log.info("商品删除成功: id={}", id);
+    }
+
+    /**
+     * 生成商品图片视觉描述并落库（视觉不可用或失败时保持为空，不阻断商品主流程）。
+     */
+    private void fillImageDescription(Product product) {
+        if (!StringUtils.hasText(product.getImage())) {
+            return;
+        }
+        try {
+            String description = imageDescriptionService.describe(product.getImage());
+            if (StringUtils.hasText(description)) {
+                product.setImageDescription(description);
+            }
+        } catch (Exception e) {
+            log.warn("商品图片描述生成失败: id={}, err={}", product.getId(), e.getMessage());
+        }
     }
 
     @Override

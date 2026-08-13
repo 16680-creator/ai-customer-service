@@ -28,6 +28,9 @@ public class Product {
 
     private String image;
 
+    /** 视觉模型生成的图片描述（用于增强向量检索，落库一次多处复用） */
+    private String imageDescription;
+
     /** 状态：0-下架 1-上架 */
     private Integer status;
 

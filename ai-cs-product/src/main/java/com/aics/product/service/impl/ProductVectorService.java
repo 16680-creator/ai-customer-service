@@ -116,7 +116,11 @@ public class ProductVectorService {
             sb.append(" ").append(product.getDescription());
         }
         if (StringUtils.hasText(product.getImage())) {
-            String imageDescription = imageDescriptionService.describe(product.getImage());
+            // 优先用落库的图片描述；未落库时（旧数据）实时调用视觉模型兜底
+            String imageDescription = product.getImageDescription();
+            if (!StringUtils.hasText(imageDescription)) {
+                imageDescription = imageDescriptionService.describe(product.getImage());
+            }
             if (StringUtils.hasText(imageDescription)) {
                 sb.append(" ").append(imageDescription);
             }
