@@ -67,3 +67,22 @@ CREATE TABLE IF NOT EXISTS full_reduction_rule (
     enabled BOOLEAN DEFAULT TRUE,
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 售后申请表（结构对齐 deploy/mysql/after-sales-agent-init.sql，去除 MySQL 专有语法）
+CREATE TABLE IF NOT EXISTS after_sale_application (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    application_no VARCHAR(32) NOT NULL UNIQUE,
+    run_id VARCHAR(64),
+    idempotency_key VARCHAR(64) NOT NULL UNIQUE,
+    user_id BIGINT NOT NULL,
+    order_no VARCHAR(32) NOT NULL,
+    product_id BIGINT,
+    product_name VARCHAR(200),
+    quantity INT NOT NULL DEFAULT 1,
+    action_type VARCHAR(20) NOT NULL,
+    reason VARCHAR(512),
+    evidence_summary VARCHAR(1024),
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
