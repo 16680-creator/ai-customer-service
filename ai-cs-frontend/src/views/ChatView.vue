@@ -37,6 +37,7 @@
                 {{ msg.role === 'user' ? '我' : 'AI' }}
               </el-avatar>
               <div class="msg-bubble">
+                <img v-if="msg.imageUrl" :src="msg.imageUrl" class="msg-image" alt="图片" />
                 <div>{{ msg.content }}</div>
                 <!-- 引用溯源卡片：RAG 回答有 citations 时展示 -->
                 <div v-if="msg.citations && msg.citations.length > 0" class="citation-cards">
@@ -105,6 +106,16 @@
               type="textarea"
               @keydown.enter.exact.prevent="sendMessage"
             />
+            <el-upload
+              :show-file-list="false"
+              :auto-upload="false"
+              :on-change="handleImageChange"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              style="margin-left: 10px"
+            >
+              <el-button :icon="Picture" :disabled="sending" title="上传图片" style="height: 54px" />
+            </el-upload>
+            <el-button v-if="uploadedImageUrl" type="warning" :icon="Delete" @click="clearImage" title="移除图片" style="margin-left: 6px; height: 54px" />
             <el-button type="primary" @click="sendMessage" :loading="sending" :icon="Promotion" style="margin-left: 10px; height: 54px">
               发送
             </el-button>
@@ -118,9 +129,9 @@
 <script setup>
 import { ref, watch, nextTick } from 'vue'
 import { getToken, getUser } from '../utils/auth'
-import { chatApi, messageApi } from '../api'
+import { chatApi, messageApi, visionApi } from '../api'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Promotion, Document, Delete } from '@element-plus/icons-vue'
+import { Plus, Promotion, Document, Delete, Picture } from '@element-plus/icons-vue'
 
 const GATEWAY = import.meta.env.VITE_GATEWAY || 'http://localhost:8080'
 
@@ -141,6 +152,8 @@ const sending = ref(false)
 const messagesRef = ref(null)
 const chatMode = ref('normal')
 const knowledgeBase = ref('')
+// 已上传的图片 URL（多模态图生文，非空时走 /chat/vision/sse）
+const uploadedImageUrl = ref('')
 
 // 将当前显示切换到指定会话的消息数组
 function switchToMessages(sessionId) {
@@ -271,18 +284,44 @@ watch(currentSession, (newId) => {
 // 页面初始化
 initApp()
 
+// 上传图片：调 /chat/upload-image 拿到 MinIO URL，暂存待发送
+async function handleImageChange(uploadFile) {
+  const file = uploadFile?.raw
+  if (!file) return
+  try {
+    const resp = await visionApi.uploadImage(file)
+    if (resp.data && resp.data.code === 200 && resp.data.data) {
+      uploadedImageUrl.value = resp.data.data
+      ElMessage.success('图片已上传')
+    } else {
+      ElMessage.error(resp.data?.message || '图片上传失败')
+    }
+  } catch (e) {
+    ElMessage.error('图片上传失败: ' + (e.message || ''))
+  }
+}
+
+// 移除已上传的图片
+function clearImage() {
+  uploadedImageUrl.value = ''
+}
+
 // 真正的流式对话（SSE）：fetch + ReadableStream 解析，逐 token 追加（打字机效果）
+// 支持图片：携带 imageUrl 时走 /chat/vision/sse（多模态图生文）
 async function sendMessage() {
   const text = inputMessage.value.trim()
-  if (!text) return
+  const imageUrl = uploadedImageUrl.value
+  // 图片对话允许只有图片无文字；纯文本对话必须有文字
+  if (!text && !imageUrl) return
   // 流式输出期间禁止重复发送（按钮 loading 挡不住 Enter 键，需显式防重入）
   if (sending.value) return
   if (chatMode.value === 'rag' && !knowledgeBase.value.trim()) {
     return ElMessage.warning('RAG 模式请先填写知识库标识')
   }
 
-  currentMessages.value.push({ role: 'user', content: text })
+  currentMessages.value.push({ role: 'user', content: text || '(图片)', imageUrl: imageUrl || null })
   inputMessage.value = ''
+  uploadedImageUrl.value = ''
   sending.value = true
   await scrollToBottom()
 
@@ -293,9 +332,12 @@ async function sendMessage() {
 
   try {
     const params = new URLSearchParams({ sessionId: currentSession.value, message: text })
+    if (imageUrl) params.set('imageUrl', imageUrl)
     if (chatMode.value === 'rag') params.set('knowledgeBase', knowledgeBase.value.trim())
 
-    const resp = await fetch(`${GATEWAY}/api/chat/stream/sse?${params}`, {
+    // 有图片走图片对话 SSE，无图片走普通 SSE
+    const endpoint = imageUrl ? 'vision/sse' : 'stream/sse'
+    const resp = await fetch(`${GATEWAY}/api/chat/${endpoint}?${params}`, {
       method: 'POST',
       headers: { Authorization: 'Bearer ' + (getToken() || '') }
     })
@@ -395,6 +437,10 @@ async function scrollToBottom() {
 }
 .msg-row.user .msg-bubble { background: #409eff; color: #fff; border-top-right-radius: 4px; }
 .msg-row.assistant .msg-bubble { background: #f0f2f5; color: #1d1e2c; border-top-left-radius: 4px; }
+.msg-image {
+  max-width: 200px; max-height: 200px; border-radius: 8px;
+  display: block; margin-bottom: 8px; object-fit: cover;
+}
 
 .chat-mode-bar {
   display: flex; align-items: center; padding: 10px 16px 0;

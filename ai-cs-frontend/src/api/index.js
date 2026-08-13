@@ -98,4 +98,14 @@ export const graphApi = {
     ragApi.get('/graph/query', { params: { entity, depth, knowledgeBase } }),
 }
 
+// ===== 多模态图生文（004-vlm-multimodal）=====
+export const visionApi = {
+  /** 上传图片（返回 MinIO 图片 URL） */
+  uploadImage: (file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return chatApi.post('/upload-image', formData)
+  },
+}
+
 export default SERVICES
