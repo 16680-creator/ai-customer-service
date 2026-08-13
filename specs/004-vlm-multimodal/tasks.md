@@ -26,9 +26,9 @@
 
 **目的**：配置与数据模型基础
 
-- [ ] T001 [P] 新增视觉配置属性类 `VisionProperties`（`@ConfigurationProperties(prefix="aics.vision")`，字段 baseUrl/apiKey/model/enabled/timeout/allowedImageHost）在 `ai-cs-chat/src/main/java/com/aics/chat/config/VisionProperties.java`
-- [ ] T002 [P] 新增 SQL 迁移文件（product 表幂等加 `image_description VARCHAR(1024) NULL` 列）在 `deploy/mysql/vlm-multimodal-init.sql`
-- [ ] T003 在 `ai-cs-chat/src/main/resources/application.yml` 补充 `aics.vision.*` 配置项注释与默认值（base-url/api-key/model/enabled/timeout/allowed-image-host）
+- [X] T001 [P] 新增视觉配置属性类 `VisionProperties`（`@ConfigurationProperties(prefix="aics.vision")`，字段 baseUrl/apiKey/model/enabled/timeout/allowedImageHost）在 `ai-cs-chat/src/main/java/com/aics/chat/config/VisionProperties.java`
+- [X] T002 [P] 新增 SQL 迁移文件（product 表幂等加 `image_description VARCHAR(1024) NULL` 列）在 `deploy/mysql/vlm-multimodal-init.sql`
+- [X] T003 在 `ai-cs-chat/src/main/resources/application.yml` 补充 `aics.vision.*` 配置项注释与默认值（base-url/api-key/model/enabled/timeout/allowed-image-host）
 
 ---
 
@@ -38,13 +38,13 @@
 
 **⚠️ 关键**：此阶段完成前，不得开始任何用户故事的工作
 
-- [ ] T004 在 `SpringAiConfig.java` 手动装配视觉模型 Bean `visionChatModel`（`OpenAiChatModel`，`@Qualifier("visionChatModel")`，读 aics.vision.*），并 `@EnableConfigurationProperties(VisionProperties.class)` 在 `ai-cs-chat/src/main/java/com/aics/chat/config/SpringAiConfig.java`
-- [ ] T005 [P] 新增图片对话请求 DTO `VisionChatRequest`（sessionId/imageUrl/message/hybrid/rewrite）在 `ai-cs-chat/src/main/java/com/aics/chat/dto/VisionChatRequest.java`
-- [ ] T006 [P] 新增图片对话响应 DTO `VisionChatResponse`（answer/citations/imageDescription/degraded）在 `ai-cs-chat/src/main/java/com/aics/chat/dto/VisionChatResponse.java`
-- [ ] T007 [P] 新增图片 URL 安全校验器 `ImageUrlValidator`（SSRF 白名单 + http/https + 格式校验）在 `ai-cs-chat/src/main/java/com/aics/chat/util/ImageUrlValidator.java`
-- [ ] T008 [P] 在 `ResultCode` 枚举新增图片相关错误码（`VISION_SERVICE_UNAVAILABLE`、`IMAGE_URL_INVALID`）在 `ai-cs-common/src/main/java/com/aics/common/result/ResultCode.java`
-- [ ] T009 在 `Resilience4jConfig` 与 `application.yml` 新增视觉调用弹性配置（`visionService` timeLimiter/retry 实例，超时 5s）在 `ai-cs-chat/src/main/java/com/aics/chat/config/Resilience4jConfig.java`
-- [ ] T010 编写基础层单元测试：`VisionPropertiesTest`（配置绑定默认值）、`ImageUrlValidatorTest`（白名单命中/非法 URL/非 http 拒绝），运行确认 Red→Green 在 `ai-cs-chat/src/test/java/com/aics/chat/config/VisionPropertiesTest.java`、`ai-cs-chat/src/test/java/com/aics/chat/util/ImageUrlValidatorTest.java`
+- [X] T004 在 `SpringAiConfig.java` 手动装配视觉模型 Bean `visionChatModel`（`OpenAiChatModel`，`@Qualifier("visionChatModel")`，读 aics.vision.*），并 `@EnableConfigurationProperties(VisionProperties.class)` 在 `ai-cs-chat/src/main/java/com/aics/chat/config/SpringAiConfig.java`
+- [X] T005 [P] 新增图片对话请求 DTO `VisionChatRequest`（sessionId/imageUrl/message/hybrid/rewrite）在 `ai-cs-chat/src/main/java/com/aics/chat/dto/VisionChatRequest.java`
+- [X] T006 [P] 新增图片对话响应 DTO `VisionChatResponse`（answer/citations/imageDescription/degraded）在 `ai-cs-chat/src/main/java/com/aics/chat/dto/VisionChatResponse.java`
+- [X] T007 [P] 新增图片 URL 安全校验器 `ImageUrlValidator`（SSRF 白名单 + http/https + 格式校验）在 `ai-cs-chat/src/main/java/com/aics/chat/util/ImageUrlValidator.java`
+- [X] T008 [P] 在 `ResultCode` 枚举新增图片相关错误码（`VISION_SERVICE_UNAVAILABLE`、`IMAGE_URL_INVALID`）在 `ai-cs-common/src/main/java/com/aics/common/result/ResultCode.java`
+- [X] T009 在 `Resilience4jConfig` 与 `application.yml` 新增视觉调用弹性配置（`visionService` timeLimiter/retry 实例，超时 5s）在 `ai-cs-chat/src/main/java/com/aics/chat/config/Resilience4jConfig.java`
+- [X] T010 编写基础层单元测试：`VisionPropertiesTest`（配置绑定默认值）、`ImageUrlValidatorTest`（白名单命中/非法 URL/非 http 拒绝），运行确认 Red→Green 在 `ai-cs-chat/src/test/java/com/aics/chat/config/VisionPropertiesTest.java`、`ai-cs-chat/src/test/java/com/aics/chat/util/ImageUrlValidatorTest.java`
 
 **检查点**：基础层就绪 - 可以开始并行实施用户故事
 
@@ -60,18 +60,18 @@
 
 > **注意：先编写这些测试，确保它们在实施前失败**
 
-- [ ] T011 [P] [US1] 编写 `VisionChatServiceImplTest`：Mock 视觉模型返回固定描述，校验两段式编排（视觉理解 → RAG 检索 → LLM 回答）与引用溯源在 `ai-cs-chat/src/test/java/com/aics/chat/service/VisionChatServiceImplTest.java`
-- [ ] T012 [P] [US1] 编写 `ChatControllerVisionTest`：`/chat/vision` 参数校验（imageUrl 空/非法）与返回结构在 `ai-cs-chat/src/test/java/com/aics/chat/controller/ChatControllerVisionTest.java`
+- [X] T011 [P] [US1] 编写 `VisionChatServiceImplTest`：Mock 视觉模型返回固定描述，校验两段式编排（视觉理解 → RAG 检索 → LLM 回答）与引用溯源在 `ai-cs-chat/src/test/java/com/aics/chat/service/VisionChatServiceImplTest.java`
+- [X] T012 [P] [US1] 编写 `ChatControllerVisionTest`：`/chat/vision` 参数校验（imageUrl 空/非法）与返回结构在 `ai-cs-chat/src/test/java/com/aics/chat/controller/ChatControllerVisionTest.java`
 
 ### 用户故事 1 的实施
 
-- [ ] T013 [US1] 实现 `VisionChatService` 接口（chatWithVision / chatWithVisionSse）在 `ai-cs-chat/src/main/java/com/aics/chat/service/VisionChatService.java`
-- [ ] T014 [US1] 实现 `VisionChatServiceImpl`：视觉理解（visionChatModel + Media 多模态消息）→ 描述文本走 RAG 检索 → DeepSeek 生成回答，复用现有 `ResilientAiService` 在 `ai-cs-chat/src/main/java/com/aics/chat/service/impl/VisionChatServiceImpl.java`（依赖 T011）
-- [ ] T015 [US1] `ChatController` 新增 `/chat/upload-image`（复用 `FileStorageService`，目录 `chat/images`，校验格式/大小）在 `ai-cs-chat/src/main/java/com/aics/chat/controller/ChatController.java`
-- [ ] T016 [US1] `ChatController` 新增 `/chat/vision`（图片对话，含 imageUrl 白名单校验）在 `ai-cs-chat/src/main/java/com/aics/chat/controller/ChatController.java`
-- [ ] T017 [US1] `ChatController` 新增 `/chat/vision/sse`（SSE 逐 token 推送）在 `ai-cs-chat/src/main/java/com/aics/chat/controller/ChatController.java`
-- [ ] T018 [P] [US1] 前端 `ChatView.vue` 新增图片上传按钮 + 消息气泡图片渲染，`api/index.js` 新增 upload-image/vision/vision-sse 接口封装在 `ai-cs-frontend/src/views/ChatView.vue`、`ai-cs-frontend/src/api/index.js`
-- [ ] T019 [US1] 运行本故事全部测试与覆盖率校验，验证 Red → Green → Refactor 完成
+- [X] T013 [US1] 实现 `VisionChatService` 接口（chatWithVision / chatWithVisionSse）在 `ai-cs-chat/src/main/java/com/aics/chat/service/VisionChatService.java`
+- [X] T014 [US1] 实现 `VisionChatServiceImpl`：视觉理解（visionChatModel + Media 多模态消息）→ 描述文本走 RAG 检索 → DeepSeek 生成回答，复用现有 `ResilientAiService` 在 `ai-cs-chat/src/main/java/com/aics/chat/service/impl/VisionChatServiceImpl.java`（依赖 T011）
+- [X] T015 [US1] `ChatController` 新增 `/chat/upload-image`（复用 `FileStorageService`，目录 `chat/images`，校验格式/大小）在 `ai-cs-chat/src/main/java/com/aics/chat/controller/ChatController.java`
+- [X] T016 [US1] `ChatController` 新增 `/chat/vision`（图片对话，含 imageUrl 白名单校验）在 `ai-cs-chat/src/main/java/com/aics/chat/controller/ChatController.java`
+- [X] T017 [US1] `ChatController` 新增 `/chat/vision/sse`（SSE 逐 token 推送）在 `ai-cs-chat/src/main/java/com/aics/chat/controller/ChatController.java`
+- [X] T018 [P] [US1] 前端 `ChatView.vue` 新增图片上传按钮 + 消息气泡图片渲染，`api/index.js` 新增 upload-image/vision/vision-sse 接口封装在 `ai-cs-frontend/src/views/ChatView.vue`、`ai-cs-frontend/src/api/index.js`
+- [X] T019 [US1] 运行本故事全部测试与覆盖率校验，验证 Red → Green → Refactor 完成
 
 **检查点**：此时用户故事 1 应完全可用并可独立测试（图片 → 看图 → 回答）
 
@@ -85,14 +85,14 @@
 
 ### 用户故事 2 的测试（必选 - TDD Red 阶段）⚠️
 
-- [ ] T020 [P] [US2] 补充降级分支测试：Mock 视觉模型抛异常 → 有文字走纯文本（degraded=true）/ 仅图片返回 `VISION_SERVICE_UNAVAILABLE` 在 `ai-cs-chat/src/test/java/com/aics/chat/service/VisionChatServiceImplTest.java`
-- [ ] T021 [P] [US2] 编写存量回归测试：普通文本对话 `/chat/send`、`/chat/rag` 行为与视觉能力上线前一致在 `ai-cs-chat/src/test/java/com/aics/chat/controller/ChatControllerTest.java`（或复用已有测试类）
+- [X] T020 [P] [US2] 补充降级分支测试：Mock 视觉模型抛异常 → 有文字走纯文本（degraded=true）/ 仅图片返回 `VISION_SERVICE_UNAVAILABLE` 在 `ai-cs-chat/src/test/java/com/aics/chat/service/VisionChatServiceImplTest.java`
+- [X] T021 [P] [US2] 编写存量回归测试：普通文本对话 `/chat/send`、`/chat/rag` 行为与视觉能力上线前一致在 `ai-cs-chat/src/test/java/com/aics/chat/controller/ChatControllerTest.java`（或复用已有测试类）
 
 ### 用户故事 2 的实施
 
-- [ ] T022 [US2] 在 `VisionChatServiceImpl` 完善降级逻辑（视觉不可用 → degraded=true 纯文本 / 仅图片明确错误码，不抛 5xx）
-- [ ] T023 [US2] 图片对话接入 Hybrid/改写参数透传（hybrid/rewrite 布尔参数控制检索模式）
-- [ ] T024 [US2] 运行本故事全部测试与覆盖率校验，验证 Red → Green → Refactor 完成
+- [X] T022 [US2] 在 `VisionChatServiceImpl` 完善降级逻辑（视觉不可用 → degraded=true 纯文本 / 仅图片明确错误码，不抛 5xx）
+- [X] T023 [US2] 图片对话接入 Hybrid/改写参数透传（hybrid/rewrite 布尔参数控制检索模式）
+- [X] T024 [US2] 运行本故事全部测试与覆盖率校验，验证 Red → Green → Refactor 完成
 
 **检查点**：此时用户故事 1 和 2 均应可独立运行
 
@@ -106,14 +106,14 @@
 
 ### 用户故事 3 的测试（必选 - TDD Red 阶段）⚠️
 
-- [ ] T025 [P] [US3] 编写 `SiliconFlowImageDescriptionServiceTest`：Mock 视觉模型 → 成功返回描述 / 失败返回 null在 `ai-cs-product/src/test/java/com/aics/product/service/SiliconFlowImageDescriptionServiceTest.java`
+- [X] T025 [P] [US3] 编写 `SiliconFlowImageDescriptionServiceTest`：Mock 视觉模型 → 成功返回描述 / 失败返回 null在 `ai-cs-product/src/test/java/com/aics/product/service/SiliconFlowImageDescriptionServiceTest.java`
 
 ### 用户故事 3 的实施
 
-- [ ] T026 [US3] 在 product 服务装配视觉模型 Bean（复用 Nacos `aics.vision.*` 配置，`@Qualifier("visionChatModel")`）在 `ai-cs-product/src/main/java/com/aics/product/config/VisionConfig.java`
-- [ ] T027 [US3] 实现 `SiliconFlowImageDescriptionService` 替换 `NoopImageDescriptionService`（`describe(imageUrl)` 调视觉模型，失败返回 null）在 `ai-cs-product/src/main/java/com/aics/product/service/impl/SiliconFlowImageDescriptionService.java`
-- [ ] T028 [US3] product 实体/Mapper 新增 `imageDescription` 字段映射，商品创建/更新触发描述生成并落库在 `ai-cs-product/src/main/java/com/aics/product/entity/Product.java`、对应 Mapper XML
-- [ ] T029 [US3] 运行本故事全部测试与覆盖率校验，验证 Red → Green → Refactor 完成
+- [X] T026 [US3] 在 product 服务装配视觉模型 Bean（复用 Nacos `aics.vision.*` 配置，`@Qualifier("visionChatModel")`）在 `ai-cs-product/src/main/java/com/aics/product/config/VisionConfig.java`
+- [X] T027 [US3] 实现 `SiliconFlowImageDescriptionService` 替换 `NoopImageDescriptionService`（`describe(imageUrl)` 调视觉模型，失败返回 null）在 `ai-cs-product/src/main/java/com/aics/product/service/impl/SiliconFlowImageDescriptionService.java`
+- [X] T028 [US3] product 实体/Mapper 新增 `imageDescription` 字段映射，商品创建/更新触发描述生成并落库在 `ai-cs-product/src/main/java/com/aics/product/entity/Product.java`、对应 Mapper XML
+- [X] T029 [US3] 运行本故事全部测试与覆盖率校验，验证 Red → Green → Refactor 完成
 
 **检查点**：所有用户故事此时应均可独立运行
 
@@ -123,10 +123,10 @@
 
 **目的**：影响多个用户故事的改进
 
-- [ ] T030 [P] 安全加固：视觉结果 PII 脱敏（手机号/身份证）+ 敏感词过滤在 `ai-cs-chat/src/main/java/com/aics/chat/util/`
-- [ ] T031 [P] 补充单元测试并确认覆盖率达到宪法第2-1条阈值（行 ≥40%、分支 ≥30%）
-- [ ] T032 运行 quickstart.md 验证路径（编译 + 上传/图片对话/SSE/商品图描述接口）
-- [ ] T033 [P] 核对 spec/plan 附录代码位置与实际实现一致
+- [X] T030 [P] 安全加固：视觉结果 PII 脱敏（手机号/身份证）+ 敏感词过滤在 `ai-cs-chat/src/main/java/com/aics/chat/util/`
+- [X] T031 [P] 补充单元测试并确认覆盖率达到宪法第2-1条阈值（行 ≥40%、分支 ≥30%）
+- [X] T032 运行 quickstart.md 验证路径（编译 + 上传/图片对话/SSE/商品图描述接口）
+- [X] T033 [P] 核对 spec/plan 附录代码位置与实际实现一致
 
 ---
 
