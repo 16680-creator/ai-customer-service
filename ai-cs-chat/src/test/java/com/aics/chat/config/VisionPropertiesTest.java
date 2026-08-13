@@ -16,7 +16,7 @@ class VisionPropertiesTest {
     void defaultValues() {
         VisionProperties p = new VisionProperties();
         assertEquals("https://api.siliconflow.cn", p.getBaseUrl());
-        assertEquals("Qwen/Qwen2.5-VL-72B-Instruct", p.getModel());
+        assertEquals("Qwen/Qwen3-VL-32B-Instruct", p.getModel());
         assertTrue(p.isEnabled());
         assertEquals("", p.getApiKey());
         assertEquals("", p.getAllowedImageHost());
