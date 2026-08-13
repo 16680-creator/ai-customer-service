@@ -43,6 +43,18 @@ public enum ResultCode {
     CHAT_VISION_SERVICE_UNAVAILABLE(3005, "视觉服务暂不可用，无法识别图片"),
     CHAT_IMAGE_URL_INVALID(3006, "图片地址无效或不允许访问"),
 
+    // ==================== Agent 编排 31xx ====================
+    AGENT_SAFETY_BLOCKED(3101, "输入安全检查拦截，无法执行"),
+    AGENT_INTENT_LOW_CONFIDENCE(3102, "意图置信度不足，无法路由"),
+    AGENT_RUN_NOT_FOUND(3103, "Agent 执行记录不存在"),
+    AGENT_CONFIRMATION_INVALID(3104, "确认凭证无效或与操作不匹配"),
+    AGENT_CONFIRMATION_EXPIRED(3105, "确认已超时，请重新发起操作"),
+    AGENT_MAX_STEPS_EXCEEDED(3106, "Agent 执行超出最大步骤数，已中止"),
+    AGENT_TIMEOUT(3107, "Agent 执行超时，已中止"),
+    AGENT_WRITE_OP_NOT_CONFIRMED(3108, "高风险写操作未经用户确认，已拒绝执行"),
+    AGENT_HANDOFF_CREATE_FAIL(3109, "转人工工单创建失败"),
+    AGENT_ORDER_LOCATE_FAIL(3110, "无法定位当前用户的订单"),
+
     // ==================== 搜索模块 4xxx ====================
     SEARCH_INDEX_NOT_FOUND(4001, "搜索索引不存在"),
     SEARCH_QUERY_FAIL(4002, "搜索查询失败"),
@@ -64,6 +76,13 @@ public enum ResultCode {
     ORDER_PAYMENT_METHOD_INVALID(7005, "支付方式无效"),
     ORDER_CART_EMPTY(7006, "购物车为空或未选择商品"),
     ORDER_PAY_AMOUNT_MISMATCH(7007, "支付金额与订单金额不一致"),
+
+    // ==================== 售后模块 71xx ====================
+    AFTER_SALE_NOT_ELIGIBLE(7101, "订单不满足售后条件"),
+    AFTER_SALE_APPLICATION_EXISTS(7102, "该订单已存在进行中的售后申请"),
+    AFTER_SALE_CREATE_FAIL(7103, "售后申请创建失败"),
+    AFTER_SALE_APPLICATION_NOT_FOUND(7104, "售后申请不存在"),
+    AFTER_SALE_ACTION_INVALID(7105, "售后动作类型无效"),
 
     // ==================== 商品模块 8xxx ====================
     PRODUCT_NOT_FOUND(8001, "商品不存在"),
