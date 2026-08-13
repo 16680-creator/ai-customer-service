@@ -21,6 +21,61 @@ import java.util.List;
  * <p>调用 {@code POST {baseUrl}/v1/rerank}，模型默认 {@code BAAI/bge-reranker-v2-m3}。
  * 任何异常（超时、网络错误、无 API Key）都会降级：返回空 Mono，
  * 调用方 {@code block()} 得到 {@code null} 后回退为向量相似度排序。</p>
+ *
+ * <h3>【AI 技术详解】Rerank（重排序）原理</h3>
+ * <ul>
+ *   <li><b>为什么需要 Rerank</b>：
+ *       <ul>
+ *         <li><b>向量检索的局限</b>：余弦相似度是"粗排"，速度快但精度一般</li>
+ *         <li><b>Rerank 的优势</b>：交叉编码器（Cross-Encoder）精排，更准但更慢</li>
+ *         <li><b>两阶段策略</b>：先粗后精，兼顾性能与精度</li>
+ *       </ul>
+ *   </li>
+ *   <li><b>Rerank 模型原理</b>：
+ *       <ul>
+ *         <li><b>双塔模型（Bi-Encoder）</b>：向量检索用的模型，文档和查询分别编码，
+ *             计算余弦相似度。速度快但无法捕捉文档与查询的交互关系</li>
+ *         <li><b>交叉编码器（Cross-Encoder）</b>：Rerank 用的模型，将查询和文档拼接后一起编码，
+ *             能捕捉更细粒度的语义关系。精度高但速度慢</li>
+ *         <li><b>bge-reranker-v2-m3</b>：BAAI 开源的 Rerank 模型，支持多语言</li>
+ *       </ul>
+ *   </li>
+ *   <li><b>两阶段检索流程</b>：
+ *       <ol>
+ *         <li>第一阶段：向量检索 Top-20（宽召回，速度快）</li>
+ *         <li>第二阶段：Rerank 精排 Top-5（精度高，速度慢）</li>
+ *         <li>最终返回最相关的 5 个文档片段</li>
+ *       </ol>
+ *   </li>
+ * </ul>
+ *
+ * <h3>【AI 技术详解】Rerank 与 Embedding 的区别</h3>
+ * <ul>
+ *   <li><b>Embedding（向量化）</b>：
+ *       <ul>
+ *         <li>用途：将文本转为向量，用于相似度检索</li>
+ *         <li>模型：Bi-Encoder（双塔），文档和查询分别编码</li>
+ *         <li>速度：快（向量可预计算，检索时只算余弦相似度）</li>
+ *         <li>精度：一般（无法捕捉文档与查询的交互关系）</li>
+ *       </ul>
+ *   </li>
+ *   <li><b>Rerank（重排序）</b>：
+ *       <ul>
+ *         <li>用途：对检索结果精排，提升相关性</li>
+ *         <li>模型：Cross-Encoder（交叉编码器），查询和文档一起编码</li>
+ *         <li>速度：慢（每次都要重新计算）</li>
+ *         <li>精度：高（能捕捉更细粒度的语义关系）</li>
+ *       </ul>
+ *   </li>
+ * </ul>
+ *
+ * <h3>【技术关联】与 KnowledgeBaseService 的协作</h3>
+ * <pre>
+ *   KnowledgeBaseService.search()
+ *       ├── 第一阶段：VectorStore.similaritySearch() → Top-20 宽召回
+ *       ├── 第二阶段：RerankService.rerank() → Top-5 精排
+ *       └── 降级：Rerank 失败时回退为向量相似度排序
+ * </pre>
  */
 @Slf4j
 @Service
@@ -36,19 +91,23 @@ public class SiliconFlowRerankService implements RerankService {
     private final RestClient.Builder restClientBuilder;
 
     /**
-     * 异步执行 Rerank 调用，超时/异常时降级返回空 Mono。
+     * 【AI 核心】异步执行 Rerank 调用，超时/异常时降级返回空 Mono。
      *
-     * <p>实现要点：</p>
+     * <p><b>【AI 技术详解】Reactor 响应式编程</b>：
      * <ul>
-     *   <li>{@code Mono.fromCallable(...)}：把同步阻塞的 HTTP 调用包装成 Mono，
-     *       callable 在订阅时才执行（冷源）。</li>
-     *   <li>{@code .subscribeOn(Schedulers.boundedElastic())}：把阻塞调用调度到弹性线程池执行，
-     *       避免占用 Reactor 主线程；<b>必须</b>显式 subscribeOn，否则 fromCallable 会在调用方线程同步执行，
-     *       导致后续 {@code .timeout()} 计时器要等阻塞调用返回后才启动，超时配置形同虚设。</li>
-     *   <li>{@code .timeout(Duration)}：超过 {@link RerankProperties#getTimeoutMs()} 即抛
-     *       {@code TimeoutException}。</li>
-     *   <li>{@code .onErrorResume(e -> Mono.empty())}：任何异常（超时、网络错误、解析失败）都降级为空 Mono，
-     *       调用方 {@code block()} 得到 {@code null} 后回退为向量相似度排序。</li>
+     *   <li><b>Mono</b>：Reactor 的异步类型，代表 0 或 1 个元素的异步流</li>
+     *   <li><b>冷源（Cold Source）</b>：Mono.fromCallable() 创建的是冷源，
+     *       只有订阅时才执行（类似懒加载）</li>
+     *   <li><b>subscribeOn</b>：指定执行线程池，避免阻塞主线程</li>
+     *   <li><b>timeout</b>：超时控制，超时后抛出 TimeoutException</li>
+     *   <li><b>onErrorResume</b>：错误恢复，异常时返回默认值（空 Mono）</li>
+     * </ul>
+     *
+     * <p><b>【技术关联】为什么用 Reactor 而不是 CompletableFuture</b>：
+     * <ul>
+     *   <li>Rerank 是可选增强，不是必需依赖，用 Mono 更优雅地处理"无结果"场景</li>
+     *   <li>Mono.empty() 表示"无结果"，比 CompletableFuture.completedFuture(null) 更语义化</li>
+     *   <li>Reactor 的操作符（timeout、onErrorResume）比 CompletableFuture 更丰富</li>
      * </ul>
      *
      * @param query     用户问题

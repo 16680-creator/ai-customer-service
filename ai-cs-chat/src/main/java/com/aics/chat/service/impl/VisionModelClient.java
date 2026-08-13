@@ -31,6 +31,46 @@ import java.util.concurrent.CompletionException;
  *
  * <p>弹性治理：复用 Resilience4j（{@code visionService} 实例），
  * 视觉调用失败时降级返回 null，由 {@link VisionChatServiceImpl} 据此退化为纯文本对话。</p>
+ *
+ * <h3>【AI 技术详解】多模态视觉模型</h3>
+ * <ul>
+ *   <li><b>模型选型</b>：硅基流动 Qwen2.5-VL-72B-Instruct
+ *       <ul>
+ *         <li>Qwen2.5：阿里通义千问系列，中英文效果优秀</li>
+ *         <li>VL：Vision-Language，视觉-语言多模态模型</li>
+ *         <li>72B：720 亿参数，理解能力强</li>
+ *         <li>Instruct：指令微调版本，遵循指令能力强</li>
+ *       </ul>
+ *   </li>
+ *   <li><b>为什么不用 GPT-4V</b>：需要海外网络、付费，且中文效果不如 Qwen2.5</li>
+ *   <li><b>为什么不用本地部署</b>：72B 模型需要大量 GPU 资源，云端 API 更便捷</li>
+ * </ul>
+ *
+ * <h3>【AI 技术详解】多模态消息构造</h3>
+ * <pre>
+ *   UserMessage.builder()
+ *       .text("请描述这张图片中的关键信息...")  // 文本指令
+ *       .media(new Media(mimeType, imageUrl))   // 图片 URL
+ *       .build()
+ *
+ *   // Spring AI 会自动转成 OpenAI 协议格式：
+ *   {
+ *     "role": "user",
+ *     "content": [
+ *       {"type": "text", "text": "请描述这张图片中的关键信息..."},
+ *       {"type": "image_url", "image_url": {"url": "https://..."}}
+ *     ]
+ *   }
+ * </pre>
+ *
+ * <h3>【技术关联】视觉模型与文本模型的分离</h3>
+ * <ul>
+ *   <li><b>视觉模型</b>：Qwen2.5-VL-72B（看图，生成描述）</li>
+ *   <li><b>文本模型</b>：DeepSeek-Chat（生成回答）</li>
+ *   <li><b>分离原因</b>：DeepSeek 不支持视觉，需要独立的视觉模型</li>
+ *   <li><b>Bean 冲突</b>：两个 OpenAiChatModel 类型相同，用 @Primary 会冲突，
+ *       故视觉模型手动构造，不注册为 Spring Bean</li>
+ * </ul>
  */
 @Slf4j
 @Service
@@ -66,7 +106,22 @@ public class VisionModelClient {
     }
 
     /**
-     * 弹性图片理解调用：把图片 URL 作为多模态消息交给视觉模型，返回图片文本描述。
+     * 【AI 核心】弹性图片理解调用：把图片 URL 作为多模态消息交给视觉模型，返回图片文本描述。
+     *
+     * <p><b>【AI 技术详解】多模态消息构造</b>：
+     * <ul>
+     *   <li><b>UserMessage.builder()</b>：Spring AI 的多模态消息构建器</li>
+     *   <li><b>.text(...)</b>：给视觉模型的指令，让它聚焦"提取关键信息"</li>
+     *   <li><b>.media(new Media(mimeType, URI))</b>：把图片 URL 包装成 Media，
+     *       OpenAiChatModel 会自动转成 OpenAI 协议的 image_url 字段</li>
+     * </ul>
+     *
+     * <p><b>【技术关联】与 VisionChatServiceImpl 的关系</b>：
+     * <ul>
+     *   <li>本方法：封装视觉模型调用，带弹性容错（超时/重试/熔断）</li>
+     *   <li>VisionChatServiceImpl：调用本方法并处理结果（脱敏、降级）</li>
+     *   <li>分离关注点：模型调用 vs 业务逻辑</li>
+     * </ul>
      *
      * @param imageUrl 图片 URL（已通过 {@link com.aics.chat.util.ImageUrlValidator} 校验）
      * @return 图片描述文本；识别失败或降级时返回 null

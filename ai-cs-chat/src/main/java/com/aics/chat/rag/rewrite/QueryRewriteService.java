@@ -16,16 +16,57 @@ import java.util.Set;
 /**
  * 查询改写 + HyDE 服务 —— 让 LLM 当"检索查询优化师"。
  *
- * <h3>学习要点（技术：查询改写 / HyDE / 结构化输出）</h3>
+ * <h3>【AI 技术详解】查询改写（Query Rewrite）</h3>
  * <ul>
- *   <li><b>查询改写</b>：用户口语问题（"那个功能怎么用"）直接检索往往召回差；
- *       让 LLM 生成多个精确子查询，可显著扩大召回面。</li>
- *   <li><b>HyDE</b>：Hypothetical Document Embeddings —— 先生成"假设性标准答案"，
- *       再对这段文档做向量化检索。假设文档比问题包含更多实体词，与真实知识文档更相似。</li>
- *   <li><b>结构化输出</b>：要求 LLM 只输出 JSON（subQueries + hydeDocument），
- *       再解析——这是与大模型交互的常见模式，比自由文本更可靠。</li>
- *   <li><b>降级</b>：任何异常（超时/非法 JSON）返回空列表，调用方用原始问题检索，主流程不中断。</li>
+ *   <li><b>问题</b>：用户口语化问题（"那个功能怎么用"）直接检索往往召回差，
+ *       因为知识库文档通常用正式表述（"退款功能使用指南"）</li>
+ *   <li><b>方案</b>：让 LLM 把模糊问题拆成多个精确子查询，扩大召回面</li>
+ *   <li><b>示例</b>：
+ *       <ul>
+ *         <li>原始问题："那个功能怎么用"</li>
+ *         <li>改写结果：["退款功能使用方法", "如何申请退款", "退款流程步骤"]</li>
+ *         <li>每个子查询独立检索，最后用 RRF 融合去重</li>
+ *       </ul>
+ *   </li>
+ *   <li><b>价值</b>：显著提升模糊/口语化问题的召回率</li>
  * </ul>
+ *
+ * <h3>【AI 技术详解】HyDE（Hypothetical Document Embeddings）</h3>
+ * <ul>
+ *   <li><b>全称</b>：Hypothetical Document Embeddings（假设性文档嵌入）</li>
+ *   <li><b>原理</b>：让 LLM 先生成"假设性标准答案文档"，用它的向量去检索</li>
+ *   <li><b>为什么有效</b>：
+ *       <ul>
+ *         <li>问题通常是短句（"如何退款"），向量信息量有限</li>
+ *         <li>假设文档是完整段落（"退款流程如下：1. 登录..."），包含更多关键词</li>
+ *         <li>假设文档的向量与真实知识文档更相似，命中率更高</li>
+ *       </ul>
+ *   </li>
+ *   <li><b>流程</b>：
+ *       <ol>
+ *         <li>用户问"如何退款"</li>
+ *         <li>LLM 生成假设文档："退款流程如下：1. 登录账号 2. 进入订单详情 3. 点击申请退款..."</li>
+ *         <li>用假设文档的向量去检索，命中率更高</li>
+ *       </ol>
+ *   </li>
+ * </ul>
+ *
+ * <h3>【AI 技术详解】结构化输出（Structured Output）</h3>
+ * <ul>
+ *   <li><b>问题</b>：LLM 输出是自由文本，直接解析容易失败（格式不一致、多余文字等）</li>
+ *   <li><b>方案</b>：要求 LLM 只输出 JSON（subQueries + hydeDocument），再用 Jackson 解析</li>
+ *   <li><b>提示词技巧</b>：明确格式要求 + 示例 + "不要输出其他内容"</li>
+ *   <li><b>降级</b>：JSON 解析失败时返回空列表，调用方用原始问题检索</li>
+ * </ul>
+ *
+ * <h3>【技术关联】与 HybridRetriever 的协作</h3>
+ * <pre>
+ *   HybridRetriever.rewriteHybrid()
+ *       ├── QueryRewriteService.rewrite(query)     // 获取子查询 + HyDE
+ *       ├── 对每个子查询做向量检索
+ *       ├── 对 HyDE 文档做向量检索
+ *       └── MultiQueryMerger.merge()               // RRF 融合去重
+ * </pre>
  */
 @Slf4j
 @Service
@@ -39,7 +80,22 @@ public class QueryRewriteService {
     private final ObjectMapper objectMapper;
 
     /**
-     * 改写查询：LLM 生成子查询 + HyDE 文档。
+     * 【AI 核心】改写查询：LLM 生成子查询 + HyDE 文档。
+     *
+     * <p><b>【AI 技术详解】LLM 作为"检索查询优化师"</b>：
+     * <ul>
+     *   <li><b>角色</b>：LLM 不是直接回答问题，而是优化检索查询</li>
+     *   <li><b>输入</b>：用户原始问题（可能模糊、口语化）</li>
+     *   <li><b>输出</b>：多个精确子查询 + 假设性标准答案文档</li>
+     *   <li><b>价值</b>：显著提升模糊/口语化问题的召回率</li>
+     * </ul>
+     *
+     * <p><b>【技术关联】与 EmbeddingModel 的协作</b>：
+     * <ul>
+     *   <li>本方法只生成文本（子查询 + HyDE），不涉及向量化</li>
+     *   <li>向量化由调用方 HybridRetriever 完成（对每个子查询调用 VectorStore）</li>
+     *   <li>分离关注点：查询优化 vs 向量检索</li>
+     * </ul>
      *
      * @param question 原始问题
      * @return 改写结果；失败时 subQueries 为空（调用方降级用原问题）

@@ -16,14 +16,59 @@ import java.util.Map;
 /**
  * RAG 评估服务实现 —— golden 回归测试的核心编排。
  *
- * <h3>学习要点（技术：RAG 评估 / 指标计算 / LLM-as-Judge）</h3>
+ * <h3>【AI 技术详解】RAG 评估体系</h3>
  * <ul>
- *   <li><b>评估管线</b>：加载 golden 集 → 逐条检索({@link RagEvalDataSource}) → 计算指标 →
- *       可选 LLM 打分 → 汇总报告 → 阈值门禁（hitRate / LLM 均分）。</li>
- *   <li><b>指标含义</b>：Recall@k（期望文档被召回的比例）、MRR（首个命中排名的倒数）、
- *       HitRate（至少命中一条的用例占比）——分别度量"召回全不全 / 排得前不前 / 有没有命中"。</li>
- *   <li><b>可对比实验</b>：同一 golden 集在不同检索模式（VECTOR/HYBRID）下各跑一次，
- *       即可量化改动前后的质量差异，这是"用数据说话"的关键。</li>
+ *   <li><b>为什么需要评估</b>：
+ *       <ul>
+ *         <li>RAG 效果依赖检索质量，但"好不好"难以主观判断</li>
+ *         <li>需要量化指标来度量改进效果（如切换 Embedding 模型后是否更好）</li>
+ *         <li>需要自动化回归测试，防止改动引入退化</li>
+ *       </ul>
+ *   </li>
+ *   <li><b>评估维度</b>：
+ *       <ul>
+ *         <li><b>检索质量</b>：Recall@k、MRR、HitRate（度量"召回全不全 / 排得前不前 / 有没有命中"）</li>
+ *         <li><b>回答质量</b>：LLM-as-Judge 评分（1-5 分，度量"回答好不好"）</li>
+ *       </ul>
+ *   </li>
+ * </ul>
+ *
+ * <h3>【AI 技术详解】Golden 测试集</h3>
+ * <ul>
+ *   <li><b>什么是 Golden 集</b>：人工标注的标准问答对（问题 + 期望文档 + 参考答案）</li>
+ *   <li><b>作用</b>：作为评估基准，衡量 RAG 检索和回答的质量</li>
+ *   <li><b>构建方法</b>：
+ *       <ul>
+ *         <li>从真实用户问题中采样</li>
+ *         <li>人工标注期望命中的文档</li>
+ *         <li>人工编写参考答案</li>
+ *       </ul>
+ *   </li>
+ * </ul>
+ *
+ * <h3>【AI 技术详解】评估指标含义</h3>
+ * <ul>
+ *   <li><b>Recall@k</b>：期望文档被召回的比例（越高越好，衡量"召回全不全"）</li>
+ *   <li><b>MRR（Mean Reciprocal Rank）</b>：首个命中排名的倒数（越高越好，衡量"排得前不前"）</li>
+ *   <li><b>HitRate</b>：至少命中一条期望文档的用例占比（越高越好，衡量"有没有命中"）</li>
+ * </ul>
+ *
+ * <h3>【AI 技术详解】评估流程</h3>
+ * <pre>
+ *   1. 加载 Golden 集（GoldenCaseLoader.load()）
+ *   2. 逐条处理：
+ *      ├── 检索：RagEvalDataSource.retrieve()
+ *      ├── 指标：RetrievalMetrics.compute()（Recall@k / MRR / HitRate）
+ *      └── 打分：LlmJudgeService.score()（LLM-as-Judge，可选）
+ *   3. 汇总报告：平均指标 + LLM 均分
+ *   4. 阈值门禁：hitRate / LLM 均分是否达标
+ * </pre>
+ *
+ * <h3>【技术关联】可对比实验</h3>
+ * <ul>
+ *   <li>同一 Golden 集在不同检索模式（VECTOR/HYBRID）下各跑一次</li>
+ *   <li>即可量化改动前后的质量差异，这是"用数据说话"的关键</li>
+ *   <li>示例：HYBRID 模式的 HitRate 比 VECTOR 高 10%，说明混合检索更有效</li>
  * </ul>
  */
 @Slf4j

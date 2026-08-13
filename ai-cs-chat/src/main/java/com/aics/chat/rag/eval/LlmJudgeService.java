@@ -12,16 +12,35 @@ import java.util.regex.Pattern;
 /**
  * LLM-as-Judge 打分实现 —— 让大模型当"阅卷老师"。
  *
- * <h3>学习要点（技术：LLM-as-Judge / 可观测性）</h3>
+ * <h3>【AI 技术详解】LLM-as-Judge（大模型评判）</h3>
  * <ul>
- *   <li><b>为什么用 LLM 打分</b>：回答质量（准确性/完整性/简洁性）难以用规则量化，
- *       大模型能理解语义并给出 1-5 分，是 RAG 评估中"回答质量"维度的常用做法。</li>
- *   <li><b>提示词设计</b>：明确评分维度（准确性/完整性/简洁性）+ 只输出数字，
- *       降低模型自由发挥导致的解析失败。</li>
- *   <li><b>健壮性</b>：任何异常（超时/解析失败）返回 null，调用方降级，
- *       保证评估管线不会因单个打分失败而中断。</li>
- *   <li>复用现有 {@link ChatClient}（DeepSeek），不额外引入模型供应商。</li>
+ *   <li><b>什么是 LLM-as-Judge</b>：用大模型来评估 AI 回答的质量，代替人工评分</li>
+ *   <li><b>为什么需要</b>：回答质量（准确性/完整性/简洁性）难以用规则量化，
+ *       大模型能理解语义并给出 1-5 分</li>
+ *   <li><b>评分维度</b>：
+ *       <ul>
+ *         <li><b>准确性</b>：回答是否与参考答案一致、有无编造</li>
+ *         <li><b>完整性</b>：回答是否覆盖要点</li>
+ *         <li><b>简洁性</b>：回答是否简洁明了</li>
+ *       </ul>
+ *   </li>
+ *   <li><b>提示词设计</b>：明确评分维度 + 只输出数字，降低模型自由发挥导致的解析失败</li>
  * </ul>
+ *
+ * <h3>【AI 技术详解】RAG 评估体系</h3>
+ * <ul>
+ *   <li><b>检索质量指标</b>：Recall@k、MRR、HitRate（度量"召回全不全 / 排得前不前 / 有没有命中"）</li>
+ *   <li><b>回答质量指标</b>：LLM-as-Judge 评分（1-5 分，度量"回答好不好"）</li>
+ *   <li><b>综合评估</b>：检索指标 + 回答指标 = RAG 整体质量</li>
+ * </ul>
+ *
+ * <h3>【技术关联】与 RagEvalServiceImpl 的关系</h3>
+ * <pre>
+ *   RagEvalServiceImpl.evaluate()
+ *       ├── 检索：RagEvalDataSource.retrieve()
+ *       ├── 指标：RetrievalMetrics.compute()
+ *       └── 打分：LlmJudgeService.score()  ← 本类
+ * </pre>
  */
 @Slf4j
 @Service

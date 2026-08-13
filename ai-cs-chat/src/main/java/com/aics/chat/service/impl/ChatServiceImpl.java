@@ -35,7 +35,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.regex.Pattern;
 
 /**
- * AI 对话服务实现
+ * AI 对话服务实现 —— 对话业务的核心编排层。
  *
  * <p>所有 LLM 调用均通过 {@link ResilientAiService} 执行，获得超时/重试/熔断/降级能力。</p>
  *
@@ -49,17 +49,73 @@ import java.util.regex.Pattern;
  *       订阅后逐 token 推送给 {@link SseEmitter}；流结束推送 done 事件（含完整回复 + citations）。</li>
  *   <li>异常友好化：把 Resilience4j 抛出的超时/熔断异常转成用户可读提示。</li>
  * </ul>
-
- * <h3>学习要点（技术：SSE 流式 / RAG 多轮 / 历史压缩 / 工具调用）</h3>
+ *
+ * <h3>【AI 技术详解】SSE（Server-Sent Events）流式响应</h3>
  * <ul>
- *   <li><b>SSE 流式</b>：Flux 逐 token 推送给 SseEmitter（打字机效果）；RAG 模式先检索再流式，
- *       结束后用 done 事件补发引用溯源。流一旦开始不可重放，因此流式不配重试。</li>
- *   <li><b>多轮记忆</b>：历史存 Redis 热缓存 + RocketMQ到MySQL（ai-cs-message），
- *       超 20 条用 LLM 压缩为摘要（保留最近 10 条），避免上下文爆炸。</li>
- *   <li><b>用户身份注入</b>：网关把 X-User-Id 透传进来，写入 SystemMessage，
- *       让订单查询等工具在异步线程中也能拿到当前用户（ThreadLocal 在异步不可用）。</li>
- *   <li><b>思考标签过滤</b>：cleanResponse 去掉模型输出中的 &lt;think&gt; 过程，只留正式回答。</li>
+ *   <li><b>什么是 SSE</b>：HTTP 单向推送协议，服务端可以持续向客户端发送事件，
+ *       适合"打字机效果"的 AI 对话场景（逐 token 推送）</li>
+ *   <li><b>与 WebSocket 的区别</b>：
+ *       <ul>
+ *         <li>SSE：单向（服务端→客户端）、基于 HTTP、自动重连、适合文本推送</li>
+ *         <li>WebSocket：双向、独立协议、需要手动重连、适合实时交互</li>
+ *       </ul>
+ *   </li>
+ *   <li><b>Flux<String> 与 SseEmitter</b>：
+ *       <ul>
+ *         <li>Flux：Spring WebFlux 的响应式流，代表异步数据流</li>
+ *         <li>SseEmitter：Spring MVC 的 SSE 发射器，将 Flux 的数据逐个推送给客户端</li>
+ *         <li>订阅模式：{@code flux.subscribe(chunk -> emitter.send(chunk))}</li>
+ *       </ul>
+ *   </li>
+ *   <li><b>为什么流式不配重试</b>：流一旦开始推送就不可重放，重试会导致前端重复接收 token</li>
  * </ul>
+ *
+ * <h3>【AI 技术详解】多轮对话记忆管理</h3>
+ * <ul>
+ *   <li><b>问题</b>：LLM 是无状态的，每次调用都是独立的，需要把历史消息一起发送</li>
+ *   <li><b>存储架构</b>：Redis 热缓存（最近消息）+ MySQL 持久化（全量历史）</li>
+ *   <li><b>上下文窗口限制</b>：LLM 有 Token 限制（如 DeepSeek 64K），历史太长会超限</li>
+ *   <li><b>压缩策略</b>：超过 20 条消息时，用 LLM 将旧消息压缩为摘要（保留最近 10 条），
+ *       摘要作为 SystemMessage 注入，既保留上下文又节省 Token</li>
+ *   <li><b>压缩的好处</b>：
+ *       <ul>
+ *         <li>减少 Token 消耗（省钱）</li>
+ *         <li>避免上下文过长导致模型"遗忘"早期信息</li>
+ *         <li>保持对话连贯性（摘要保留关键信息）</li>
+ *       </ul>
+ *   </li>
+ * </ul>
+ *
+ * <h3>【AI 技术详解】用户身份注入与 ThreadLocal</h3>
+ * <ul>
+ *   <li><b>问题</b>：Tool Calling 在异步线程执行，ThreadLocal 不可用</li>
+ *   <li><b>解决方案</b>：将 userId 写入 SystemMessage，LLM 在调用工具时会携带该信息</li>
+ *   <li><b>为什么不用 ThreadLocal</b>：SSE 流式链路中 LLM 调用与 Tool 回调在异步线程执行，
+ *       ThreadLocal 在异步线程中无法传递（线程池复用导致数据污染）</li>
+ *   <li><b>安全清理</b>：Controller 的 finally 块中清理 ThreadLocal，防止线程复用导致脏数据</li>
+ * </ul>
+ *
+ * <h3>【AI 技术详解】思考标签过滤（Think Tag Filtering）</h3>
+ * <ul>
+ *   <li><b>问题</b>：某些模型（如 DeepSeek-R1）会在回答前输出 &lt;think&gt;...&lt;/think&gt; 思考过程</li>
+ *   <li><b>为什么过滤</b>：思考过程是模型内部推理，不应展示给用户（影响体验、可能泄露 Prompt）</li>
+ *   <li><b>实现</b>：正则匹配 {@code <thinking>...</thinking>} 并移除，只保留正式回答</li>
+ * </ul>
+ *
+ * <h3>【技术关联】调用链路图</h3>
+ * <pre>
+ *   用户请求 → Controller → ChatServiceImpl
+ *                               ├── ChatHistoryService.load()    // 加载历史
+ *                               ├── compressHistory()            // 压缩历史（超阈值时）
+ *                               ├── KnowledgeBaseService.search() // RAG 检索（可选）
+ *                               ├── ResilientAiService.callChat() // 调用 LLM
+ *                               │       ├── @TimeLimiter         // 超时控制
+ *                               │       ├── @Retry               // 重试
+ *                               │       ├── @CircuitBreaker      // 熔断
+ *                               │       └── ChatClient.call()    // 实际调用
+ *                               ├── cleanResponse()              // 过滤思考标签
+ *                               └── ChatHistoryService.append()  // 保存回复
+ * </pre>
  */
 @Slf4j
 @Service
@@ -120,8 +176,24 @@ public class ChatServiceImpl implements ChatService {
     }
 
     /**
-     * 压缩会话历史：将旧消息交给 AI 生成摘要，替换为一条 SystemMessage
-     * 保留最近的 KEEP_RECENT_SIZE 条消息
+     * 【AI 核心】压缩会话历史：将旧消息交给 AI 生成摘要，替换为一条 SystemMessage。
+     *
+     * <p><b>【AI 技术详解】上下文压缩（Context Compression）</b>：
+     * <ul>
+     *   <li><b>为什么需要压缩</b>：LLM 有 Token 限制（如 DeepSeek 64K），
+     *       历史消息太长会：①超限报错 ②消耗过多 Token（费用高）③模型"遗忘"早期信息</li>
+     *   <li><b>压缩策略</b>：
+     *       <ol>
+     *         <li>保留最近 KEEP_RECENT_SIZE 条消息（保证最近对话不丢失）</li>
+     *         <li>将旧消息交给 LLM 生成摘要（1-3 句话概括关键信息）</li>
+     *         <li>摘要作为 SystemMessage 注入，既保留上下文又节省 Token</li>
+     *       </ol>
+     *   </li>
+     *   <li><b>降级策略</b>：压缩失败时回退为"截断模式"（只保留最近消息），不阻塞对话</li>
+     * </ul>
+     *
+     * @param history 完整历史消息列表
+     * @return 压缩后的消息列表（摘要 + 最近消息）
      */
     private List<Message> compressHistory(List<Message> history) {
         int splitIndex = history.size() - KEEP_RECENT_SIZE;   // 切分点：保留最近 KEEP_RECENT_SIZE 条
@@ -201,7 +273,28 @@ public class ChatServiceImpl implements ChatService {
     }
 
     /**
-     * RAG 对话：知识库检索 → 拼接【资料】上下文 → 调用 LLM → 构建引用溯源列表。
+     * 【AI 核心】RAG 对话：知识库检索 → 拼接【资料】上下文 → 调用 LLM → 构建引用溯源列表。
+     *
+     * <p><b>【AI 技术详解】RAG 对话完整流程</b>：
+     * <ol>
+     *   <li><b>检索阶段</b>：用户问题 → EmbeddingModel 向量化 → VectorStore 余弦相似度检索
+     *       → 返回 Top-K 相关文档片段</li>
+     *   <li><b>上下文构建</b>：将检索结果拼成【资料1】【资料2】...格式，注入 Prompt</li>
+     *   <li><b>生成阶段</b>：LLM 基于【资料】+【用户问题】生成回答（不凭空编造）</li>
+     *   <li><b>引用溯源</b>：从检索结果构建 CitationItemDTO 列表，前端可展示"参考来源"</li>
+     * </ol>
+     *
+     * <p><b>【技术关联】引用溯源（Citation）的价值</b>：
+     * <ul>
+     *   <li>用户可以验证回答的准确性（点击查看原文）</li>
+     *   <li>运营可以追踪哪些知识库内容被频繁引用（优化知识库）</li>
+     *   <li>满足合规要求（金融、医疗等领域需要可追溯的信息来源）</li>
+     * </ul>
+     *
+     * @param sessionId     会话 ID
+     * @param message       用户消息
+     * @param knowledgeBase 知识库标识
+     * @return 回答 + 引用溯源列表
      */
     @Override
     public Result<ChatRagResponseDTO> chatWithRag(String sessionId, String message, String knowledgeBase) {

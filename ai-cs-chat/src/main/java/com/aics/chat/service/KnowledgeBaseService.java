@@ -25,26 +25,56 @@ import java.util.Map;
  * <p>把某个知识库的文档切块、向量化后写入 {@link VectorStore}，
  * 提问时通过语义相似度检索出最相关的文档片段，供大模型生成有依据的回答。</p>
  *
- * <h3>RAG 完整链路（两步）</h3>
+ * <h3>【AI 技术详解】RAG 完整链路（两步）</h3>
  * <pre>
- *   【入库】原始文档 ──分词裁剪 TokenTextSplitter──▶ 多个文档片段 ──EmbeddingModel 向量化──▶ 写入 VectorStore
+ *   【入库】原始文档 ──TokenTextSplitter 切块──▶ 多个文档片段 ──EmbeddingModel 向量化──▶ 写入 VectorStore
  *   【检索】用户问题 ──EmbeddingModel 向量化──▶ 向量宽召回(低阈值) ──▶ Rerank 精排 ──▶ 返回 Top-N 相关片段
  * </pre>
  *
- * <h3>为什么需要对文档做"分块"（Chunking）？</h3>
- * <pre>
- * 1. 大模型上下文有限，不能把整本手册塞进去；
- * 2. 相似度检索是按"片段"匹配的，块越小越精准；
- * 3. 分块后每个片段可独立检索、独立溯源。
- * </pre>
-
- * <h3>学习要点（技术：两阶段检索 / Rerank / 优雅降级）</h3>
+ * <h3>【AI 技术详解】为什么需要对文档做"分块"（Chunking）？</h3>
  * <ul>
- *   <li><b>入库</b>：文档经过 TokenTextSplitter 切块、bge-m3 向量化后写入 Chroma（带元数据）。</li>
- *   <li><b>检索</b>：宽召回 Top-20（低阈值）到 Rerank 精排（bge-reranker，按分数过滤）再到 Top-N。</li>
+ *   <li><b>大模型上下文有限</b>：不能把整本手册塞进去（DeepSeek 64K Token 限制）</li>
+ *   <li><b>检索精度</b>：相似度检索是按"片段"匹配的，块越小越精准</li>
+ *   <li><b>独立溯源</b>：分块后每个片段可独立检索、独立溯源（引用来源）</li>
+ *   <li><b>TokenTextSplitter</b>：按 Token 数量切分（默认 800 Token/块），
+ *       保证每个片段在模型上下文窗口内</li>
+ * </ul>
+ *
+ * <h3>【AI 技术详解】两阶段检索（Two-Stage Retrieval）</h3>
+ * <ul>
+ *   <li><b>第一阶段：宽召回（Recall）</b>：
+ *       <ul>
+ *         <li>目的：尽量多召回相关文档，宁可多不可少</li>
+ *         <li>参数：Top-20，相似度阈值 0.3（较低）</li>
+ *         <li>速度：快（向量检索只需计算余弦相似度）</li>
+ *       </ul>
+ *   </li>
+ *   <li><b>第二阶段：精排（Rerank）</b>：
+ *       <ul>
+ *         <li>目的：从宽召回结果中精选最相关的 Top-N</li>
+ *         <li>模型：bge-reranker-v2-m3（交叉编码器，精度高）</li>
+ *         <li>过滤：低于 minScore（0.7）的引用不返回</li>
+ *         <li>速度：慢（每次都要重新计算）</li>
+ *       </ul>
+ *   </li>
  *   <li><b>为什么两阶段</b>：向量相似度粗排便宜但精度一般，Rerank 用交叉编码器精排更准；
- *       先粗后精兼顾性能与精度。</li>
- *   <li><b>降级</b>：Rerank 服务不可用时回退为纯向量排序，回答不中断。</li>
+ *       先粗后精兼顾性能与精度</li>
+ * </ul>
+ *
+ * <h3>【AI 技术详解】元数据（Metadata）的作用</h3>
+ * <ul>
+ *   <li><b>knowledgeBase</b>：知识库标识，用于按库过滤检索（多知识库隔离）</li>
+ *   <li><b>documentId</b>：文档 ID，用于溯源与删除定位</li>
+ *   <li><b>title</b>：文档标题，用于前端引用卡片展示</li>
+ *   <li><b>page_number</b>：PDF 页码，用于分页溯源</li>
+ * </ul>
+ *
+ * <h3>【技术关联】与 EmbeddingModel 的关系</h3>
+ * <ul>
+ *   <li>本类不直接调用 EmbeddingModel，而是通过 VectorStore 间接调用</li>
+ *   <li>VectorStore.add() 内部会调用 EmbeddingModel 生成向量</li>
+ *   <li>VectorStore.similaritySearch() 内部会调用 EmbeddingModel 向量化查询</li>
+ *   <li>分离关注点：业务逻辑 vs 向量化细节</li>
  * </ul>
  */
 @Slf4j
@@ -156,14 +186,24 @@ public class KnowledgeBaseService {
     }
 
     /**
-     * 语义检索（两阶段）：先向量宽召回，再 Rerank 精排。
+     * 【AI 核心】语义检索（两阶段）：先向量宽召回，再 Rerank 精排。
      *
+     * <p><b>【AI 技术详解】两阶段检索流程</b>：
      * <pre>
-     * 阶段一（宽召回）：低阈值 topK=20 向量检索，保证召回率；
+     * 阶段一（宽召回）：低阈值 topK=20 向量检索，保证召回率
+     *   - 用户问题 → EmbeddingModel 向量化 → VectorStore 余弦相似度检索
+     *   - 参数：Top-20，相似度阈值 0.3（较低，宁可多召回）
+     *
      * 阶段二（精排）：
-     *   - 有 RerankService 时：按 relevanceScore 排序并过滤 minScore（默认 0.7）；
-     *   - 无 RerankService / Rerank 失败返回 null 时：退化按相似度降序取 Top-N。
+     *   - 有 RerankService 时：调用 bge-reranker 精排，按 relevanceScore 排序并过滤 minScore
+     *   - 无 RerankService / Rerank 失败返回 null 时：退化按相似度降序取 Top-N
      * </pre>
+     *
+     * <p><b>【技术关联】与 RerankService 的关系</b>：
+     * <ul>
+     *   <li>RerankService 是可选依赖（ObjectProvider 注入），不存在时退化为纯向量排序</li>
+     *   <li>Rerank 失败时不抛异常，静默降级，保证检索不中断</li>
+     * </ul>
      *
      * @param knowledgeBase 知识库标识（用于过滤）
      * @param query         用户问题

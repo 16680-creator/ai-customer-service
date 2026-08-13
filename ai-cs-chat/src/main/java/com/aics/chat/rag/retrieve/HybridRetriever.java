@@ -25,13 +25,71 @@ import java.util.Map;
 /**
  * 对话侧统一检索编排 —— 把多种检索技术组合成一个入口。
  *
- * <h3>学习要点（技术：多路检索编排 / 优雅降级）</h3>
+ * <h3>【AI 技术详解】多路检索编排（Multi-Route Retrieval Orchestration）</h3>
  * <ul>
- *   <li><b>策略模式</b>：四种检索模式（向量/Hybrid/改写/图谱）通过 {@link RetrievalMode}
- *       枚举分派到不同方法，新增模式无需改动调用方。</li>
- *   <li><b>降级设计</b>：每种增强都有两层兜底——①全局开关未开启时直接回退纯向量；
- *       ②外部依赖（搜索服务/LLM/图谱）异常时 catch 后回退纯向量。保证"核心对话永远可用"。</li>
- *   <li><b>存量兼容</b>：默认 VECTOR，业务方不传新参数行为不变，这是渐进式改造的关键。</li>
+ *   <li><b>为什么需要多路检索</b>：
+ *       <ul>
+ *         <li><b>向量检索</b>：擅长语义相似（"退款"和"退货"），但对精确串（订单号 ORD001）差</li>
+ *         <li><b>关键词检索（BM25）</b>：擅长精确匹配，但对语义相似差</li>
+ *         <li><b>两者互补</b>：Hybrid 混合检索可以兼顾精确与语义</li>
+ *       </ul>
+ *   </li>
+ *   <li><b>四种检索模式</b>：
+ *       <ol>
+ *         <li><b>VECTOR</b>：纯向量检索（默认，存量兼容）</li>
+ *         <li><b>HYBRID</b>：ES 关键词 + 向量语义 + RRF 融合</li>
+ *         <li><b>HYBRID_QUERY_REWRITE</b>：混合 + LLM 改写/HyDE（提升模糊问题召回）</li>
+ *         <li><b>GRAPH_RAG</b>：图谱优先，未命中降级（适合实体关联场景）</li>
+ *       </ol>
+ *   </li>
+ * </ul>
+ *
+ * <h3>【AI 技术详解】Hybrid 混合检索原理</h3>
+ * <pre>
+ *   用户问题 ──┬── EmbeddingModel 向量化 ──→ VectorStore 余弦相似度检索 ──→ 向量结果
+ *              │
+ *              └── 关键词提取 ──→ Elasticsearch BM25 检索 ──→ 关键词结果
+ *                                                                      │
+ *                                                                      ▼
+ *                                                              RRF 融合排序
+ *                                                                      │
+ *                                                                      ▼
+ *                                                              最终 Top-K 结果
+ * </pre>
+ *
+ * <h3>【AI 技术详解】RRF（Reciprocal Rank Fusion）融合算法</h3>
+ * <ul>
+ *   <li><b>核心公式</b>：{@code score(doc) = Σ 1/(k + rank_i)}，k 通常取 60</li>
+ *   <li><b>为什么有效</b>：在多路中都靠前的文档总分最高，实现"共识优先"</li>
+ *   <li><b>无需训练</b>：RRF 不需要标注数据，直接基于排名融合，简单有效</li>
+ * </ul>
+ *
+ * <h3>【AI 技术详解】查询改写与 HyDE</h3>
+ * <ul>
+ *   <li><b>查询改写</b>：LLM 把模糊问题（"那个功能怎么用"）拆成多个精确子查询</li>
+ *   <li><b>HyDE</b>：Hypothetical Document Embeddings —— LLM 先生成"假设性标准答案"，
+ *       用它的向量去检索（假设文档比问题包含更多关键词，命中率更高）</li>
+ * </ul>
+ *
+ * <h3>【AI 技术详解】GraphRAG 图谱检索</h3>
+ * <ul>
+ *   <li><b>适用场景</b>：实体关联查询（如"张三买了什么商品？"需要关联用户→订单→商品）</li>
+ *   <li><b>原理</b>：从问题中抽取实体 → 在知识图谱中多跳展开 → 返回关联三元组</li>
+ *   <li><b>与向量检索的区别</b>：向量检索是"语义相似"，图谱检索是"关系遍历"</li>
+ * </ul>
+ *
+ * <h3>降级设计</h3>
+ * <ul>
+ *   <li><b>策略模式</b>：四种检索模式通过 {@link RetrievalMode} 枚举分派，新增模式无需改动调用方</li>
+ *   <li><b>两层兜底</b>：①全局开关未开启时直接回退纯向量；②外部依赖异常时 catch 后回退纯向量</li>
+ *   <li><b>核心保证</b>："核心对话永远可用"，增强功能失败不影响基本回答</li>
+ * </ul>
+ *
+ * <h3>【技术关联】与搜索服务（ai-cs-search）的关系</h3>
+ * <ul>
+ *   <li>Hybrid 检索通过 Feign 调用 ai-cs-search 的 /search/hybrid 接口</li>
+ *   <li>搜索服务内部完成 ES + 向量 + RRF 融合，返回最终结果</li>
+ *   <li>跨服务调用走 HTTP 契约，遵守微服务间不直接依赖内部类的约束</li>
  * </ul>
  */
 @Slf4j
@@ -99,11 +157,21 @@ public class HybridRetriever {
     }
 
     /**
-     * Hybrid 混合检索 —— 通过 Feign 调用 ai-cs-search 的 /search/hybrid。
+     * 【AI 核心】Hybrid 混合检索 —— 通过 Feign 调用 ai-cs-search 的 /search/hybrid。
      *
-     * <p><b>为什么混合</b>：向量检索对语义相似好、对精确串（型号/订单号）差；
-     * ES 关键词(BM25)恰好相反。两者 RRF 融合可兼顾精确与语义。
-     * 跨服务调用走 Feign（HTTP 契约），遵守微服务间不直接依赖内部类的约束。</p>
+     * <p><b>【AI 技术详解】为什么需要混合检索</b>：
+     * <ul>
+     *   <li><b>向量检索的局限</b>：对语义相似好（"退款"≈"退货"），但对精确串（订单号 ORD001）差</li>
+     *   <li><b>关键词检索的局限</b>：对精确匹配好，但对语义相似差（"退款"≠"退货"）</li>
+     *   <li><b>混合检索的优势</b>：RRF 融合两者，兼顾精确与语义</li>
+     * </ul>
+     *
+     * <p><b>【技术关联】跨服务调用</b>：
+     * <ul>
+     *   <li>Hybrid 检索通过 Feign 调用 ai-cs-search 的 /search/hybrid 接口</li>
+     *   <li>搜索服务内部完成 ES + 向量 + RRF 融合，返回最终结果</li>
+     *   <li>跨服务调用走 HTTP 契约，遵守微服务间不直接依赖内部类的约束</li>
+     * </ul>
      */
     private RetrieveResult hybrid(String knowledgeBase, String query, int topK) {
         try {
@@ -145,12 +213,31 @@ public class HybridRetriever {
     }
 
     /**
-     * 查询改写 + HyDE —— 提升模糊问题的召回。
+     * 【AI 核心】查询改写 + HyDE —— 提升模糊问题的召回。
      *
-     * <p><b>查询改写</b>：LLM 把"那个功能怎么用"拆成多个精确子查询，扩大召回面；
-     * <b>HyDE</b>（Hypothetical Document Embeddings）：让 LLM 先生成"假设性标准答案文档"，
-     * 用它的向量去检索——假设文档比问题本身包含更多关键词，命中率更高。
-     * 多路结果用 {@link MultiQueryMerger}（RRF）融合去重。</p>
+     * <p><b>【AI 技术详解】查询改写（Query Rewrite）</b>：
+     * <ul>
+     *   <li><b>问题</b>：用户口语化问题（"那个功能怎么用"）直接检索召回差</li>
+     *   <li><b>方案</b>：LLM 把模糊问题拆成多个精确子查询，扩大召回面</li>
+     *   <li><b>示例</b>："那个功能怎么用" → ["退款功能使用方法", "如何申请退款", "退款流程"]</li>
+     * </ul>
+     *
+     * <p><b>【AI 技术详解】HyDE（Hypothetical Document Embeddings）</b>：
+     * <ul>
+     *   <li><b>原理</b>：让 LLM 先生成"假设性标准答案文档"，用它的向量去检索</li>
+     *   <li><b>为什么有效</b>：假设文档比问题包含更多关键词，与真实知识文档更相似</li>
+     *   <li><b>流程</b>：
+     *       <ol>
+     *         <li>用户问"如何退款"</li>
+     *         <li>LLM 生成假设文档："退款流程如下：1. 登录账号 2. 进入订单详情 3. 点击申请退款..."</li>
+     *         <li>用假设文档的向量去检索，命中率更高</li>
+     *       </ol>
+     *   </li>
+     * </ul>
+     *
+     * <p><b>【技术关联】多路结果融合</b>：
+     * 查询改写后有多路子查询结果、还有 HyDE 结果，需要用 {@link MultiQueryMerger}（RRF）融合去重。
+     * RRF 核心公式：{@code score(doc) = Σ 1/(k + rank_i)}，在多路中都靠前的文档总分最高。</p>
      */
     private RetrieveResult rewriteHybrid(String knowledgeBase, String query, int topK) {
         RewriteResult rewrite = queryRewriteService.rewrite(query);

@@ -13,19 +13,35 @@ import java.util.List;
 /**
  * 知识文档向量化服务 —— 知识库"写路径"的向量化入口。
  *
- * <h3>学习要点（技术：RAG 入库链路 / Chunking / Metadata）</h3>
+ * <h3>【AI 技术详解】RAG 入库链路</h3>
+ * <pre>
+ *   原始文档 → TokenTextSplitter 切块 → EmbeddingModel 向量化 → 写入 Chroma
+ *   （附带元数据：knowledgeBase、documentId、title）
+ * </pre>
+ *
+ * <h3>【AI 技术详解】为什么需要切块（Chunking）</h3>
  * <ul>
- *   <li><b>为什么切块（Chunking）</b>：①大模型上下文有限，不能塞整本手册；
- *       ②相似度检索按"片段"匹配，块小更精准；③每块可独立检索、独立溯源。</li>
- *   <li><b>为什么带 metadata</b>：knowledgeBase 用于按库过滤、documentId 用于溯源与删除、
- *       title 用于展示——检索结果靠这些元数据才能"讲清楚出处"。</li>
- *   <li><b>读/写分离</b>：本服务是写入方（写路径），ai-cs-chat 是检索方（读路径），
- *       共用同一 Chroma 集合与同一 bge-m3 模型，保证向量空间一致。</li>
- *   <li><b>异步解耦</b>：知识库写 DB 后经 RocketMQ 异步触发本服务，天然可重试。</li>
+ *   <li><b>大模型上下文有限</b>：不能把整本手册塞进去（DeepSeek 64K Token 限制）</li>
+ *   <li><b>检索精度</b>：相似度检索是按"片段"匹配的，块越小越精准</li>
+ *   <li><b>独立溯源</b>：分块后每个片段可独立检索、独立溯源（引用来源）</li>
+ *   <li><b>TokenTextSplitter</b>：按 Token 数量切分（默认 800 Token/块），
+ *       保证每个片段在模型上下文窗口内</li>
  * </ul>
  *
- * <p>核心流程（{@link #vectorize}）：内容校验 → TokenTextSplitter 按 Token 切块 →
- * EmbeddingModel 向量化 → 写 Chroma（附带元数据）。</p>
+ * <h3>【AI 技术详解】元数据（Metadata）的作用</h3>
+ * <ul>
+ *   <li><b>knowledgeBase</b>：知识库标识，用于按库过滤检索（多知识库隔离）</li>
+ *   <li><b>documentId</b>：文档 ID，用于溯源与删除定位</li>
+ *   <li><b>title</b>：文档标题，用于前端引用卡片展示</li>
+ * </ul>
+ *
+ * <h3>【技术关联】读/写分离架构</h3>
+ * <ul>
+ *   <li><b>写路径（本服务）</b>：知识库写 DB 后经 RocketMQ 异步触发向量化</li>
+ *   <li><b>读路径（ai-cs-chat）</b>：对话时做向量检索</li>
+ *   <li><b>一致性保证</b>：共用同一 Chroma 集合与同一 bge-m3 模型，保证向量空间一致</li>
+ *   <li><b>异步解耦</b>：知识库写 DB 后经 RocketMQ 异步触发本服务，天然可重试</li>
+ * </ul>
  */
 @Slf4j
 @Service

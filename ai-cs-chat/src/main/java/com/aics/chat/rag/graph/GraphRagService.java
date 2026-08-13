@@ -12,16 +12,56 @@ import java.util.Set;
 /**
  * 图谱检索编排服务 —— GraphRAG 与对话检索的衔接层。
  *
- * <h3>学习要点（技术：GraphRAG 检索链路）</h3>
+ * <h3>【AI 技术详解】GraphRAG（图谱检索增强生成）</h3>
  * <ul>
- *   <li><b>流程</b>：图谱未启用 → 返回空；启用后从问题中抽取候选实体
- *       （与图谱已有实体做子串匹配，MVP 用关键词匹配、后续可换 LLM 实体抽取）
- *       → 对每个实体做多跳展开 → 去重返回三元组。</li>
- *   <li><b>降级</b>：未启用/未命中都返回空列表，由调用方（HybridRetriever）回退普通 RAG，
- *       保证图谱不是"必需依赖"——这是可选增强的典型设计。</li>
- *   <li><b>实体匹配为什么用子串</b>：确定性、零额外成本；LLM 实体抽取是后续增强项，
- *       已在任务清单 T039 登记。</li>
+ *   <li><b>什么是 GraphRAG</b>：结合知识图谱的 RAG，适合实体关联查询</li>
+ *   <li><b>适用场景</b>：
+ *       <ul>
+ *         <li>"张三买了什么商品？"（用户→订单→商品）</li>
+ *         <li>"这个商品有哪些评价？"（商品→评价）</li>
+ *         <li>"退款流程是什么？"（问题→流程步骤）</li>
+ *       </ul>
+ *   </li>
+ *   <li><b>与向量检索的区别</b>：
+ *       <ul>
+ *         <li><b>向量检索</b>：语义相似（"退款"≈"退货"），但无法处理关系遍历</li>
+ *         <li><b>图谱检索</b>：关系遍历（用户→订单→商品），但需要预先构建图谱</li>
+ *       </ul>
+ *   </li>
  * </ul>
+ *
+ * <h3>【AI 技术详解】知识图谱（Knowledge Graph）</h3>
+ * <ul>
+ *   <li><b>三元组（Triple）</b>：知识图谱的基本单位，格式为 (subject, predicate, object)
+ *       <ul>
+ *         <li>示例：(张三, 购买了, iPhone 15)</li>
+ *         <li>示例：(iPhone 15, 属于, 电子产品)</li>
+ *       </ul>
+ *   </li>
+ *   <li><b>多跳展开</b>：从一个实体出发，沿着关系边遍历多层
+ *       <ul>
+ *         <li>1 跳：张三 → 购买了 → iPhone 15</li>
+ *         <li>2 跳：iPhone 15 → 属于 → 电子产品</li>
+ *         <li>3 跳：电子产品 → 有品牌 → Apple</li>
+ *       </ul>
+ *   </li>
+ *   <li><b>BFS 遍历</b>：广度优先搜索，逐层扩展，避免深度优先的路径爆炸</li>
+ * </ul>
+ *
+ * <h3>【AI 技术详解】实体抽取（Entity Extraction）</h3>
+ * <ul>
+ *   <li><b>MVP 方案</b>：与图谱中已有 subject/object 做子串匹配（简单、零成本）</li>
+ *   <li><b>增强方案</b>：用 LLM 做命名实体识别（NER），更准确但有调用成本</li>
+ *   <li><b>示例</b>：问题"张三买了什么" → 抽取实体"张三" → 在图谱中查找"张三"相关的三元组</li>
+ * </ul>
+ *
+ * <h3>【技术关联】与 HybridRetriever 的关系</h3>
+ * <pre>
+ *   HybridRetriever.graph()
+ *       ├── GraphRagService.retrieveWithGraph()  ← 本类（图谱检索）
+ *       ├── VectorStore.similaritySearch()        // 向量检索
+ *       └── 合并结果（图谱上下文置于最前）
+ * </pre>
  */
 @Slf4j
 @Service

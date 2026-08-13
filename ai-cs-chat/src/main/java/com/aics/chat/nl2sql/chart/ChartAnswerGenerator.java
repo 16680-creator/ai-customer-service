@@ -12,14 +12,51 @@ import java.util.Map;
 /**
  * 问数回答生成器 —— 结论（LLM）+ 图表类型判定 + ECharts 配置。
  *
- * <h3>学习要点（技术：LLM 结论生成 / 降级模板）</h3>
+ * <h3>【AI 技术详解】NL2SQL 问数回答生成</h3>
  * <ul>
- *   <li><b>分工</b>：图表类型判定与 ECharts option 构建是确定性逻辑（纯 Java，
- *       避免 LLM 幻觉出非法 JSON）；只有"结论"这种开放性文本交给 LLM。</li>
- *   <li><b>降级</b>：LLM 结论失败时回退模板（"共 N 行数据，详见图表"），
- *       图表仍可正常渲染——LLM 只是增强项，不是必需依赖。</li>
- *   <li><b>边界</b>：空数据/单行数据由 ChartTypeDetector 判定为 NONE，不硬生成图表。</li>
+ *   <li><b>问题</b>：NL2SQL 查询返回的是原始数据行，用户需要理解数据含义</li>
+ *   <li><b>方案</b>：LLM 生成自然语言结论 + 自动选择图表类型 + 生成 ECharts 配置</li>
+ *   <li><b>价值</b>：运营人员无需看原始数据，直接看结论和图表</li>
  * </ul>
+ *
+ * <h3>【AI 技术详解】分工设计（LLM vs 确定性逻辑）</h3>
+ * <ul>
+ *   <li><b>LLM 负责</b>：生成自然语言结论（开放性文本，适合 LLM）</li>
+ *   <li><b>确定性逻辑负责</b>：图表类型判定 + ECharts option 构建（避免 LLM 幻觉出非法 JSON）</li>
+ *   <li><b>为什么这么分</b>：
+ *       <ul>
+ *         <li>LLM 擅长自然语言生成，但可能输出非法 JSON</li>
+ *         <li>确定性逻辑擅长结构化数据处理，输出稳定可靠</li>
+ *         <li>各司其职，质量与稳定性兼得</li>
+ *       </ul>
+ *   </li>
+ * </ul>
+ *
+ * <h3>【AI 技术详解】图表类型自动判定</h3>
+ * <ul>
+ *   <li><b>ChartTypeDetector</b>：根据数据特征自动选择图表类型
+ *       <ul>
+ *         <li>单列分类数据 → 饼图（PIE）</li>
+ *         <li>双列（分类+数值）→ 柱状图（BAR）</li>
+ *         <li>时间序列 → 折线图（LINE）</li>
+ *         <li>空数据/单行 → 无图表（NONE）</li>
+ *       </ul>
+ *   </li>
+ *   <li><b>EChartsOptionBuilder</b>：根据图表类型生成 ECharts 配置 JSON</li>
+ * </ul>
+ *
+ * <h3>【技术关联】与 Nl2SqlQueryService 的关系</h3>
+ * <pre>
+ *   NL2SQL 问数完整流程：
+ *       用户问"这个月订单量趋势？"
+ *           ↓
+ *       Nl2SqlQueryService.executeReadOnlyQuery()  // 执行 SQL
+ *           ↓
+ *       ChartAnswerGenerator.generate()             // 生成回答 ← 本类
+ *           ├── ChartTypeDetector.detect()          // 判定图表类型
+ *           ├── generateConclusion()                // LLM 生成结论
+ *           └── EChartsOptionBuilder.build()        // 生成 ECharts 配置
+ * </pre>
  */
 @Slf4j
 @Service

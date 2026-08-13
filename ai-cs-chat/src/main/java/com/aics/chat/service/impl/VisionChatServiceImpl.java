@@ -19,20 +19,58 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.util.Map;
 
 /**
- * 多模态图片对话服务实现。
+ * 多模态图片对话服务实现 —— 图片理解 + RAG 检索 + LLM 回答。
  *
- * <h3>两段式编排</h3>
- * <ol>
- *   <li><b>看图</b>：{@link VisionModelClient} 调视觉模型（硅基流动 Qwen2.5-VL）把图片转成文本描述；</li>
- *   <li><b>回答</b>：把描述文本（+ 用户文字）组合成查询，复用 {@link ChatService} 的 RAG 链路
- *       检索知识库并由 DeepSeek 生成回答。</li>
- * </ol>
+ * <h3>【AI 技术详解】多模态（Multimodal）图片对话</h3>
+ * <ul>
+ *   <li><b>什么是多模态</b>：AI 能同时处理多种模态（文本、图片、音频、视频）</li>
+ *   <li><b>本项目的多模态</b>：图片 + 文本 → 文本回答（图生文）</li>
+ *   <li><b>为什么需要多模态</b>：用户可能上传截图（错误码、商品图、订单详情）询问问题</li>
+ * </ul>
+ *
+ * <h3>【AI 技术详解】两段式编排架构</h3>
+ * <pre>
+ *   用户上传图片 + 问题
+ *           │
+ *           ▼
+ *   ┌───────────────────────┐
+ *   │ 第一段：视觉模型看图   │ ← 硅基流动 Qwen2.5-VL-72B
+ *   │ 图片 → 文本描述       │   （多模态大模型，理解图片内容）
+ *   └───────────────────────┘
+ *           │
+ *           ▼
+ *   ┌───────────────────────┐
+ *   │ 第二段：RAG 检索+回答  │ ← DeepSeek
+ *   │ 描述文本 + 用户问题    │   （基于知识库检索生成回答）
+ *   │ → 检索知识库           │
+ *   │ → LLM 生成回答        │
+ *   └───────────────────────┘
+ *           │
+ *           ▼
+ *       返回回答 + 引用溯源
+ * </pre>
+ *
+ * <h3>【AI 技术详解】为什么用两段式而非直接用多模态模型回答？</h3>
+ * <ul>
+ *   <li><b>复用 RAG 能力</b>：视觉模型只负责"看图"，回答仍基于知识库检索，保证回答有依据</li>
+ *   <li><b>模型分工</b>：视觉模型擅长理解图片，文本模型擅长生成回答，各司其职</li>
+ *   <li><b>降级友好</b>：视觉模型不可用时，有文字仍可回答（降级为纯文本对话）</li>
+ *   <li><b>成本优化</b>：视觉模型调用成本高，只用一次"看图"，后续用便宜的文本模型</li>
+ * </ul>
  *
  * <h3>降级策略（视觉是增强项，不可用不影响核心对话）</h3>
  * <ul>
- *   <li>图片 URL 校验失败 → {@link ResultCode#CHAT_IMAGE_URL_INVALID}；</li>
- *   <li>视觉理解失败 + 有文字 → 降级为纯文本对话（{@code degraded=true}）；</li>
- *   <li>视觉理解失败 + 仅图片 → {@link ResultCode#CHAT_VISION_SERVICE_UNAVAILABLE} 明确提示。</li>
+ *   <li>图片 URL 校验失败 → {@link ResultCode#CHAT_IMAGE_URL_INVALID}（SSRF 防护）</li>
+ *   <li>视觉理解失败 + 有文字 → 降级为纯文本对话（{@code degraded=true}）</li>
+ *   <li>视觉理解失败 + 仅图片 → {@link ResultCode#CHAT_VISION_SERVICE_UNAVAILABLE} 明确提示</li>
+ * </ul>
+ *
+ * <h3>【技术关联】安全防护</h3>
+ * <ul>
+ *   <li><b>SSRF 防护</b>：{@link ImageUrlValidator} 白名单校验图片 URL，防止探测内网</li>
+ *   <li><b>PII 脱敏</b>：{@link PiiMasker} 对视觉描述中的手机号/身份证号脱敏，防止泄露</li>
+ *   <li><b>图片格式校验</b>：只允许 jpg/png/webp/gif，防止上传恶意文件</li>
+ *   <li><b>大小限制</b>：5MB 上限，防止资源耗尽</li>
  * </ul>
  */
 @Slf4j
@@ -98,7 +136,21 @@ public class VisionChatServiceImpl implements VisionChatService {
     }
 
     /**
-     * 视觉理解：图片 URL → 文本描述；失败返回 null，成功时脱敏。
+     * 【AI 核心】视觉理解：图片 URL → 文本描述；失败返回 null，成功时脱敏。
+     *
+     * <p><b>【AI 技术详解】视觉模型调用流程</b>：
+     * <ol>
+     *   <li>构造多模态消息：文本指令 + 图片 URL</li>
+     *   <li>调用视觉模型（硅基流动 Qwen2.5-VL-72B）</li>
+     *   <li>模型返回图片描述文本</li>
+     *   <li>PII 脱敏（手机号/身份证号）</li>
+     * </ol>
+     *
+     * <p><b>【技术关联】与 VisionModelClient 的关系</b>：
+     * <ul>
+     *   <li>VisionModelClient：封装视觉模型调用，带弹性容错（超时/重试/熔断）</li>
+     *   <li>本方法：调用 VisionModelClient 并处理结果（脱敏、降级）</li>
+     * </ul>
      */
     private String describeImage(String imageUrl) {
         try {

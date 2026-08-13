@@ -20,26 +20,66 @@ import java.util.regex.Pattern;
 /**
  * AI 智能问数（NL2SQL）工具服务 —— 让大模型直接查数据库。
  *
- * <h3>学习要点（技术：Function Calling / NL2SQL / 安全防护）</h3>
+ * <h3>【AI 技术详解】NL2SQL（Natural Language to SQL）</h3>
  * <ul>
- *   <li><b>原理</b>：以 Spring AI {@link Tool} 方式注册给 LLM。用户自然语言提问 →
- *       模型判断查哪个库、组装 SELECT SQL → 调用本工具执行 → 模型把结果组织成自然语言回复。</li>
- *   <li><b>为什么这么设计</b>：把"写 SQL"交给模型，把"执行安全"交给代码。
- *       模型不直接连数据库，只通过白名单校验后的只读通道查询。</li>
- *   <li><b>安全五道闸</b>：①仅 SELECT 单条（拦分号/注释绕过）②拦写操作关键字
- *       ③禁系统库/危险函数 ④强制 LIMIT 100 防拖库 ⑤JDBC readOnly + 10s 超时双保险。</li>
- *   <li><b>多库路由</b>：通过 database 参数路由到 user/product/order/chat/knowledge
- *       五个业务库的只读数据源。</li>
+ *   <li><b>什么是 NL2SQL</b>：将自然语言问题转换为 SQL 查询语句的技术</li>
+ *   <li><b>应用场景</b>：运营人员不懂 SQL，但想查数据（"这个月有多少订单？"）</li>
+ *   <li><b>技术原理</b>：
+ *       <ol>
+ *         <li>用户提供自然语言问题（"这个月有多少订单？"）</li>
+ *         <li>LLM 分析问题，判断查哪个库、组装 SQL（SELECT COUNT(*) FROM orders WHERE ...）</li>
+ *         <li>调用本工具执行 SQL</li>
+ *         <li>LLM 把查询结果组织成自然语言回复（"本月共有 1234 个订单"）</li>
+ *       </ol>
+ *   </li>
  * </ul>
  *
- * <h3>安全策略（只读 + 白名单）</h3>
+ * <h3>【AI 技术详解】Function Calling（函数调用）机制</h3>
  * <ul>
- *   <li>仅允许 {@code SELECT} 开头的单条查询，拦截多语句（分号拼接）与注释绕过；</li>
- *   <li>拦截 INSERT/UPDATE/DELETE/DDL/GRANT/SHOW 等全部写操作与危险关键字；</li>
- *   <li>禁止访问 information_schema/mysql/sys 等系统库与 sleep/benchmark 等危险函数；</li>
- *   <li>强制追加 {@code LIMIT 100}（已有 LIMIT 且超过 100 则改写），防止拖库；</li>
- *   <li>连接串追加 {@code readOnly=true}，JDBC 查询超时 10s，双保险只读。</li>
+ *   <li><b>原理</b>：以 Spring AI {@link Tool} 方式注册给 LLM，LLM 输出"我要调用某个工具"的 JSON 指令，
+ *       Spring AI 框架拦截该指令，调用对应的 Java 方法，再把结果返回给 LLM</li>
+ *   <li><b>为什么这么设计</b>：把"写 SQL"交给模型，把"执行安全"交给代码。
+ *       模型不直接连数据库，只通过白名单校验后的只读通道查询</li>
+ *   <li><b>优势</b>：
+ *       <ul>
+ *         <li>LLM 负责理解意图和生成 SQL（擅长自然语言处理）</li>
+ *         <li>代码负责安全校验和执行（擅长规则执行）</li>
+ *         <li>各司其职，安全与智能兼得</li>
+ *       </ul>
+ *   </li>
  * </ul>
+ *
+ * <h3>【AI 技术详解】安全五道闸</h3>
+ * <ol>
+ *   <li><b>仅 SELECT 单条</b>：拦分号/注释绕过，防止多语句注入</li>
+ *   <li><b>拦写操作关键字</b>：INSERT/UPDATE/DELETE/DDL/GRANT/SHOW 等全部拦截</li>
+ *   <li><b>禁系统库/危险函数</b>：information_schema/mysql/sys、sleep/benchmark 等</li>
+ *   <li><b>强制 LIMIT 100</b>：防止拖库，已有 LIMIT 且超过 100 则改写</li>
+ *   <li><b>JDBC readOnly + 10s 超时</b>：双保险只读，即使绕过白名单也无法写入</li>
+ * </ol>
+ *
+ * <h3>【AI 技术详解】多库路由</h3>
+ * <ul>
+ *   <li><b>问题</b>：业务数据分散在多个库（用户库、商品库、订单库等）</li>
+ *   <li><b>方案</b>：通过 database 参数路由到对应的只读数据源</li>
+ *   <li><b>LLM 如何选择库</b>：System Prompt 中提供数据库 Schema，LLM 根据问题语义选择</li>
+ * </ul>
+ *
+ * <h3>【技术关联】与 SpringAiConfig 的关系</h3>
+ * <pre>
+ *   SpringAiConfig.toolCallbackProvider()
+ *       └── MethodToolCallbackProvider.builder()
+ *               .toolObjects(orderQueryService, nl2SqlQueryService)  // 注册为 LLM 工具
+ *               .build()
+ *
+ *   LLM 调用流程：
+ *       用户问"这个月有多少订单？"
+ *           → LLM 判断需要查数据库
+ *           → LLM 输出：调用 executeReadOnlyQuery(database="order", sql="SELECT COUNT(*) FROM orders WHERE ...")
+ *           → Spring AI 调用本方法执行 SQL
+ *           → 返回查询结果 JSON
+ *           → LLM 组织成自然语言回复
+ * </pre>
  */
 @Slf4j
 @Service
@@ -96,11 +136,25 @@ public class Nl2SqlQueryService {
     }
 
     /**
-     * 执行只读 SQL 查询 —— LLM 工具入口（@Tool 暴露给模型）。
+     * 【AI 核心】执行只读 SQL 查询 —— LLM 工具入口（@Tool 暴露给模型）。
      *
      * <p>执行顺序：①按 database 选只读数据源 → ②白名单校验 SQL → ③强制 LIMIT →
      * ④JDBC 执行（10s 超时）→ ⑤结果转 JSON 文本返回给模型。
      * 日期字段序列化为可读字符串，便于模型理解。</p>
+     *
+     * <p><b>【AI 技术详解】@Tool 注解的作用</b>：
+     * <ul>
+     *   <li><b>description</b>：告诉 LLM 这个工具的功能、参数含义、使用规则</li>
+     *   <li><b>LLM 如何使用</b>：根据 description 判断何时调用、传什么参数</li>
+     *   <li><b>重要性</b>：description 写得越好，LLM 调用越准确</li>
+     * </ul>
+     *
+     * <p><b>【技术关联】与 SpringAiConfig 的关系</b>：
+     * <ul>
+     *   <li>本方法通过 @Tool 注解暴露给 LLM</li>
+     *   <li>SpringAiConfig.toolCallbackProvider() 将本类注册为工具对象</li>
+     *   <li>LLM 调用时，Spring AI 框架自动调用本方法</li>
+     * </ul>
      *
      * @param database 逻辑库标识：user(用户) / product(商品) / order(订单支付) / chat(对话消息) / knowledge(知识库)
      * @param sql      只读 SELECT 查询语句
