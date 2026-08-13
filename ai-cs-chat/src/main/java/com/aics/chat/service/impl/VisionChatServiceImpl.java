@@ -102,9 +102,12 @@ public class VisionChatServiceImpl implements VisionChatService {
      */
     private String describeImage(String imageUrl) {
         try {
+            // describeAsync(...).get()：阻塞等待视觉模型返回描述（Future.get 解包）
             String description = visionModelClient.describeAsync(imageUrl).get();
+            // 视觉描述可能含截图中的手机号/身份证号，注入 Prompt 前先脱敏
             return piiMasker.mask(description);
         } catch (Exception e) {
+            // 视觉理解失败（超时/熔断/异常）→ 返回 null，由调用方降级
             log.warn("视觉理解失败: {}", e.getMessage());
             return null;
         }
@@ -127,17 +130,18 @@ public class VisionChatServiceImpl implements VisionChatService {
 
     /**
      * 组合查询：用户文字 + 图片描述。
+     * <p>把两段输入拼成一条检索查询，交给 RAG 链路：有文字用文字，有图片描述则用"图片内容：xxx"补充。</p>
      */
     private String buildQuery(String message, String description) {
         StringBuilder sb = new StringBuilder();
         if (StringUtils.hasText(message)) {
-            sb.append(message);
+            sb.append(message);   // 用户附带文字优先
         }
         if (StringUtils.hasText(description)) {
             if (sb.length() > 0) {
-                sb.append("；");
+                sb.append("；");   // 文字与图片描述之间用分号分隔
             }
-            sb.append("图片内容：").append(description);
+            sb.append("图片内容：").append(description);   // 图片描述作为补充上下文
         }
         return sb.toString();
     }

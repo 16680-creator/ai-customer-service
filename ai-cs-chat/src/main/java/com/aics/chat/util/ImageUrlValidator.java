@@ -27,10 +27,11 @@ public class ImageUrlValidator {
     public ImageUrlValidator(VisionProperties visionProperties) {
         String hosts = visionProperties.getAllowedImageHost();
         if (StringUtils.hasText(hosts)) {
-            Arrays.stream(hosts.split(","))
-                    .map(String::trim)
-                    .filter(StringUtils::hasText)
-                    .forEach(allowedHosts::add);
+            // 白名单配置形如 "minio.internal,cdn.example.com"，逗号分隔
+            Arrays.stream(hosts.split(","))       // 按逗号拆成多个主机
+                    .map(String::trim)            // 去掉首尾空格
+                    .filter(StringUtils::hasText) // 过滤空项
+                    .forEach(allowedHosts::add);  // 加入白名单集合
         }
     }
 
@@ -45,28 +46,28 @@ public class ImageUrlValidator {
             return false;
         }
         try {
-            URI uri = URI.create(imageUrl);
-            String scheme = uri.getScheme();
-            // 仅允许 http/https，拒绝 file/ftp 等其他协议
+            URI uri = URI.create(imageUrl);   // 解析 URL（失败会抛异常，走 catch 返回 false）
+            String scheme = uri.getScheme();  // 协议：http / https / file / ftp ...
+            // 仅允许 http/https，拒绝 file/ftp 等其他协议（防本地文件读取）
             if (scheme == null || (!"http".equalsIgnoreCase(scheme) && !"https".equalsIgnoreCase(scheme))) {
                 return false;
             }
-            String host = uri.getHost();
+            String host = uri.getHost();      // 主机名，如 "minio.internal"
             if (!StringUtils.hasText(host)) {
-                return false;
+                return false;                  // 无主机名（如相对路径）拒绝
             }
-            // 白名单未配置时拒绝所有地址（安全默认，防 SSRF）
+            // 白名单未配置时拒绝所有地址（安全默认，防 SSRF 探测内网）
             if (allowedHosts.isEmpty()) {
                 log.warn("图片 URL 白名单未配置，拒绝访问: host={}", host);
                 return false;
             }
-            // 主机名精确匹配或子域匹配
+            // 主机名精确匹配（minio.internal）或子域匹配（img.minio.internal）
             for (String allowed : allowedHosts) {
                 if (host.equalsIgnoreCase(allowed) || host.endsWith("." + allowed)) {
                     return true;
                 }
             }
-            return false;
+            return false;   // 未命中白名单，拒绝
         } catch (Exception e) {
             log.warn("图片 URL 解析失败: imageUrl={}", imageUrl);
             return false;

@@ -70,20 +70,25 @@ public class SiliconFlowImageDescriptionService implements ImageDescriptionServi
 
     @Override
     public String describe(String imageUrl) {
+        // 视觉模型未初始化 或 图片地址为空 → 返回 null（调用方跳过描述，不阻断主流程）
         if (visionModel == null || !StringUtils.hasText(imageUrl)) {
             return null;
         }
         try {
+            // 构造多模态消息：指令 + 图片 URL（Media 包装，OpenAiChatModel 转 image_url）
             UserMessage userMessage = UserMessage.builder()
                     .text("请描述这张商品图片的外观、品类和关键特征，用简洁的中文概括。")
                     .media(new Media(MimeTypeUtils.IMAGE_PNG, URI.create(imageUrl)))
                     .build();
+            // 调用视觉模型：call → 结果 → 输出 → 纯文本描述
             String description = visionModel.call(new Prompt(List.of(userMessage)))
                     .getResult()
                     .getOutput()
                     .getText();
+            // 描述为空串视为识别失败，统一返回 null
             return StringUtils.hasText(description) ? description : null;
         } catch (Exception e) {
+            // 视觉调用异常（超时/限流/网络）→ 返回 null，商品创建/更新流程不中断
             log.warn("商品图片描述生成失败: {}", e.getMessage());
             return null;
         }

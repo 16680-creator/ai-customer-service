@@ -13,10 +13,22 @@ import java.util.regex.Pattern;
 @Component
 public class PiiMasker {
 
-    /** 11 位手机号：保留前 3 位 + 后 4 位 */
+    /**
+     * 11 位手机号：保留前 3 位 + 后 4 位
+     * 正则拆解：
+     *   (1[3-9]\d)  — 第1组：前3位（1 开头 + 3~9 + 任意数字，即手机号号段）
+     *   \d{4}       — 中间4位（被脱敏，不保留）
+     *   (\d{4})     — 第2组：后4位（保留）
+     */
     private static final Pattern PHONE = Pattern.compile("(1[3-9]\\d)\\d{4}(\\d{4})");
 
-    /** 18 位身份证号：保留前 6 位 + 后 4 位 */
+    /**
+     * 18 位身份证号：保留前 6 位 + 后 4 位
+     * 正则拆解：
+     *   (\d{6})         — 第1组：前6位（行政区划码）
+     *   \d{8}           — 中间8位（出生日期，被脱敏）
+     *   (\d{3}[\dXx])   — 第2组：后4位（顺序码3位 + 校验码，校验码可为 X）
+     */
     private static final Pattern ID_CARD = Pattern.compile("(\\d{6})\\d{8}(\\d{3}[\\dXx])");
 
     /**

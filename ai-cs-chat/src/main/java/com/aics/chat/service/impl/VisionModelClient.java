@@ -75,16 +75,27 @@ public class VisionModelClient {
     @Retry(name = "visionService", fallbackMethod = "fallbackDescribe")
     @CircuitBreaker(name = "visionService", fallbackMethod = "fallbackDescribe")
     public CompletableFuture<String> describeAsync(String imageUrl) {
+        // supplyAsync：把阻塞的视觉模型调用丢到独立线程执行，
+        // 返回 Future 供 @TimeLimiter 通过 Future.get(timeout) 实现 5s 超时控制
         return CompletableFuture.supplyAsync(() -> {
             try {
                 if (visionModel == null) {
+                    // 视觉模型未初始化（未启用/未配 API Key）→ 抛异常触发降级
                     throw new IllegalStateException("视觉模型未初始化");
                 }
-                // 多模态消息：文本指令 + 图片（URL 作为 Media）
+                // 构造多模态消息：文本指令 + 图片
+                // - UserMessage.builder()：Spring AI 的多模态消息构建器
+                // - .text(...)：给视觉模型的指令，让它聚焦"提取关键信息"
+                // - .media(new Media(mimeType, URI))：把图片 URL 包装成 Media，
+                //   OpenAiChatModel 会自动转成 OpenAI 协议的 image_url 字段
                 UserMessage userMessage = UserMessage.builder()
                         .text("请描述这张图片中的关键信息（文字、型号、错误码、页面状态等），用简洁的中文概括。")
                         .media(new Media(MimeTypeUtils.IMAGE_PNG, URI.create(imageUrl)))
                         .build();
+                // call(...)：发起视觉模型调用
+                //   .getResult()：拿到完整结果
+                //   .getOutput()：拿到消息输出
+                //   .getText()：提取纯文本描述
                 String description = visionModel.call(new Prompt(List.of(userMessage)))
                         .getResult()
                         .getOutput()
