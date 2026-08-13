@@ -29,6 +29,7 @@
 | 001-cart-checkout | 购物车与结算 | 已实施 | 购物车、订单、优惠、支付链路 |
 | 002-rag-quality-upgrade | RAG 检索质量升级五件套 | 已实施 | Rerank、混合检索、引用溯源、Tika 多格式、MQ 增量同步 |
 | 003-rag-advanced-features | RAG 进阶六件套 | 实施中 | 评估体系、Hybrid RAG、查询改写/HyDE、GraphRAG、问数图表、知识库运营闭环 |
+| 005-after-sales-agent | 智能客服 Agent 编排与人工转接 | 实施中 | 售后 Agent 状态机、工具编排、用户确认、幂等、转人工、轨迹审计 |
 
 ## 备注
 

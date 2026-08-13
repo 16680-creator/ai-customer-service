@@ -1,4 +1,4 @@
-﻿# AI 智能客服平台（AI Customer Service Platform）
+# AI 智能客服平台（AI Customer Service Platform）
 
 ---
 
@@ -93,11 +93,11 @@ chat / knowledge / search / message / notify / user / order / product → common
 详见 [specs/README.md](specs/README.md)。
 
 <!-- SPECKIT START -->
-当前活动功能：多模态图生文（VLM）
-- feature-id: `004-vlm-multimodal`
-- 分支: `004-vlm-multimodal`
-- 实施计划: [specs/004-vlm-multimodal/plan.md](specs/004-vlm-multimodal/plan.md)
-- 功能规格: [specs/004-vlm-multimodal/spec.md](specs/004-vlm-multimodal/spec.md)
+当前活动功能：智能客服 Agent 编排与人工转接
+- feature-id: `005-after-sales-agent`
+- 分支: `005-after-sales-agent`
+- 实施计划: [specs/005-after-sales-agent/plan.md](specs/005-after-sales-agent/plan.md)
+- 功能规格: [specs/005-after-sales-agent/spec.md](specs/005-after-sales-agent/spec.md)
 <!-- SPECKIT END -->
 
 ---
