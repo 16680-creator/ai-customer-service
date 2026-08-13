@@ -22,10 +22,10 @@ aics:
   # RAG two-stage retrieval
   rag:
     recall-top-k: 20
-    # 宽召回阈值：只保证召回率，质量交给 Rerank 精排(min-score 0.7)把关
+    # Broad recall threshold: recall first, quality left to Rerank (min-score 0.7)
     recall-threshold: 0.3
 
-  # AI 智能问数（NL2SQL）：只读数据源，供 executeReadOnlyQuery 工具按库执行 SELECT
+  # AI NL2SQL: read-only data sources for the executeReadOnlyQuery tool
   nl2sql:
     username: root
     password: ${DB_PASSWORD}
@@ -35,3 +35,12 @@ aics:
       order: jdbc:mysql://123.60.31.79:3306/ai_customer_service?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
       chat: jdbc:mysql://123.60.31.79:3306/chat_db?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
       knowledge: jdbc:mysql://123.60.31.79:3306/knowledge_db?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+
+  # Multimodal vision chat: SiliconFlow Qwen3-VL sees the image, DeepSeek answers
+  vision:
+    base-url: https://api.siliconflow.cn
+    api-key: sk-aonceapnbwfoswegzsieghnijdddzbsccsitmndyevpfdwcs
+    model: Qwen/Qwen3-VL-32B-Instruct
+    enabled: true
+    # MinIO public endpoint host (SSRF whitelist for image URLs)
+    allowed-image-host: 123.60.31.79

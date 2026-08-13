@@ -20,7 +20,7 @@ public class VisionProperties {
     private String apiKey = "";
 
     /** 视觉模型名（硅基流动多模态模型） */
-    private String model = "Qwen/Qwen2.5-VL-72B-Instruct";
+    private String model = "Qwen/Qwen3-VL-32B-Instruct";
 
     /** 视觉能力总开关（false 时图片对话全部降级） */
     private boolean enabled = true;

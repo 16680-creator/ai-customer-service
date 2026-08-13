@@ -1,25 +1,24 @@
-# 将 tools/nacos-config 下的所有 yml 配置发布到 Nacos aics 命名空间
-# 用法: powershell -ExecutionPolicy Bypass -File .\publish-nacos-config.ps1
+# Publish all tools\nacos-config\*.yml to the Nacos "aics" namespace.
+# Usage: powershell -ExecutionPolicy Bypass -File .\publish-nacos-config.ps1
+#
+# Uses curl.exe --data-urlencode "content@<file>" so file bytes are sent
+# raw (UTF-8 safe). Do NOT use Invoke-RestMethod with a hashtable body:
+# PowerShell 5.1 encodes it as GBK and corrupts Chinese characters.
 
-$nacos   = "http://127.0.0.1:8848"
-$tenant  = "aics"
-$group   = "DEFAULT_GROUP"
-$dir     = "D:\Projects\Persion\ai-customer-service\tools\nacos-config"
+$nacos  = "http://127.0.0.1:8848"
+$tenant = "aics"
+$group  = "DEFAULT_GROUP"
+$dir    = "$PSScriptRoot\nacos-config"
 
+$ok = 0; $fail = 0
 Get-ChildItem -Path $dir -Filter *.yml | ForEach-Object {
-    $dataId  = $_.Name
-    $content = Get-Content -Raw -Path $_.FullName
-    $body = @{
-        dataId  = $dataId
-        group   = $group
-        tenant  = $tenant
-        type    = "yaml"
-        content = $content
-    }
-    try {
-        $r = Invoke-RestMethod -Uri "$nacos/nacos/v1/cs/configs" -Method Post -Body $body -TimeoutSec 15
-        Write-Output ("{0} => {1}" -f $dataId, $r)
-    } catch {
-        Write-Output ("{0} => ERROR: {1}" -f $dataId, $_.Exception.Message)
-    }
+    $r = & curl.exe -s -X POST "$nacos/nacos/v1/cs/configs" `
+        --data-urlencode "dataId=$($_.Name)" `
+        --data-urlencode "group=$group" `
+        --data-urlencode "tenant=$tenant" `
+        --data-urlencode "type=yaml" `
+        --data-urlencode "content@$($_.FullName)"
+    if ("$r".Trim() -eq "true") { $ok++; Write-Output ("  [OK]   " + $_.Name) }
+    else { $fail++; Write-Output ("  [FAIL] " + $_.Name + " => " + $r) }
 }
+Write-Output "Published $ok configs, $fail failed"

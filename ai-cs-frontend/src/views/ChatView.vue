@@ -325,9 +325,9 @@ async function sendMessage() {
   sending.value = true
   await scrollToBottom()
 
-  // 预置空回复气泡，流式填充
-  const assistant = { role: 'assistant', content: '' }
-  currentMessages.value.push(assistant)
+  // 预置空回复气泡，流式填充（需持响应式代理引用，逐 token 追加才会触发视图更新）
+  currentMessages.value.push({ role: 'assistant', content: '' })
+  const assistant = currentMessages.value[currentMessages.value.length - 1]
   await scrollToBottom()
 
   try {

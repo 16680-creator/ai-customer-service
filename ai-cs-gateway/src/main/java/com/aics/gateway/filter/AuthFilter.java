@@ -41,10 +41,14 @@ public class AuthFilter implements GlobalFilter, Ordered {
 
     /** 白名单路径（不需要认证） */
     private static final List<String> WHITE_LIST = List.of(
+            "/user/login",
+            "/user/register",
+            "/user/captcha",
             "/api/user/login",
             "/api/user/register",
             "/api/user/captcha",
             "/api/health",
+            "/health",
             "/doc.html",
             "/webjars/",
             "/v3/api-docs",
