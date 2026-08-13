@@ -59,7 +59,7 @@ import org.springframework.beans.factory.annotation.Value;
  * 见类下 {@link Value} 字段；ChatModel 配置由 {@code spring.ai.openai.*} 装配，不在本类显式声明。</p>
  */
 @Configuration
-@EnableConfigurationProperties(RerankProperties.class)
+@EnableConfigurationProperties({RerankProperties.class, VisionProperties.class})
 public class SpringAiConfig {
 
     private static final Logger log = LoggerFactory.getLogger(SpringAiConfig.class);

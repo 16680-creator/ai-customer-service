@@ -40,6 +40,8 @@ public enum ResultCode {
     CHAT_MESSAGE_SEND_FAIL(3002, "消息发送失败"),
     CHAT_AI_SERVICE_UNAVAILABLE(3003, "AI服务暂不可用"),
     CHAT_CONTEXT_OVERFLOW(3004, "对话上下文超出限制"),
+    CHAT_VISION_SERVICE_UNAVAILABLE(3005, "视觉服务暂不可用，无法识别图片"),
+    CHAT_IMAGE_URL_INVALID(3006, "图片地址无效或不允许访问"),
 
     // ==================== 搜索模块 4xxx ====================
     SEARCH_INDEX_NOT_FOUND(4001, "搜索索引不存在"),

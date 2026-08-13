@@ -2,9 +2,15 @@ package com.aics.chat.controller;
 
 import com.aics.chat.dto.ChatHistoryMessage;
 import com.aics.chat.dto.ChatRagResponseDTO;
+import com.aics.chat.dto.VisionChatRequest;
+import com.aics.chat.dto.VisionChatResponse;
 import com.aics.chat.service.ChatService;
+import com.aics.chat.service.VisionChatService;
 import com.aics.chat.util.ChatUserContext;
+import com.aics.common.exception.BusinessException;
 import com.aics.common.result.Result;
+import com.aics.common.result.ResultCode;
+import com.aics.common.storage.FileStorageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.NotBlank;
@@ -12,10 +18,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * AI 对话控制器
@@ -41,6 +49,14 @@ import java.util.Map;
 public class ChatController {
 
     private final ChatService chatService;
+    private final VisionChatService visionChatService;
+    private final FileStorageService fileStorageService;
+
+    /** 图片对话支持的图片格式 */
+    private static final Set<String> ALLOWED_IMAGE_EXT = Set.of("jpg", "jpeg", "png", "webp", "gif");
+
+    /** 图片大小上限 5MB */
+    private static final long MAX_IMAGE_SIZE = 5 * 1024 * 1024L;
 
     /**
      * 发送对话消息（普通同步对话）。
@@ -156,5 +172,88 @@ public class ChatController {
     @GetMapping("/history")
     public Result<List<ChatHistoryMessage>> getHistory(@RequestParam("sessionKey") @NotBlank(message = "会话标识不能为空") String sessionKey) {
         return chatService.getHistory(sessionKey);
+    }
+
+    /**
+     * 上传图片（图片对话前置）。
+     *
+     * <p>复用 {@code ai-cs-common} 的 {@link FileStorageService}（MinIO），目录 {@code chat/images}；
+     * 校验格式与大小，与商品图限制保持一致。</p>
+     */
+    @Operation(summary = "上传图片")
+    @PostMapping("/upload-image")
+    public Result<String> uploadImage(@RequestParam("file") MultipartFile file) {
+        String originalName = file.getOriginalFilename() == null ? "" : file.getOriginalFilename();
+        String ext = "";
+        int dotIndex = originalName.lastIndexOf('.');
+        if (dotIndex >= 0) {
+            ext = originalName.substring(dotIndex + 1).toLowerCase();
+        }
+        if (!ALLOWED_IMAGE_EXT.contains(ext)) {
+            throw new BusinessException(ResultCode.BAD_REQUEST, "仅支持 jpg/png/webp/gif 格式");
+        }
+        if (file.getSize() > MAX_IMAGE_SIZE) {
+            throw new BusinessException(ResultCode.BAD_REQUEST, "图片大小不能超过 5MB");
+        }
+        String url = fileStorageService.upload(file, "chat/images");
+        return Result.success("图片上传成功", url);
+    }
+
+    /**
+     * 图片对话（多模态图生文）。
+     *
+     * <p>两段式：视觉模型理解图片 → 描述文本走 RAG 检索 → DeepSeek 回答。
+     * 视觉不可用时降级为纯文本对话（有文字）或返回明确提示（仅图片）。</p>
+     */
+    @Operation(summary = "图片对话")
+    @PostMapping("/vision")
+    public Result<VisionChatResponse> chatWithVision(@RequestParam("sessionId") @NotBlank(message = "会话ID不能为空") String sessionId,
+                                                     @RequestParam("imageUrl") @NotBlank(message = "图片地址不能为空") String imageUrl,
+                                                     @RequestParam(value = "message", required = false) String message,
+                                                     @RequestParam(value = "knowledgeBase", required = false) String knowledgeBase,
+                                                     @RequestParam(value = "hybrid", defaultValue = "false") boolean hybrid,
+                                                     @RequestParam(value = "rewrite", defaultValue = "false") boolean rewrite,
+                                                     @RequestHeader(value = "X-User-Id", required = false) Long userId) {
+        try {
+            ChatUserContext.setUserId(userId);
+            return visionChatService.chatWithVision(buildVisionRequest(sessionId, imageUrl, message, knowledgeBase, hybrid, rewrite));
+        } finally {
+            ChatUserContext.clear();
+        }
+    }
+
+    /**
+     * 图片对话（SSE 流式，逐 token 推送）。
+     */
+    @Operation(summary = "图片对话（SSE 流式）")
+    @PostMapping(value = "/vision/sse", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter chatWithVisionSse(@RequestParam("sessionId") @NotBlank(message = "会话ID不能为空") String sessionId,
+                                        @RequestParam("imageUrl") @NotBlank(message = "图片地址不能为空") String imageUrl,
+                                        @RequestParam(value = "message", required = false) String message,
+                                        @RequestParam(value = "knowledgeBase", required = false) String knowledgeBase,
+                                        @RequestParam(value = "hybrid", defaultValue = "false") boolean hybrid,
+                                        @RequestParam(value = "rewrite", defaultValue = "false") boolean rewrite,
+                                        @RequestHeader(value = "X-User-Id", required = false) Long userId) {
+        try {
+            ChatUserContext.setUserId(userId);
+            return visionChatService.chatWithVisionSse(buildVisionRequest(sessionId, imageUrl, message, knowledgeBase, hybrid, rewrite));
+        } finally {
+            ChatUserContext.clear();
+        }
+    }
+
+    /**
+     * 组装图片对话请求 DTO。
+     */
+    private VisionChatRequest buildVisionRequest(String sessionId, String imageUrl, String message,
+                                                 String knowledgeBase, boolean hybrid, boolean rewrite) {
+        VisionChatRequest request = new VisionChatRequest();
+        request.setSessionId(sessionId);
+        request.setImageUrl(imageUrl);
+        request.setMessage(message);
+        request.setKnowledgeBase(knowledgeBase);
+        request.setHybrid(hybrid);
+        request.setRewrite(rewrite);
+        return request;
     }
 }
