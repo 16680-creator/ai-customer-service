@@ -18,7 +18,7 @@ import lombok.Data;
 public class AgentRunDTO {
 
     @Schema(description = "执行ID（UUID，幂等键）", example = "uuid-run-001")
-    @NotBlank(message = "执行ID不能为空")
+    @NotBlank(message = "执行ID不能为空") // 幂等键：runId 已存在时服务端直接返回首次创建的 runId
     private String runId;
 
     @Schema(description = "会话ID", example = "1001")
@@ -36,10 +36,10 @@ public class AgentRunDTO {
     private String sentiment;
 
     @Schema(description = "状态：RUNNING/WAITING_CONFIRM/COMPLETED/CANCELLED/HANDOFF/FAILED（默认 RUNNING）", example = "RUNNING")
-    private String status;
+    private String status; // 可选：不传时由实体初始值保证为 RUNNING
 
     @Schema(description = "当前步骤号（默认 0）", example = "0")
-    private Integer currentStep;
+    private Integer currentStep; // 可选：不传时由实体初始值保证为 0
 
     @Schema(description = "Prompt/规则版本", example = "v1.2")
     private String promptVersion;

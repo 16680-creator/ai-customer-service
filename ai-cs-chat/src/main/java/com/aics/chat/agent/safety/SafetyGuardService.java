@@ -35,18 +35,22 @@ public class SafetyGuardService {
      * @return 通过或拦截（含原因）
      */
     public SafetyCheckResult check(String input) {
+        // 空输入直接拦截
         if (input == null || input.isBlank()) {
             return SafetyCheckResult.block("输入内容为空");
         }
+        // 超长输入拦截（防注入超长载荷）
         if (input.length() > 2000) {
             return SafetyCheckResult.block("输入内容超过长度限制（2000 字符）");
         }
+        // 逐条命中正则规则即拦截（确定性检测，零工具调用）
         for (Rule rule : RULES) {
             if (rule.pattern().matcher(input).find()) {
                 log.warn("输入安全检查拦截, reason={}, input={}", rule.desc(), input);
                 return SafetyCheckResult.block("检测到" + rule.desc() + "，已拦截本次请求");
             }
         }
+        // 全部规则未命中：判定安全
         return SafetyCheckResult.pass();
     }
 

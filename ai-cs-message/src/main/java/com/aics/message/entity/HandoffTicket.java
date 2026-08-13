@@ -26,7 +26,7 @@ public class HandoffTicket implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /** 主键ID */
-    @TableId(type = IdType.AUTO)
+    @TableId(type = IdType.AUTO) // 工单无业务主键，由数据库自增生成（工单号 ticketNo 才是业务唯一键）
     private Long id;
 
     /** 工单号（HF+时间戳+序号） */

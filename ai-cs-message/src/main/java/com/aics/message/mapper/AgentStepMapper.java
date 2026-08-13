@@ -13,6 +13,8 @@ import org.apache.ibatis.annotations.Mapper;
  * 由 {@link com.aics.message.service.impl.AgentTraceServiceImpl} 基于 LambdaQueryWrapper 组合实现。
  * </p>
  */
+// 注册为 MyBatis Mapper 接口，由 MyBatis-Plus 自动生成代理实现
 @Mapper
 public interface AgentStepMapper extends BaseMapper<AgentStep> {
+    // 无需自定义 SQL：按 (runId, stepNo) 的幂等追加/覆盖由 Service 层基于 LambdaQueryWrapper 组合实现
 }

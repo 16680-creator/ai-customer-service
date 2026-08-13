@@ -13,6 +13,8 @@ import org.apache.ibatis.annotations.Mapper;
  * {@link com.aics.message.service.impl.AgentTraceServiceImpl} 实现。
  * </p>
  */
+// 注册为 MyBatis Mapper 接口，由 MyBatis-Plus 自动生成代理实现
 @Mapper
 public interface HandoffTicketMapper extends BaseMapper<HandoffTicket> {
+    // 无需自定义 SQL：工单号生成与创建由 Service 层实现，此处仅需标准 CRUD
 }

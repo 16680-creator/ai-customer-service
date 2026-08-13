@@ -16,6 +16,7 @@ public class AgentConfirmRequestDTO {
     private String runId;
 
     @Schema(description = "确认凭证（由 Agent 返回）")
+    // 凭证由 Agent 上一步（确认态）返回，用于防篡改校验
     @NotBlank(message = "确认凭证不能为空")
     private String token;
 

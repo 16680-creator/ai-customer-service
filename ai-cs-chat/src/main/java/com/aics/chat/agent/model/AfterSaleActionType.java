@@ -38,10 +38,12 @@ public enum AfterSaleActionType {
             return null;
         }
         for (AfterSaleActionType t : values()) {
+            // 大小写不敏感匹配动作编码（兼容 LLM 输出变体）
             if (t.code.equalsIgnoreCase(code.trim())) {
                 return t;
             }
         }
+        // 未匹配到已知动作：返回 null 由上层走默认值
         return null;
     }
 }

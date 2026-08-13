@@ -66,11 +66,13 @@ public class AgentTraceServiceImpl implements AgentTraceService {
      */
     @Override
     public String createRun(AgentRunDTO dto) {
+        // 1. 幂等检查：按 runId 查询，已存在则直接返回首次创建的 runId，避免重复建单
         AgentRun existing = agentRunMapper.selectById(dto.getRunId());
         if (existing != null) {
             log.info("Agent 执行记录已存在，幂等返回: runId={}", dto.getRunId());
             return existing.getRunId();
         }
+        // 2. 组装新执行记录（可选字段为空时沿用实体默认值：RUNNING / 0）
         AgentRun run = new AgentRun();
         run.setRunId(dto.getRunId());
         run.setSessionId(dto.getSessionId());
@@ -85,6 +87,7 @@ public class AgentTraceServiceImpl implements AgentTraceService {
         }
         run.setPromptVersion(dto.getPromptVersion());
         run.setErrorSummary(dto.getErrorSummary());
+        // 3. 落库并返回新 runId（createTime/updateTime 由 MetaObjectHandler 自动填充）
         agentRunMapper.insert(run);
         log.info("Agent 执行记录创建成功: runId={}", run.getRunId());
         return run.getRunId();
@@ -96,10 +99,12 @@ public class AgentTraceServiceImpl implements AgentTraceService {
      */
     @Override
     public void updateRunStatus(String runId, String status, Integer currentStep, String errorSummary) {
+        // 1. 前置校验：执行记录不存在则抛 AGENT_RUN_NOT_FOUND，避免对孤儿记录做状态流转
         AgentRun existing = agentRunMapper.selectById(runId);
         if (existing == null) {
             throw new BusinessException(ResultCode.AGENT_RUN_NOT_FOUND);
         }
+        // 2. 构建更新对象并落库（updateById 仅更新非 null 字段，支持 status/currentStep/errorSummary 部分更新）
         AgentRun update = new AgentRun();
         update.setRunId(runId);
         update.setStatus(status);
@@ -115,14 +120,17 @@ public class AgentTraceServiceImpl implements AgentTraceService {
      */
     @Override
     public void appendStep(String runId, AgentStepDTO dto) {
+        // 1. 前置校验：执行记录必须存在，避免写入孤儿步骤轨迹
         AgentRun run = agentRunMapper.selectById(runId);
         if (run == null) {
             throw new BusinessException(ResultCode.AGENT_RUN_NOT_FOUND);
         }
+        // 2. 按 (runId, stepNo) 查询：同一步骤已存在则覆盖更新（幂等）
         LambdaQueryWrapper<AgentStep> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(AgentStep::getRunId, runId).eq(AgentStep::getStepNo, dto.getStepNo());
         AgentStep existing = agentStepMapper.selectOne(wrapper);
         if (existing != null) {
+            // 覆盖更新已有步骤的内容（保留原主键 id 与创建时间）
             existing.setStepType(dto.getStepType());
             existing.setToolName(dto.getToolName());
             existing.setInputDigest(dto.getInputDigest());
@@ -138,6 +146,7 @@ public class AgentTraceServiceImpl implements AgentTraceService {
             log.info("Agent 步骤已覆盖更新（幂等）: runId={}, stepNo={}", runId, dto.getStepNo());
             return;
         }
+        // 3. 该步骤首次上报：插入新步骤轨迹（默认状态 SUCCESS、耗时 0 由实体初始值保证）
         AgentStep step = new AgentStep();
         step.setRunId(runId);
         step.setStepNo(dto.getStepNo());
@@ -162,10 +171,12 @@ public class AgentTraceServiceImpl implements AgentTraceService {
      */
     @Override
     public void recordConfirmation(String runId, AgentConfirmationDTO dto) {
+        // 1. 按 (runId, action) 查询：同一执行内同一动作仅保留一条确认记录
         LambdaQueryWrapper<AgentConfirmation> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(AgentConfirmation::getRunId, runId).eq(AgentConfirmation::getAction, dto.getAction());
         AgentConfirmation existing = agentConfirmationMapper.selectOne(wrapper);
         if (existing != null) {
+            // 2. 已存在则覆盖更新（幂等）：支持 PENDING → CONFIRMED/REJECTED 的状态流转
             existing.setPayloadDigest(dto.getPayloadDigest());
             if (dto.getStatus() != null) {
                 existing.setStatus(dto.getStatus());
@@ -177,6 +188,7 @@ public class AgentTraceServiceImpl implements AgentTraceService {
             log.info("Agent 确认记录已覆盖更新（幂等）: runId={}, action={}", runId, dto.getAction());
             return;
         }
+        // 3. 首次记录：插入新确认记录（默认状态 PENDING 由实体初始值保证）
         AgentConfirmation confirmation = new AgentConfirmation();
         confirmation.setRunId(runId);
         confirmation.setAction(dto.getAction());
@@ -197,7 +209,9 @@ public class AgentTraceServiceImpl implements AgentTraceService {
      */
     @Override
     public HandoffTicketVO createHandoffTicket(HandoffTicketDTO dto) {
+        // 1. 生成唯一工单号：HF + yyyyMMddHHmmss + 4 位随机数字（服务端生成，保证全局唯一）
         String ticketNo = "HF" + TICKET_NO_FORMAT.format(LocalDateTime.now()) + RandomUtil.randomNumbers(4);
+        // 2. 组装工单实体并落库（默认状态 OPEN、优先级 NORMAL 由实体初始值保证）
         HandoffTicket ticket = new HandoffTicket();
         ticket.setTicketNo(ticketNo);
         ticket.setRunId(dto.getRunId());
@@ -213,6 +227,7 @@ public class AgentTraceServiceImpl implements AgentTraceService {
         ticket.setExecutedSteps(dto.getExecutedSteps());
         handoffTicketMapper.insert(ticket);
         log.info("转人工工单已创建: ticketNo={}, runId={}", ticketNo, dto.getRunId());
+        // 3. 返回工单号与状态，供调用方展示并触发后续转人工通知
         return new HandoffTicketVO(ticket.getTicketNo(), ticket.getStatus());
     }
 
@@ -222,15 +237,19 @@ public class AgentTraceServiceImpl implements AgentTraceService {
      */
     @Override
     public AgentRunDetailVO getRunDetail(String runId) {
+        // 1. 前置校验：执行记录不存在则抛 AGENT_RUN_NOT_FOUND
         AgentRun run = agentRunMapper.selectById(runId);
         if (run == null) {
             throw new BusinessException(ResultCode.AGENT_RUN_NOT_FOUND);
         }
+        // 2. 查询该执行下全部步骤，SQL 侧按 stepNo 升序
         LambdaQueryWrapper<AgentStep> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(AgentStep::getRunId, runId).orderByAsc(AgentStep::getStepNo);
         List<AgentStep> steps = agentStepMapper.selectList(wrapper);
+        // 3. 内存防御性二次排序：即使 SQL 排序被忽略，也保证审计回放顺序稳定
         steps.sort(Comparator.comparing(AgentStep::getStepNo));
 
+        // 4. 组装详情 VO：run 元数据 + 步骤轨迹（实体转 DTO）
         AgentRunDetailVO vo = new AgentRunDetailVO();
         vo.setRunId(run.getRunId());
         vo.setSessionId(run.getSessionId());
@@ -251,6 +270,7 @@ public class AgentTraceServiceImpl implements AgentTraceService {
      * 实体转 DTO（步骤）
      */
     private static AgentStepDTO toStepDTO(AgentStep step) {
+        // 实体转 DTO：字段逐一拷贝，供详情响应使用
         AgentStepDTO dto = new AgentStepDTO();
         dto.setRunId(step.getRunId());
         dto.setStepNo(step.getStepNo());

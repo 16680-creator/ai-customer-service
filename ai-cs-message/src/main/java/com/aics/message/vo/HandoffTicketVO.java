@@ -19,7 +19,7 @@ import lombok.NoArgsConstructor;
 public class HandoffTicketVO {
 
     @Schema(description = "工单号", example = "HF202601011200001234")
-    private String ticketNo;
+    private String ticketNo; // 服务端生成的唯一工单号：HF + 时间戳 + 4 位随机数字
 
     @Schema(description = "工单状态：OPEN/ASSIGNED/CLOSED", example = "OPEN")
     private String status;

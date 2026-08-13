@@ -19,14 +19,17 @@ public record ToolResult(Outcome outcome, String message, Object data) {
     }
 
     public static ToolResult success(String message, Object data) {
+        // 成功：携带消息与数据
         return new ToolResult(Outcome.SUCCESS, message, data);
     }
 
     public static ToolResult candidates(String message, Object data) {
+        // 多候选：等待用户选择（如多个可售后订单）
         return new ToolResult(Outcome.CANDIDATES, message, data);
     }
 
     public static ToolResult fail(String message) {
+        // 失败：仅携带原因，无数据
         return new ToolResult(Outcome.FAIL, message, null);
     }
 

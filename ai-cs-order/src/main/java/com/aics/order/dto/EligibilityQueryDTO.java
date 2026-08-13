@@ -12,10 +12,10 @@ import lombok.Data;
 public class EligibilityQueryDTO {
 
     @Schema(description = "订单号", example = "20260801120000010001")
-    @NotBlank(message = "订单号不能为空")
+    @NotBlank(message = "订单号不能为空") // 订单号必填：售后资格按订单维度校验
     private String orderNo;
 
     @Schema(description = "售后动作：EXCHANGE/RETURN/REFUND", example = "EXCHANGE")
-    @NotBlank(message = "售后动作不能为空")
+    @NotBlank(message = "售后动作不能为空") // 动作必填：与订单号共同构成"进行中申请"查重维度
     private String actionType;
 }

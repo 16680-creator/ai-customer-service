@@ -13,10 +13,10 @@ import java.time.LocalDateTime;
 public class AfterSaleApplyVO {
 
     @Schema(description = "申请单号（AS+时间戳+序号）")
-    private String applicationNo;
+    private String applicationNo; // 申请单号，Agent 后续可凭此查询进度
 
     @Schema(description = "申请状态：PENDING/APPROVED/REJECTED/COMPLETED/CANCELLED")
-    private String status;
+    private String status; // 当前申请状态
 
     @Schema(description = "售后动作：EXCHANGE/RETURN/REFUND")
     private String actionType;

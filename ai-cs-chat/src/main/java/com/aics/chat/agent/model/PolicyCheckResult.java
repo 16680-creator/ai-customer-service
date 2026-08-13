@@ -14,15 +14,18 @@ public record PolicyCheckResult(boolean eligible, String ruleId, String ruleCont
                                 String reason, List<String> citations) {
 
     public static PolicyCheckResult eligible(PolicyRule rule) {
+        // 满足规则：携带规则编号与原文引用
         return new PolicyCheckResult(true, rule.id(), rule.content(),
                 "满足规则 " + rule.id() + "（" + rule.days() + " 天期限内）", List.of(rule.id()));
     }
 
     public static PolicyCheckResult notEligible(PolicyRule rule, String reason) {
+        // 不满足：仍携带规则引用，便于向用户说明依据
         return new PolicyCheckResult(false, rule.id(), rule.content(), reason, List.of(rule.id()));
     }
 
     public static PolicyCheckResult insufficient() {
+        // 依据不足：无规则引用，避免编造规则
         return new PolicyCheckResult(false, null, null, "知识库未命中相关售后规则，依据不足", List.of());
     }
 }

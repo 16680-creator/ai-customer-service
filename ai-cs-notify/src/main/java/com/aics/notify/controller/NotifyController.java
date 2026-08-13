@@ -50,6 +50,8 @@ public class NotifyController {
     @Operation(summary = "发送转人工通知", description = "将转人工事件（含工单号、用户ID、优先级、摘要）序列化为 JSON 并定向推送给指定用户")
     @PostMapping("/handoff")
     public Result<Void> sendHandoffNotice(@Valid @RequestBody HandoffNoticeDTO dto) {
+        // 入参校验由 @Valid 触发（ticketNo/userId/summary 必填）
+        // 委托服务层：JSON 序列化（注入 event=HANDOFF）并经 WebSocket 定向推送给目标用户
         notifyHandoffService.sendHandoffNotice(dto);
         return Result.success();
     }

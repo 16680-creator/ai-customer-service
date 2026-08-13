@@ -22,7 +22,7 @@ public class AgentStepDTO {
     private String runId;
 
     @Schema(description = "步骤序号", example = "1")
-    @NotNull(message = "步骤序号不能为空")
+    @NotNull(message = "步骤序号不能为空") // (runId, stepNo) 组成表级唯一键：同一步骤重复上报时按 stepNo 幂等覆盖
     private Integer stepNo;
 
     @Schema(description = "步骤类型：SAFETY/INTENT/LOCATE_ORDER/CHECK_POLICY/RECOMMEND/CONFIRM/EXECUTE/HANDOFF", example = "LOCATE_ORDER")
@@ -42,7 +42,7 @@ public class AgentStepDTO {
     private Long durationMs;
 
     @Schema(description = "状态：SUCCESS/FAILED/SKIPPED（默认 SUCCESS）", example = "SUCCESS")
-    private String status;
+    private String status; // 可选：不传时由实体初始值保证为 SUCCESS
 
     @Schema(description = "错误摘要")
     private String errorSummary;

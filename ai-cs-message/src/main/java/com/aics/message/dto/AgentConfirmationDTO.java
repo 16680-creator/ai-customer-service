@@ -24,7 +24,7 @@ public class AgentConfirmationDTO {
     private String runId;
 
     @Schema(description = "待确认动作：CREATE_EXCHANGE/CREATE_RETURN/CREATE_REFUND", example = "CREATE_EXCHANGE")
-    @NotBlank(message = "待确认动作不能为空")
+    @NotBlank(message = "待确认动作不能为空") // (runId, action) 组成表级唯一键：同一动作仅一条记录，重复上报幂等覆盖
     private String action;
 
     @Schema(description = "操作摘要的SHA-256", example = "a1b2c3d4e5f6...")
@@ -41,6 +41,6 @@ public class AgentConfirmationDTO {
     private LocalDateTime confirmedAt;
 
     @Schema(description = "确认超时时间", example = "2026-01-01T10:30:00")
-    @NotNull(message = "确认超时时间不能为空")
+    @NotNull(message = "确认超时时间不能为空") // 必填：确认有效期的截止时间，超时后由上层编排处理
     private LocalDateTime timeoutAt;
 }

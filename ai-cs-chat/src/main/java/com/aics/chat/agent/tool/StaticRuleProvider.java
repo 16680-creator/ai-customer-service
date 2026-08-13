@@ -24,6 +24,7 @@ public class StaticRuleProvider implements RuleProvider {
 
     @Override
     public List<PolicyRule> loadRules(AfterSaleActionType actionType) {
+        // 按动作类型取种子规则（未覆盖的动作返回空列表）
         PolicyRule rule = RULES.get(actionType);
         return rule == null ? List.of() : List.of(rule);
     }

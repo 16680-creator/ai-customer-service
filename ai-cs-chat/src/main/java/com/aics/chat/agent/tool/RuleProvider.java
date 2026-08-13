@@ -27,6 +27,7 @@ public interface RuleProvider {
      * @return 规则（解析失败返回 null）
      */
     static PolicyRule parse(String title, String content) {
+        // 空内容无法解析
         if (content == null || content.isBlank()) {
             return null;
         }
@@ -39,6 +40,7 @@ public interface RuleProvider {
         } else if (content.contains("退款")) {
             actionType = AfterSaleActionType.REFUND;
         }
+        // 无法识别动作类型：非规则文档
         if (actionType == null) {
             return null;
         }
@@ -48,6 +50,7 @@ public interface RuleProvider {
         if (!daysMatcher.find()) {
             daysMatcher = java.util.regex.Pattern.compile("(\\d+)\\s*天").matcher(content);
         }
+        // 未找到期限：非规则文档
         if (!daysMatcher.find()) {
             return null;
         }
@@ -64,6 +67,7 @@ public interface RuleProvider {
         if (idMatcher.find()) {
             id = idMatcher.group(1);
         }
+        // 解析成功：组装规则条目
         return new PolicyRule(id, actionType, days, content.trim());
     }
 }

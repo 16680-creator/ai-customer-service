@@ -17,7 +17,7 @@ public class ProductRecommendQuery {
     /** 基准价格（用户正在查看/意向商品的价格） */
     @NotNull(message = "基准价格不能为空")
     @Schema(description = "基准价格", example = "199.00", requiredMode = Schema.RequiredMode.REQUIRED)
-    private BigDecimal basePrice;
+    private BigDecimal basePrice; // 价格区间的中心值（必填，否则拒绝请求）
 
     /** 价格浮动比例（默认 0.15；null、<=0 或 >=1 时按默认 0.15 处理） */
     @Schema(description = "价格浮动比例，默认 0.15（0 < tolerance < 1 生效）", example = "0.15")
@@ -34,5 +34,5 @@ public class ProductRecommendQuery {
     /** 返回条数（默认 3，最大 10） */
     @Max(value = 10, message = "limit 最大不能超过 10")
     @Schema(description = "返回条数，默认 3，最大 10", example = "3")
-    private int limit = 3;
+    private int limit = 3; // 默认返回 3 条，最大 10 条（@Max 校验）
 }

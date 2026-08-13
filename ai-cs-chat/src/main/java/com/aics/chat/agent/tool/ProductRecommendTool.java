@@ -50,21 +50,25 @@ public class ProductRecommendTool implements AgentTool {
      * @return SUCCESS：推荐列表（可能为空列表）；FAIL：服务不可用
      */
     public ToolResult recommend(BigDecimal basePrice, String keywords, Long categoryId) {
+        // 基准价非法（空或非正数）：拒绝推荐
         if (basePrice == null || basePrice.compareTo(BigDecimal.ZERO) <= 0) {
             return ToolResult.fail("缺少有效的基准价格，无法推荐");
         }
         try {
+            // 同价位召回：基准价 ± 容差 + 特性关键词（透传，不本地编造）
             Result<List<ProductRecommendVO>> result = productRecommendFeignClient.recommend(
                     basePrice, properties.getPriceTolerance(), categoryId,
                     StringUtils.hasText(keywords) ? keywords : null,
                     properties.getRecommendLimit());
             if (result != null && result.isSuccess()) {
+                // 成功：空列表也视为正常召回结果
                 List<ProductRecommendVO> data = result.getData() == null ? List.of() : result.getData();
                 return ToolResult.success("推荐召回完成", data);
             }
             return ToolResult.fail(result != null ? result.getMessage() : "推荐服务返回异常");
         } catch (Exception e) {
             log.warn("商品推荐调用失败: basePrice={}, err={}", basePrice, e.getMessage());
+            // 服务不可用：可解释失败，不阻断主流程
             return ToolResult.fail("商品推荐服务暂时不可用，请稍后再试");
         }
     }

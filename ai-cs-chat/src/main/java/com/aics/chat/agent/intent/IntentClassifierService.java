@@ -62,11 +62,14 @@ public class IntentClassifierService {
      * 意图分类入口
      */
     public IntentResult classify(String input) {
+        // 开启 LLM 意图识别时优先走 LLM 路径
         if (properties.isLlmIntentEnabled()) {
             try {
+                // LLM 调用限时 10 秒，超时/异常走规则兜底
                 String json = resilientAiService.callRagChat(buildPrompt(input))
                         .get(10, TimeUnit.SECONDS);
                 IntentResult parsed = parseLlmJson(json);
+                // 解析成功且非空：应用置信度门禁
                 if (parsed != null && !parsed.intents().isEmpty()) {
                     return applyThreshold(parsed);
                 }
@@ -75,6 +78,7 @@ public class IntentClassifierService {
                 log.warn("LLM 意图识别失败，降级规则分类: {}", e.getMessage());
             }
         }
+        // 降级：确定性规则分类
         return ruleBasedClassify(input);
     }
 
@@ -84,9 +88,11 @@ public class IntentClassifierService {
      */
     private IntentResult applyThreshold(IntentResult parsed) {
         List<AgentIntent> filtered = parsed.intents().stream()
+                // 剔除低于置信度阈值的意图
                 .filter(i -> i.confidence() >= properties.getIntentThreshold())
                 .toList();
         if (filtered.isEmpty()) {
+            // 全部低于阈值：按普通对话路由，不触发任何工具
             return IntentResult.of(List.of(AgentIntent.of(AgentIntentType.NORMAL_CHAT, 0.6, Map.of())),
                     parsed.sentiment(), false, parsed.rawJson());
         }
@@ -119,8 +125,10 @@ public class IntentClassifierService {
         try {
             String json = raw.trim();
             if (json.startsWith("```")) {
+                // 容忍 LLM 输出被 markdown 代码块包裹
                 json = json.replaceFirst("```(json)?", "").replaceFirst("```$", "").trim();
             }
+            // 截取首个 { 到最后一个 } 之间的 JSON 片段
             int start = json.indexOf('{');
             int end = json.lastIndexOf('}');
             if (start < 0 || end <= start) {
@@ -149,6 +157,7 @@ public class IntentClassifierService {
                 return null;
             }
             SentimentType sentiment = parseSentiment(root.path("sentiment").asText());
+            // 情绪为 ANGRY 时强制转人工（与 LLM 返回的 needsHandoff 取或）
             boolean needsHandoff = root.path("needsHandoff").asBoolean(false)
                     || sentiment == SentimentType.ANGRY;
             return IntentResult.of(intents, sentiment, needsHandoff, raw);
@@ -164,13 +173,16 @@ public class IntentClassifierService {
     public IntentResult ruleBasedClassify(String input) {
         String text = input == null ? "" : input;
         List<AgentIntent> intents = new ArrayList<>();
+        // 命中转人工关键词：优先标记转人工意图
         if (containsAny(text, HANDOFF_KEYWORDS)) {
             intents.add(AgentIntent.of(AgentIntentType.HUMAN_HANDOFF, 0.95, Map.of("reason", text)));
         }
+        // 命中售后关键词：抽取动作参数并补齐原因
         if (containsAny(text, AFTER_SALE_KEYWORDS)) {
             Map<String, String> params = new HashMap<>();
             Matcher actionMatcher = ACTION_PATTERN.matcher(text);
             if (actionMatcher.find()) {
+                // 将中文动作词映射为枚举编码（换货/退货/其余→退款）
                 String action = switch (actionMatcher.group(1)) {
                     case "换货" -> "EXCHANGE";
                     case "退货" -> "RETURN";
@@ -181,12 +193,14 @@ public class IntentClassifierService {
             params.put("reason", text);
             intents.add(AgentIntent.of(AgentIntentType.AFTER_SALE, 0.95, params));
         }
+        // 命中推荐关键词（含固定句式兜底）：抽取预算与特性关键词
         if (containsAny(text, RECOMMEND_KEYWORDS)
                 || (text.contains("有没有") && text.contains("耳机"))
                 || (text.contains("有没有") && text.contains("商品"))) {
             Map<String, String> params = new HashMap<>();
             Matcher budgetMatcher = BUDGET_PATTERN.matcher(text);
             if (budgetMatcher.find()) {
+                // 抽取预算金额（如 "300元" → "300"）
                 params.put("budget", budgetMatcher.group(1));
             }
             if (text.contains("降噪")) {
@@ -197,9 +211,11 @@ public class IntentClassifierService {
             intents.add(AgentIntent.of(AgentIntentType.PRODUCT_RECOMMEND, 0.95, params));
         }
         if (intents.isEmpty()) {
+            // 无任何命中：普通对话兜底
             intents.add(AgentIntent.of(AgentIntentType.NORMAL_CHAT, 0.6, Map.of()));
         }
         SentimentType sentiment = detectSentiment(text);
+        // 主动要求转人工或情绪愤怒：触发转人工
         boolean needsHandoff = intents.stream().anyMatch(i -> i.type() == AgentIntentType.HUMAN_HANDOFF)
                 || sentiment == SentimentType.ANGRY;
         return IntentResult.of(intents, sentiment, needsHandoff, null);

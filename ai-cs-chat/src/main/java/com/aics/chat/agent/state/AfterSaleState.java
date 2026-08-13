@@ -56,6 +56,7 @@ public enum AfterSaleState {
     FAILED;
 
     public boolean isTerminal() {
+        // 终态判定：完成/取消/转人工/失败后不再驱动状态机
         return this == COMPLETED || this == CANCELLED || this == HANDOFF || this == FAILED;
     }
 }

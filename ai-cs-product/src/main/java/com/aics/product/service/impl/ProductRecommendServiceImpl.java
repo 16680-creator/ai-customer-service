@@ -43,12 +43,15 @@ public class ProductRecommendServiceImpl implements ProductRecommendService {
 
     @Override
     public List<ProductRecommendVO> recommend(ProductRecommendQuery query) {
+        // 参数校验：基准价格必填，否则直接拒绝
         if (query == null || query.getBasePrice() == null) {
             throw new BusinessException(ResultCode.BAD_REQUEST, "基准价格不能为空");
         }
 
         BigDecimal basePrice = query.getBasePrice();
+        // 解析价格浮动比例：null、<=0、>=1 均回退默认 0.15
         BigDecimal tolerance = resolveTolerance(query.getPriceTolerance());
+        // 价格区间下界 = 基准价 × (1 - tolerance)（上界同理取 1 + tolerance）
         BigDecimal low = basePrice.multiply(BigDecimal.ONE.subtract(tolerance));
         BigDecimal high = basePrice.multiply(BigDecimal.ONE.add(tolerance));
 
@@ -69,11 +72,15 @@ public class ProductRecommendServiceImpl implements ProductRecommendService {
 
         // 排序：关键词命中数降序 → |price-basePrice| 升序 → 销量降序
         Comparator<Product> comparator = Comparator
+                // 主排序：关键词命中数越多越靠前
                 .comparingInt((Product p) -> countHits(p, keywords))
                 .reversed()
+                // 次排序：价格越接近基准价越靠前
                 .thenComparing(p -> p.getPrice().subtract(basePrice).abs())
+                // 末排序：销量降序（销量为 null 排最后）
                 .thenComparing(Product::getSales, Comparator.nullsLast(Comparator.reverseOrder()));
 
+        // 返回条数：非法值（<=0）回退默认 3
         int limit = query.getLimit() > 0 ? query.getLimit() : DEFAULT_LIMIT;
         return matched.stream()
                 .sorted(comparator)
@@ -159,6 +166,7 @@ public class ProductRecommendServiceImpl implements ProductRecommendService {
      */
     private String buildMatchReason(Product product, List<String> keywords) {
         StringBuilder sb = new StringBuilder();
+        // 前缀以商品真实价格开头（stripTrailingZeros 去除小数末尾无意义的 0）
         sb.append("同价位 ¥")
                 .append(product.getPrice().stripTrailingZeros().toPlainString());
 
@@ -170,11 +178,13 @@ public class ProductRecommendServiceImpl implements ProductRecommendService {
                 .filter(k -> !contains(product.getDescription(), k) && contains(product.getName(), k))
                 .toList();
         if (!descriptionHits.isEmpty()) {
+            // 有描述命中才拼接该片段，避免出现空描述
             sb.append("，描述包含").append(wrapKeywords(descriptionHits));
         }
         if (!nameOnlyHits.isEmpty()) {
             sb.append("，名称包含").append(wrapKeywords(nameOnlyHits));
         }
+        // 销量为真实字段，一并拼接进推荐解释
         sb.append("，销量 ").append(product.getSales());
         return sb.toString();
     }

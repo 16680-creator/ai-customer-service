@@ -40,6 +40,7 @@ public class AfterSaleServiceImpl implements AfterSaleService {
 
     @Override
     public EligibilityVO checkEligibility(Long userId, EligibilityQueryDTO dto) {
+        // 先取订单，再走统一资格校验链（订单存在/归属 -> 已支付 -> 无进行中申请）
         OrderVO order = fetchOrder(userId, dto.getOrderNo());
         return buildEligibility(order, dto.getOrderNo(), dto.getActionType());
     }
@@ -136,11 +137,13 @@ public class AfterSaleServiceImpl implements AfterSaleService {
         EligibilityVO vo = new EligibilityVO();
         vo.setOrderNo(orderNo);
         if (order == null) {
+            // 订单不存在或不属于当前用户：直接判定不可申请
             vo.setEligible(false);
             vo.setReason("订单不存在或不属于当前用户");
             return vo;
         }
         if (!OrderStatus.PAID.getCode().equals(order.getStatus())) {
+            // 仅已支付订单可申请售后（换货/退货/退款均要求订单已支付）
             vo.setOrderStatus(order.getStatus());
             vo.setEligible(false);
             vo.setReason("订单状态不允许售后（当前状态：" + order.getStatus() + "）");
@@ -148,6 +151,7 @@ public class AfterSaleServiceImpl implements AfterSaleService {
         }
         vo.setOrderStatus(order.getStatus());
 
+        // 查重：同订单同动作是否存在进行中（待处理/已通过）的申请
         Long ongoing = afterSaleApplicationMapper.selectCount(
                 new LambdaQueryWrapper<AfterSaleApplication>()
                         .eq(AfterSaleApplication::getOrderNo, orderNo)
@@ -156,10 +160,12 @@ public class AfterSaleServiceImpl implements AfterSaleService {
                                 AfterSaleStatus.PENDING.getCode(),
                                 AfterSaleStatus.APPROVED.getCode()));
         if (ongoing != null && ongoing > 0) {
+            // 已有进行中申请：拒绝重复申请
             vo.setEligible(false);
             vo.setReason("该订单已存在进行中的售后申请");
             return vo;
         }
+        // 全部校验通过：允许申请
         vo.setEligible(true);
         return vo;
     }
@@ -170,16 +176,18 @@ public class AfterSaleServiceImpl implements AfterSaleService {
     private String resolveProductName(OrderVO order, Long productId) {
         if (productId == null || order == null
                 || order.getItems() == null || order.getItems().isEmpty()) {
-            return null;
+            return null; // 整单售后（未指定商品）或订单无商品快照：名称留空
         }
+        // 按商品ID匹配订单商品快照，取首个命中项的商品名
         return order.getItems().stream()
                 .filter(item -> productId.equals(item.getProductId()))
                 .map(OrderVO.OrderItemVO::getProductName)
                 .findFirst()
-                .orElse(null);
+                .orElse(null); // 订单中查无此商品：返回 null，快照留空
     }
 
     private String generateApplicationNo() {
+        // 申请单号：AS + 时间戳（yyyyMMddHHmmss）+ 4 位随机数
         return "AS" + LocalDateTime.now().format(NO_FORMATTER) + RandomUtil.randomNumbers(4);
     }
 

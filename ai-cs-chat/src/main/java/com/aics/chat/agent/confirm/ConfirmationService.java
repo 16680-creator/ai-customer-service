@@ -31,9 +31,12 @@ public class ConfirmationService {
      * @return 凭证 Token
      */
     public String issue(AfterSaleContext context, AgentActionPlan plan) {
+        // 随机凭证：不可预测，防止伪造
         String token = UUID.randomUUID().toString();
         context.setConfirmationToken(token);
+        // 绑定操作摘要摘要值：确认时比对，防确认内容被篡改
         context.setPayloadDigest(digest(plan));
+        // 确认超时 = 签发时间 + 配置确认时长（分钟）
         context.setConfirmationExpiresAt(LocalDateTime.now()
                 .plusMinutes(properties.getConfirmTimeoutMinutes()));
         return token;
@@ -43,13 +46,16 @@ public class ConfirmationService {
      * 校验确认凭证：存在、未超时、摘要与当前操作一致
      */
     public boolean validate(AfterSaleContext context, AgentActionPlan plan) {
+        // 无凭证或无操作计划：直接校验失败
         if (context.getConfirmationToken() == null || plan == null) {
             return false;
         }
+        // 已超时：校验失败（需重新发起确认）
         if (context.getConfirmationExpiresAt() == null
                 || LocalDateTime.now().isAfter(context.getConfirmationExpiresAt())) {
             return false;
         }
+        // 摘要一致才算有效确认：当前操作与签发时完全一致
         return digest(plan).equals(context.getPayloadDigest());
     }
 
@@ -66,6 +72,7 @@ public class ConfirmationService {
      */
     String digest(AgentActionPlan plan) {
         try {
+            // 操作计划序列化后做 SHA-256，输出十六进制摘要
             String json = objectMapper.writeValueAsString(plan);
             MessageDigest md = MessageDigest.getInstance("SHA-256");
             byte[] bytes = md.digest(json.getBytes(StandardCharsets.UTF_8));

@@ -56,6 +56,7 @@ public class HandoffTool implements AgentTool {
     public ToolResult createHandoff(String runId, Long sessionId, String reason, String priority,
                                     String orderNo, String sentiment, String problemSummary,
                                     String executedSteps) {
+        // 未登录不能创建转人工工单
         Long userId = ChatUserContext.getUserId();
         if (userId == null) {
             return ToolResult.fail("无法识别当前登录用户身份，请先登录");
@@ -69,12 +70,14 @@ public class HandoffTool implements AgentTool {
         dto.setOrderNo(orderNo);
         dto.setSentiment(sentiment);
         dto.setProblemSummary(problemSummary);
+        // 已执行步骤清单随工单移交（坐席可追溯 Agent 做过什么）
         dto.setExecutedSteps(executedSteps);
         try {
             Result<HandoffTicketVO> result = agentTraceFeignClient.createHandoffTicket(dto);
             if (result != null && result.isSuccess() && result.getData() != null) {
                 String ticketNo = result.getData().getTicketNo();
                 log.info("转人工工单创建成功: ticketNo={}, reason={}", ticketNo, reason);
+                // 工单创建成功后再通知坐席侧
                 notifyHandoff(ticketNo, userId, priority, orderNo, problemSummary);
                 return ToolResult.success("转人工工单创建成功", ticketNo);
             }
@@ -99,6 +102,7 @@ public class HandoffTool implements AgentTool {
             notice.setSummary(summary);
             notifyFeignClient.handoffNotice(notice);
         } catch (Exception e) {
+            // 通知失败仅告警，不阻断转人工主流程
             log.warn("转人工通知推送失败: ticketNo={}, err={}", ticketNo, e.getMessage());
         }
     }

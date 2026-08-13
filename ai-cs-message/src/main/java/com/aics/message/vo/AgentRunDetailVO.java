@@ -53,5 +53,5 @@ public class AgentRunDetailVO {
     private LocalDateTime updateTime;
 
     @Schema(description = "步骤轨迹（按步骤序号升序）")
-    private List<AgentStepDTO> steps;
+    private List<AgentStepDTO> steps; // 按 stepNo 升序返回（SQL 排序 + 内存二次排序），保证审计回放顺序稳定
 }

@@ -23,7 +23,10 @@ import com.aics.message.vo.HandoffTicketVO;
  * 调用方：{@link com.aics.message.controller.AgentTraceController}。
  * </p>
  */
+// 幂等键约定：createRun 按 runId 幂等；appendStep 按 (runId, stepNo)、recordConfirmation 按 (runId, action) 覆盖更新
 public interface AgentTraceService {
+
+    // ==================== 执行轨迹写入（均幂等） ====================
 
     /**
      * 创建 Agent 执行记录（幂等：runId 已存在直接返回）
@@ -58,6 +61,8 @@ public interface AgentTraceService {
      * @param dto   确认信息
      */
     void recordConfirmation(String runId, AgentConfirmationDTO dto);
+
+    // ==================== 人工转接与审计查询 ====================
 
     /**
      * 创建转人工工单（生成 HF 前缀唯一工单号）

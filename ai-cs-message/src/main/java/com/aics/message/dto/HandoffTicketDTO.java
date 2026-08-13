@@ -18,7 +18,7 @@ import lombok.Data;
 public class HandoffTicketDTO {
 
     @Schema(description = "所属执行ID", example = "uuid-run-001")
-    private String runId;
+    private String runId; // 可空：工单号 ticketNo 由服务端生成不参与入参，本字段仅用于关联执行记录
 
     @Schema(description = "会话ID", example = "1001")
     private Long sessionId;
@@ -28,7 +28,7 @@ public class HandoffTicketDTO {
     private Long userId;
 
     @Schema(description = "触发原因：POLICY_NOT_MET/NEGATIVE_SENTIMENT/EXECUTION_FAILED/USER_REQUEST", example = "NEGATIVE_SENTIMENT")
-    @NotBlank(message = "触发原因不能为空")
+    @NotBlank(message = "触发原因不能为空") // 必填：转人工触发原因，坐席据此判断工单跟进方向
     private String reason;
 
     @Schema(description = "优先级：HIGH/NORMAL（默认 NORMAL）", example = "NORMAL")

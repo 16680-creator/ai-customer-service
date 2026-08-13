@@ -53,6 +53,7 @@ public class AgentTraceController {
     @Operation(summary = "创建 Agent 执行记录")
     @PostMapping("/runs")
     public Result<String> createRun(@Valid @RequestBody AgentRunDTO dto) {
+        // 幂等创建：runId 已存在时服务层直接返回首次创建的 runId
         return Result.success(agentTraceService.createRun(dto));
     }
 
@@ -67,10 +68,12 @@ public class AgentTraceController {
     @PutMapping("/runs/{runId}/status")
     public Result<Void> updateRunStatus(@PathVariable("runId") String runId,
                                         @RequestBody Map<String, Object> body) {
+        // 解析请求体：status 必填；currentStep 数值统一转 int（可为空）；errorSummary 可选
         String status = (String) body.get("status");
         Integer currentStep = body.get("currentStep") == null
                 ? null : ((Number) body.get("currentStep")).intValue();
         String errorSummary = (String) body.get("errorSummary");
+        // 委托服务层完成状态更新（执行记录不存在时抛 AGENT_RUN_NOT_FOUND）
         agentTraceService.updateRunStatus(runId, status, currentStep, errorSummary);
         return Result.success();
     }
@@ -86,6 +89,7 @@ public class AgentTraceController {
     @PostMapping("/runs/{runId}/steps")
     public Result<Void> appendStep(@PathVariable("runId") String runId,
                                    @Valid @RequestBody AgentStepDTO dto) {
+        // 同 (runId, stepNo) 已存在时服务层覆盖更新（幂等）
         agentTraceService.appendStep(runId, dto);
         return Result.success();
     }
@@ -101,6 +105,7 @@ public class AgentTraceController {
     @PostMapping("/runs/{runId}/confirmations")
     public Result<Void> recordConfirmation(@PathVariable("runId") String runId,
                                            @Valid @RequestBody AgentConfirmationDTO dto) {
+        // 同 (runId, action) 已存在时服务层覆盖更新（幂等）
         agentTraceService.recordConfirmation(runId, dto);
         return Result.success();
     }
@@ -114,6 +119,7 @@ public class AgentTraceController {
     @Operation(summary = "创建转人工工单")
     @PostMapping("/handoff-tickets")
     public Result<HandoffTicketVO> createHandoffTicket(@Valid @RequestBody HandoffTicketDTO dto) {
+        // 创建转人工工单：服务端生成唯一工单号，返回工单号 + 状态（chat 模块经 Feign 调用）
         return Result.success(agentTraceService.createHandoffTicket(dto));
     }
 
@@ -126,6 +132,7 @@ public class AgentTraceController {
     @Operation(summary = "查询 Agent 执行轨迹详情")
     @GetMapping("/runs/{runId}")
     public Result<AgentRunDetailVO> getRunDetail(@PathVariable("runId") String runId) {
+        // 查询执行详情：run 元数据 + 按 stepNo 升序的步骤轨迹（审计回放）
         return Result.success(agentTraceService.getRunDetail(runId));
     }
 }

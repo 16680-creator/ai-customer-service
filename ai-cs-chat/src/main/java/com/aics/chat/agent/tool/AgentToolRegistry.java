@@ -25,6 +25,7 @@ public class AgentToolRegistry {
     public AgentToolRegistry(AgentStateMachine stateMachine, List<AgentTool> toolList) {
         this.stateMachine = stateMachine;
         if (toolList != null) {
+            // 启动时按工具名注册所有 AgentTool Bean
             toolList.forEach(t -> tools.put(t.name(), t));
         }
     }
@@ -34,6 +35,7 @@ public class AgentToolRegistry {
      */
     public AgentTool get(String name) {
         AgentTool tool = tools.get(name);
+        // 未注册工具显式抛错，防止静默调用未知工具
         if (tool == null) {
             throw new BusinessException(ResultCode.AGENT_RUN_NOT_FOUND, "工具未注册: " + name);
         }
@@ -59,6 +61,7 @@ public class AgentToolRegistry {
      * 校验：当前状态允许调用该工具（不通过抛异常）
      */
     public void assertToolAllowed(AfterSaleState state, String toolName) {
+        // 状态门禁：当前状态未授权该工具则拒绝调用
         if (!stateMachine.isToolAllowed(state, toolName)) {
             throw new BusinessException(ResultCode.AGENT_WRITE_OP_NOT_CONFIRMED,
                     "状态 " + state + " 不允许调用工具 " + toolName);

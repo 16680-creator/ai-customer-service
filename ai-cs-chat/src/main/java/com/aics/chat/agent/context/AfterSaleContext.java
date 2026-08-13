@@ -104,16 +104,19 @@ public class AfterSaleContext {
     }
 
     public void transit(AfterSaleState next) {
+        // 迁移到下一状态：清除等待标记并累计步骤数
         this.state = next;
         this.needsUserInput = false;
         this.steps++;
     }
 
     public void markWaitingUser() {
+        // 标记等待用户输入（状态机循环在此暂停）
         this.needsUserInput = true;
     }
 
     public void recordStep() {
+        // 仅累计步骤数（不迁移状态）
         this.steps++;
     }
 }

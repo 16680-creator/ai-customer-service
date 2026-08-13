@@ -10,6 +10,7 @@ import lombok.Getter;
 @AllArgsConstructor
 public enum AfterSaleActionType {
 
+    // 支持的售后动作：换货 / 退货 / 退款
     EXCHANGE("EXCHANGE", "换货"),
     RETURN("RETURN", "退货"),
     REFUND("REFUND", "退款");
@@ -22,13 +23,13 @@ public enum AfterSaleActionType {
      */
     public static AfterSaleActionType fromCode(String code) {
         if (code == null) {
-            return null;
+            return null; // 空值视为无效动作
         }
         for (AfterSaleActionType type : values()) {
             if (type.code.equals(code)) {
-                return type;
+                return type; // 命中 code 即返回对应枚举
             }
         }
-        return null;
+        return null; // 未匹配到任何枚举值（客户端传了未知动作）
     }
 }

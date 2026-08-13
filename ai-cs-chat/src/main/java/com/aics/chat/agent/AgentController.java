@@ -45,12 +45,15 @@ public class AgentController {
     public Result<AgentTurnResult> agent(@RequestHeader(value = "X-User-Id", required = false) Long userId,
                                          @Valid @RequestBody AgentRequestDTO request) {
         Long uid = resolveUserId(userId);
+        // 写入线程上下文，供 Feign 调用透传 X-User-Id
         ChatUserContext.setUserId(uid);
         try {
+            // 进入 Agent 编排：新 run 或续跑
             AgentTurnResult result = afterSaleAgentService.handleTurn(
                     uid, request.getSessionId(), request.getRunId(), request.getInput());
             // 非售后意图路由回普通对话
             if (result.routeToNormalChat() && request.getInput() != null) {
+                // 委托普通对话服务生成回复
                 Result<String> chatResult = chatService.chat(
                         String.valueOf(request.getSessionId() == null ? 0 : request.getSessionId()),
                         request.getInput());
@@ -62,6 +65,7 @@ public class AgentController {
             }
             return Result.success(result);
         } finally {
+            // 清理线程上下文，防止用户串号
             ChatUserContext.clear();
         }
     }
@@ -76,6 +80,7 @@ public class AgentController {
         Long uid = resolveUserId(userId);
         ChatUserContext.setUserId(uid);
         try {
+            // 决策转译为确认/拒绝文本，复用 handleTurn 的确认分支
             String decision = "CONFIRM".equalsIgnoreCase(request.getDecision()) ? "确认" : "拒绝";
             AgentTurnResult result = afterSaleAgentService.handleTurn(
                     uid, request.getSessionId(), request.getRunId(), decision);
@@ -91,6 +96,7 @@ public class AgentController {
     @GetMapping("/runs/{runId}")
     @Operation(summary = "查询执行轨迹", description = "按 runId 回放 Agent 执行的完整步骤轨迹")
     public Result<Map<String, Object>> runDetail(@PathVariable("runId") String runId) {
+        // 直接透传轨迹服务的审计回放结果
         return agentTraceFeignClient.getRunDetail(runId);
     }
 

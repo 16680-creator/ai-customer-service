@@ -15,6 +15,7 @@ public class AgentRequestDTO {
     private Long sessionId;
 
     @Schema(description = "续跑的 runId（首次为空）")
+    // runId 为空开启新 run；非空时按 runId 续跑多轮状态机
     private String runId;
 
     @Schema(description = "用户输入")

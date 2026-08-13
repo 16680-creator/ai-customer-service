@@ -30,11 +30,14 @@ public class RedisAgentRunStore implements AgentRunStore {
     @Override
     public void save(AfterSaleContext context) {
         try {
+            // 上下文序列化后写入 Redis
             String json = objectMapper.writeValueAsString(context);
+            // TTL：总超时 + 确认超时 + 60s 缓冲，保证确认窗口内不失效
             long ttlSeconds = properties.getTotalTimeoutMs() / 1000
                     + properties.getConfirmTimeoutMinutes() * 60L + 60;
             redisTemplate.opsForValue().set(KEY_PREFIX + context.getRunId(), json, Duration.ofSeconds(ttlSeconds));
         } catch (Exception e) {
+            // Redis 不可用时仅告警，不阻断业务（走内存/降级路径）
             log.warn("Agent run 状态写入 Redis 失败: runId={}, err={}", context.getRunId(), e.getMessage());
         }
     }
@@ -43,12 +46,15 @@ public class RedisAgentRunStore implements AgentRunStore {
     public Optional<AfterSaleContext> load(String runId) {
         try {
             String json = redisTemplate.opsForValue().get(KEY_PREFIX + runId);
+            // 键不存在（已过期或从未创建）：返回空
             if (json == null) {
                 return Optional.empty();
             }
+            // 反序列化还原上下文
             return Optional.of(objectMapper.readValue(json, AfterSaleContext.class));
         } catch (Exception e) {
             log.warn("Agent run 状态读取 Redis 失败: runId={}, err={}", runId, e.getMessage());
+            // 读取失败按不存在处理，上层走「run 未找到」分支
             return Optional.empty();
         }
     }

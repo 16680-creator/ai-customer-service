@@ -42,5 +42,5 @@ public class ProductRecommendVO {
 
     /** 推荐解释（只由真实字段拼接：价格、命中的关键词、销量） */
     @Schema(description = "推荐解释（由真实字段拼接，如：同价位 ¥199，描述包含「降噪」「蓝牙」，销量 50）")
-    private String matchReason;
+    private String matchReason; // 由真实字段拼接的推荐解释，AI 客服可直接引用
 }

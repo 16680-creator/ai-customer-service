@@ -8,7 +8,7 @@ import java.util.List;
 /**
  * 同价位商品召回与推荐解释服务
  */
-public interface ProductRecommendService {
+public interface ProductRecommendService { // 同价位商品召回 + 关键词过滤 + 排序 + 推荐解释拼接的对外门面
 
     /**
      * 同价位商品推荐：

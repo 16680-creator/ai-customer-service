@@ -10,7 +10,7 @@ import java.util.List;
 /**
  * 售后申请服务
  */
-public interface AfterSaleService {
+public interface AfterSaleService { // 售后能力门面：供 AI 客服 Agent 调用（资格校验、幂等申请、查询）
 
     /**
      * 校验售后资格（订单归属、状态、进行中申请去重）

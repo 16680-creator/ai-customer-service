@@ -40,9 +40,11 @@ public class AgentTraceRecorder {
             dto.setUserId(ctx.getUserId());
             dto.setStatus("RUNNING");
             dto.setCurrentStep(0);
+            // 记录提示词/规则版本，审计可追溯
             dto.setPromptVersion("after-sale-v1");
             agentTraceFeignClient.createRun(dto);
         } catch (Exception e) {
+            // 轨迹写入失败仅告警：审计尽力而为，不阻断业务
             log.warn("Agent run 轨迹写入失败: runId={}, err={}", ctx.getRunId(), e.getMessage());
         }
     }
@@ -74,6 +76,7 @@ public class AgentTraceRecorder {
             dto.setStepNo(ctx.getSteps() + 1);
             dto.setStepType(stepType);
             dto.setToolName(toolName);
+            // 输入/输出摘要化后落库：敏感参数不落明文
             dto.setInputDigest(truncate(inputDigest, 256));
             dto.setOutputDigest(truncate(outputDigest, 1024));
             dto.setDurationMs(durationMs);
@@ -117,8 +120,10 @@ public class AgentTraceRecorder {
             for (byte b : bytes) {
                 sb.append(String.format("%02x", b));
             }
+            // SHA-256 十六进制摘要，截断为 64 位
             return truncate(sb.toString(), 64);
         } catch (Exception e) {
+            // 摘要计算异常：退化为原文截断
             return truncate(text, 64);
         }
     }
@@ -128,6 +133,7 @@ public class AgentTraceRecorder {
      */
     public String executedStepsJson(List<String> stepSummaries) {
         try {
+            // 已执行步骤序列化：转人工移交时携带完整上下文
             return objectMapper.writeValueAsString(stepSummaries == null ? List.of() : stepSummaries);
         } catch (Exception e) {
             return "[]";
@@ -138,6 +144,7 @@ public class AgentTraceRecorder {
         if (text == null) {
             return null;
         }
+        // 超长截断：防止大字段撑爆轨迹存储
         return text.length() <= max ? text : text.substring(0, max);
     }
 }

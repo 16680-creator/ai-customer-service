@@ -26,7 +26,7 @@ public class AgentStep implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /** 主键ID */
-    @TableId(type = IdType.AUTO)
+    @TableId(type = IdType.AUTO) // 步骤无业务主键，由数据库自增生成
     private Long id;
 
     /** 所属执行ID */

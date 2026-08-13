@@ -13,10 +13,10 @@ import java.time.LocalDateTime;
  * 售后申请实体
  */
 @Data
-@TableName("after_sale_application")
+@TableName("after_sale_application") // 映射售后申请表
 public class AfterSaleApplication {
 
-    @TableId(type = IdType.AUTO)
+    @TableId(type = IdType.AUTO) // 主键自增
     private Long id;
 
     /** 申请单号（AS+时间戳+序号） */
@@ -55,9 +55,9 @@ public class AfterSaleApplication {
     /** 状态：PENDING/APPROVED/REJECTED/COMPLETED/CANCELLED */
     private String status;
 
-    @TableField(fill = FieldFill.INSERT)
+    @TableField(fill = FieldFill.INSERT) // 插入时自动填充创建时间
     private LocalDateTime createTime;
 
-    @TableField(fill = FieldFill.INSERT_UPDATE)
+    @TableField(fill = FieldFill.INSERT_UPDATE) // 插入/更新时自动填充更新时间
     private LocalDateTime updateTime;
 }

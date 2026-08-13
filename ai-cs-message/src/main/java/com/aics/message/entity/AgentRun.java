@@ -28,7 +28,7 @@ public class AgentRun implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /** 执行ID（UUID，主键） */
-    @TableId(type = IdType.INPUT)
+    @TableId(type = IdType.INPUT) // 主键由 chat 模块 Agent 编排链路生成（UUID），非数据库自增
     private String runId;
 
     /** 会话ID */

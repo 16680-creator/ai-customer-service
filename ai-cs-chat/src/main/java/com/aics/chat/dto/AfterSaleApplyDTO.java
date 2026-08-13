@@ -29,7 +29,7 @@ public class AfterSaleApplyDTO {
     /** Agent 执行 ID */
     private String runId;
 
-    /** 幂等键 */
+    /** 幂等键（由 chat 侧按 runId + 动作类型拼接，订单服务按此去重） */
     private String idempotencyKey;
 
     /** 证据/规则引用摘要 */

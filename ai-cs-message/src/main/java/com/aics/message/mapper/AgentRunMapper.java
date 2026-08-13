@@ -13,6 +13,8 @@ import org.apache.ibatis.annotations.Mapper;
  * 由 {@link com.aics.message.service.impl.AgentTraceServiceImpl} 基于 selectById/updateById 组合实现。
  * </p>
  */
+// 注册为 MyBatis Mapper 接口，由 MyBatis-Plus 自动生成代理实现
 @Mapper
 public interface AgentRunMapper extends BaseMapper<AgentRun> {
+    // 无需自定义 SQL：按 runId 的幂等创建与状态更新由 Service 层基于 selectById/updateById 组合实现
 }

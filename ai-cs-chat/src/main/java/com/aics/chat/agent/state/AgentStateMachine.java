@@ -39,6 +39,7 @@ public class AgentStateMachine {
                 AfterSaleState.CONFIRM_ACTION, AfterSaleState.FAILED));
         map.put(AfterSaleState.EXECUTE_AFTER_SALE, Set.of(AfterSaleState.COMPLETED, AfterSaleState.HANDOFF,
                 AfterSaleState.FAILED));
+        // 终态无出边（一旦进入即结束本轮执行）
         map.put(AfterSaleState.COMPLETED, Set.of());
         map.put(AfterSaleState.CANCELLED, Set.of());
         map.put(AfterSaleState.HANDOFF, Set.of());
@@ -63,6 +64,7 @@ public class AgentStateMachine {
         if (from == null || to == null) {
             return false;
         }
+        // 查迁移表：未登记的 from 默认空集（非法迁移一律拒绝）
         return TRANSITIONS.getOrDefault(from, Set.of()).contains(to);
     }
 
@@ -91,6 +93,7 @@ public class AgentStateMachine {
      * 校验状态是否允许调用指定工具
      */
     public boolean isToolAllowed(AfterSaleState state, String toolName) {
+        // 工具调用门禁：仅允许当前状态授权的工具
         return allowedTools(state).contains(toolName);
     }
 }

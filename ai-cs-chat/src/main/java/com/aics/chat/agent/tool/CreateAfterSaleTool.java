@@ -47,6 +47,7 @@ public class CreateAfterSaleTool implements AgentTool {
      * @return SUCCESS：申请单号；FAIL：失败原因
      */
     public ToolResult create(AgentActionPlan plan, String runId) {
+        // 未登录不能执行写操作
         Long userId = ChatUserContext.getUserId();
         if (userId == null) {
             return ToolResult.fail("无法识别当前登录用户身份，请先登录");
@@ -59,9 +60,11 @@ public class CreateAfterSaleTool implements AgentTool {
         dto.setActionType(plan.actionType().getCode());
         dto.setReason(plan.reason());
         dto.setRunId(runId);
+        // 幂等键 = runId + 动作类型，订单服务按此去重，重试不产生重复申请
         dto.setIdempotencyKey(runId + ":" + plan.actionType().getCode());
         dto.setEvidenceSummary(plan.evidenceSummary());
         try {
+            // 调用订单服务创建售后申请（X-User-Id 透传做归属校验）
             Result<AfterSaleApplyVO> result = afterSaleFeignClient.apply(userId, dto);
             if (result != null && result.isSuccess() && result.getData() != null) {
                 log.info("售后申请创建成功: applicationNo={}, idempotencyKey={}",
@@ -71,6 +74,7 @@ public class CreateAfterSaleTool implements AgentTool {
             return ToolResult.fail(result != null ? result.getMessage() : "售后申请创建失败");
         } catch (Exception e) {
             log.warn("售后申请调用失败: orderNo={}, err={}", plan.orderNo(), e.getMessage());
+            // 调用异常：返回可解释失败，由上层重试或转人工
             return ToolResult.fail("售后申请服务暂时不可用：" + e.getMessage());
         }
     }

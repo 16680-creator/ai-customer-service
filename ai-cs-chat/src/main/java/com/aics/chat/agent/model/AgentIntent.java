@@ -12,6 +12,7 @@ import java.util.Map;
 public record AgentIntent(AgentIntentType type, double confidence, Map<String, String> params) {
 
     public static AgentIntent of(AgentIntentType type, double confidence, Map<String, String> params) {
+        // 参数为空时归一为空 Map，避免下游 NPE
         return new AgentIntent(type, confidence, params == null ? Map.of() : params);
     }
 }

@@ -60,12 +60,14 @@ public class IntentEvalService {
      * 运行评估并返回 Macro-F1 报告
      */
     public EvalReport evaluate() {
+        // 各类别 TP/FP/FN 计数（数组下标：0=TP, 1=FP, 2=FN）
         Map<AgentIntentType, int[]> tpFpFn = new EnumMap<>(AgentIntentType.class);
         for (AgentIntentType type : AgentIntentType.values()) {
             tpFpFn.put(type, new int[3]);
         }
         for (Sample sample : DATASET) {
             IntentResult result = classifier.ruleBasedClassify(sample.input());
+            // 取置信度最高（首个）意图作为预测标签
             AgentIntentType predicted = result.intents().isEmpty() ? AgentIntentType.OTHER
                     : result.intents().get(0).type();
             int[] stats = tpFpFn.get(predicted);
@@ -79,6 +81,7 @@ public class IntentEvalService {
         Map<String, Double> perClassF1 = new LinkedHashMap<>();
         double sum = 0;
         int counted = 0;
+        // 逐类计算精确率/召回率/F1 并累加
         for (AgentIntentType type : List.of(AgentIntentType.AFTER_SALE, AgentIntentType.PRODUCT_RECOMMEND,
                 AgentIntentType.HUMAN_HANDOFF, AgentIntentType.NORMAL_CHAT)) {
             int[] s = tpFpFn.get(type);
@@ -89,6 +92,7 @@ public class IntentEvalService {
             sum += f1;
             counted++;
         }
+        // Macro-F1 = 各类别 F1 的算术平均
         return new EvalReport(counted == 0 ? 0 : sum / counted, perClassF1, DATASET.size());
     }
 

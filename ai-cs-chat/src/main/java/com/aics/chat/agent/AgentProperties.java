@@ -16,6 +16,8 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "aics.agent")
 public class AgentProperties {
 
+    // ===== 步骤与超时限制 =====
+
     /** 单次 run 最大步骤数 */
     private int maxSteps = 12;
 
@@ -31,6 +33,8 @@ public class AgentProperties {
     /** 意图置信度阈值，低于该值不路由工具 */
     private double intentThreshold = 0.6;
 
+    // ===== 规则检索 =====
+
     /** 同价位商品召回价格容差（±百分比，0.15 表示 ±15%） */
     private double priceTolerance = 0.15;
 
@@ -45,6 +49,8 @@ public class AgentProperties {
 
     /** 触发转人工的情绪（ANGRY） */
     private String sentimentHandoff = "ANGRY";
+
+    // ===== 降级与重试 =====
 
     /** 写操作失败重试次数 */
     private int writeRetryTimes = 1;

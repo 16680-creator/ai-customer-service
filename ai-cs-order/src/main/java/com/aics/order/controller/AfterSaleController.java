@@ -35,6 +35,7 @@ public class AfterSaleController {
     @PostMapping("/eligibility")
     public Result<EligibilityVO> checkEligibility(@RequestHeader("X-User-Id") Long userId,
                                                   @Valid @RequestBody EligibilityQueryDTO dto) {
+        // 校验售后资格（userId 由网关透传，保证只校验本人订单）
         return Result.success(afterSaleService.checkEligibility(userId, dto));
     }
 
@@ -42,12 +43,14 @@ public class AfterSaleController {
     @PostMapping("/apply")
     public Result<AfterSaleApplyVO> createApplication(@RequestHeader("X-User-Id") Long userId,
                                                       @Valid @RequestBody AfterSaleApplyDTO dto) {
+        // 创建售后申请：幂等键去重，重复提交返回首次结果
         return Result.success("售后申请已提交", afterSaleService.createApplication(userId, dto));
     }
 
     @Operation(summary = "查询我的售后申请列表")
     @GetMapping("/list")
     public Result<List<AfterSaleApplyVO>> listByUser(@RequestHeader("X-User-Id") Long userId) {
+        // 查询当前用户全部售后申请（按创建时间倒序）
         return Result.success(afterSaleService.listByUser(userId));
     }
 
@@ -55,6 +58,7 @@ public class AfterSaleController {
     @GetMapping("/{applicationNo}")
     public Result<AfterSaleApplyVO> getByApplicationNo(@RequestHeader("X-User-Id") Long userId,
                                                        @PathVariable("applicationNo") String applicationNo) {
+        // 按申请单号查询（service 层按 userId 过滤，防止越权查看他人申请）
         return Result.success(afterSaleService.getByApplicationNo(userId, applicationNo));
     }
 }
