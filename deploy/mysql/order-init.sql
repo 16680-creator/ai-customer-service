@@ -90,3 +90,28 @@ CREATE TABLE IF NOT EXISTS `full_reduction_rule` (
     PRIMARY KEY (`id`),
     KEY `idx_enabled_time` (`enabled`, `start_time`, `end_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='满减规则';
+
+-- 售后申请表（005 售后 Agent）
+CREATE TABLE IF NOT EXISTS after_sale_application (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `application_no` VARCHAR(32) NOT NULL COMMENT '申请单号（AS+时间戳+序号）',
+    `run_id` VARCHAR(64) DEFAULT NULL COMMENT 'Agent执行ID（来源可追溯）',
+    `idempotency_key` VARCHAR(64) NOT NULL COMMENT '幂等键（runId+action），重复提交返回首次结果',
+    `user_id` BIGINT NOT NULL COMMENT '申请用户ID',
+    `order_no` VARCHAR(32) NOT NULL COMMENT '关联订单号',
+    `product_id` BIGINT DEFAULT NULL COMMENT '商品ID（整单售后可为空）',
+    `product_name` VARCHAR(200) DEFAULT NULL COMMENT '商品名称快照',
+    `quantity` INT NOT NULL DEFAULT 1 COMMENT '售后数量',
+    `action_type` VARCHAR(20) NOT NULL COMMENT '售后动作：EXCHANGE/RETURN/REFUND',
+    `reason` VARCHAR(512) DEFAULT NULL COMMENT '售后原因',
+    `evidence_summary` VARCHAR(1024) DEFAULT NULL COMMENT '证据/规则引用摘要',
+    `status` VARCHAR(20) NOT NULL DEFAULT 'PENDING' COMMENT '状态：PENDING/APPROVED/REJECTED/COMPLETED/CANCELLED',
+    `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_idempotency_key` (`idempotency_key`),
+    UNIQUE KEY `uk_application_no` (`application_no`),
+    KEY `idx_user_id` (`user_id`),
+    KEY `idx_order_no` (`order_no`),
+    KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='售后申请表';
