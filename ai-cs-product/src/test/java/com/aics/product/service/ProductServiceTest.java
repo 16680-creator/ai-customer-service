@@ -11,6 +11,7 @@ import com.aics.product.service.impl.ProductServiceImpl;
 import com.aics.product.service.impl.ProductVectorService;
 import com.aics.product.vo.ProductVO;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.junit.jupiter.api.BeforeEach;
@@ -268,12 +269,13 @@ class ProductServiceTest {
     @DisplayName("扣减库存 - 成功")
     void deductStock_shouldSuccess() {
         when(productMapper.selectById(1L)).thenReturn(sampleProduct);
-        when(productMapper.updateById(any(Product.class))).thenReturn(1);
+        when(productMapper.update(isNull(), any(LambdaUpdateWrapper.class))).thenReturn(1);
         when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
 
         assertDoesNotThrow(() -> productService.deductStock(1L, 5));
 
-        verify(productMapper).updateById(argThat(p -> p.getStock() == 95));
+        // 当前实现为 DB 原子条件更新（stock >= qty 才扣减，防超卖）
+        verify(productMapper).update(isNull(), any(LambdaUpdateWrapper.class));
     }
 
     @Test
@@ -300,12 +302,13 @@ class ProductServiceTest {
     @DisplayName("恢复库存 - 成功")
     void restoreStock_shouldSuccess() {
         when(productMapper.selectById(1L)).thenReturn(sampleProduct);
-        when(productMapper.updateById(any(Product.class))).thenReturn(1);
+        when(productMapper.update(isNull(), any(LambdaUpdateWrapper.class))).thenReturn(1);
         when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
 
         assertDoesNotThrow(() -> productService.restoreStock(1L, 10));
 
-        verify(productMapper).updateById(argThat(p -> p.getStock() == 110));
+        // 当前实现为 DB 原子条件更新（stock = stock + qty，sales 同步回退）
+        verify(productMapper).update(isNull(), any(LambdaUpdateWrapper.class));
     }
 
     // ==================== 分类管理 ====================
