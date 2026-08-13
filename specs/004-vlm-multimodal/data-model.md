@@ -11,6 +11,7 @@
 | sessionId | String | 是 | 会话 ID（复用现有会话体系） |
 | imageUrl | String | 是 | 图片 URL（MinIO 上传返回，需通过 SSRF 白名单校验） |
 | message | String | 否 | 附带文字描述（可空，仅图片时为空） |
+| knowledgeBase | String | 否 | 知识库标识（可空，空则纯文本回答；非空则走 RAG 检索） |
 | hybrid | boolean | 否 | 默认 false；true 时检索走 Hybrid 混合检索 |
 | rewrite | boolean | 否 | 默认 false；true 时检索前先查询改写/HyDE |
 
