@@ -124,6 +124,7 @@
 | AGENT_TIMEOUT | 3107 | Agent 执行超时 |
 | AGENT_WRITE_OP_NOT_CONFIRMED | 3108 | 写操作未确认 |
 | AGENT_HANDOFF_CREATE_FAIL | 3109 | 转人工工单创建失败 |
+| AGENT_ORDER_LOCATE_FAIL | 3110 | 无法定位当前用户的订单 |
 | AFTER_SALE_NOT_ELIGIBLE | 7101 | 订单不满足售后条件 |
 | AFTER_SALE_APPLICATION_EXISTS | 7102 | 该订单已存在进行中的售后申请 |
 | AFTER_SALE_CREATE_FAIL | 7103 | 售后申请创建失败 |
