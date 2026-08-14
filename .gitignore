@@ -57,3 +57,4 @@ tools/nacos-config/lib/
 
 # 本地运行输出
 tools/nacos-start2.out
+.worktrees/
