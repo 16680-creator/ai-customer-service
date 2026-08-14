@@ -7,6 +7,7 @@ import com.aics.chat.observability.ObservabilityProperties;
 import com.aics.chat.observability.QuotaService;
 import com.aics.chat.observability.TraceContext;
 import com.aics.chat.observability.TraceContextHolder;
+import com.aics.chat.util.ChatUserContext;
 import io.micrometer.observation.ObservationRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,7 +17,9 @@ import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.web.client.ResourceAccessException;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -28,6 +31,8 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class ResilientAiServiceRoutingTest {
@@ -83,6 +88,60 @@ class ResilientAiServiceRoutingTest {
 
         String result = service.callChat(ModelScenario.CHAT, List.of()).get();
         assertEquals("backup answer", result);
+    }
+
+    @Test
+    void callChat_retriesTransientFailureOnPrimaryBeforeFallback() throws Exception {
+        ModelClientHolder primary = holder("deepseek-chat", mock(ChatClient.class, RETURNS_DEEP_STUBS));
+        ModelClientHolder fallback = holder("siliconflow-qwen3-32b", mock(ChatClient.class, RETURNS_DEEP_STUBS));
+        when(registry.get("deepseek-chat")).thenReturn(primary);
+        when(registry.get("siliconflow-qwen3-32b")).thenReturn(fallback);
+        when(modelRouter.route(any(RouteRequest.class)))
+                .thenReturn(RouteDecision.builder()
+                        .selectedModelId("deepseek-chat")
+                        .fallbackChain(List.of("siliconflow-qwen3-32b"))
+                        .reason(RouteReason.PRIMARY_UNAVAILABLE)
+                        .build());
+        ChatResponse response = chatResponse("retry answer");
+        when(primary.getChatClient().prompt().messages(anyList()).call().chatResponse())
+                .thenThrow(new ResourceAccessException("connection reset"))
+                .thenReturn(response);
+
+        String result = service.callChat(ModelScenario.CHAT, List.of()).get();
+
+        assertEquals("retry answer", result);
+        verify(registry, never()).get("siliconflow-qwen3-32b");
+    }
+
+    @Test
+    void callChat_propagatesCapturedUserIdToQuotaRouting() throws Exception {
+        ChatUserContext.setUserId(1L);
+        try {
+            ModelRouterProperties props = new ModelRouterProperties();
+            props.getQuota().setEnabled(true);
+            service = new ResilientAiService(modelRouter, registry, health, quotaService, props,
+                    ObservationRegistry.create(), usageRecorder);
+
+            ModelClientHolder primary = holder("deepseek-chat", mock(ChatClient.class, RETURNS_DEEP_STUBS));
+            when(registry.get("deepseek-chat")).thenReturn(primary);
+            when(quotaService.check(1L, "chat"))
+                    .thenReturn(QuotaCheckResult.exceeded(10L, 5L, BigDecimal.ONE, BigDecimal.ONE));
+            when(modelRouter.route(any(RouteRequest.class)))
+                    .thenReturn(RouteDecision.builder()
+                            .selectedModelId("deepseek-chat")
+                            .fallbackChain(List.of())
+                            .reason(RouteReason.QUOTA_DOWNGRADE)
+                            .build());
+            when(primary.getChatClient().prompt().messages(anyList()).call().chatResponse())
+                    .thenReturn(chatResponse("quota answer"));
+
+            String result = service.callChat(ModelScenario.CHAT, List.of()).get();
+
+            assertEquals("quota answer", result);
+            verify(quotaService).check(1L, "chat");
+        } finally {
+            ChatUserContext.clear();
+        }
     }
 
     private static ModelClientHolder holder(String id, ChatClient client) {

@@ -122,7 +122,7 @@ public class SpringAiConfig {
             cart_item(id, user_id, product_id, product_name, product_price, quantity, selected, create_time, update_time) 购物车
             coupon(id, user_id, coupon_name, amount, min_order_amount, status, expire_time, use_time, order_no, create_time) 优惠券
             full_reduction_rule(id, rule_name, threshold_amount, reduction_amount, start_time, end_time, enabled) 满减规则
-            pay_transaction(id, order_no, user_id, payment_method, pay_amount, status, notify_count, pay_time, refund_time, create_time, update_time) 支付流水
+            pay_transaction(id, order_no, user_id, payment_method, trade_no, pay_amount, status, notify_count, pay_time, refund_time, create_time, update_time) 支付流水
             【chat 对话消息库】
             chat_session(id, user_id, agent_id, channel, status, title, create_time, update_time, deleted) 会话
             chat_message(id, session_id, sender_type, sender_id, content, content_type, metadata, create_time, session_key, role) 消息

@@ -35,6 +35,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
@@ -91,10 +92,11 @@ public class ResilientAiService {
 
     private CompletableFuture<String> invokeNonStream(ModelScenario scenario, NonStreamCall call) {
         TraceContext captured = TraceContextHolder.capture();
+        Long userId = ChatUserContext.getUserId();
         return CompletableFuture.supplyAsync(() -> {
             TraceContextHolder.restore(captured);
             try {
-                RouteDecision decision = route(scenario);
+                RouteDecision decision = route(scenario, userId);
                 if (decision.getSelectedModelId() == null) {
                     log.warn("模型路由无可用模型: scenario={}, reason={}", scenario, decision.getReason());
                     return fallbackText(scenario);
@@ -108,27 +110,33 @@ public class ResilientAiService {
                 Throwable lastError = null;
                 for (String modelId : chain) {
                     attempt++;
-                    ModelClientHolder holder = modelRegistry.get(modelId);
-                    Observation observation = startLlmObservation(scenario, holder, decision, fallbackFrom, attempt);
                     try {
-                        ChatResponse response = callWithTransientRetry(holder, call);
-                        String text = response == null || response.getResult() == null
-                                ? "" : response.getResult().getOutput().getText();
-                        Usage usage = response == null || response.getMetadata() == null
-                                ? null : response.getMetadata().getUsage();
-                        finishLlmObservation(observation, usage, null);
-                        modelUsageRecorder.record(scenarioId(scenario), holder.getDefinition().getProvider(),
-                                holder.getDefinition().getModel(),
-                                usage == null ? null : usage.getPromptTokens(),
-                                usage == null ? null : usage.getCompletionTokens(),
-                                "SUCCESS", null);
-                        return text;
+                        ModelClientHolder holder = modelRegistry.get(modelId);
+                        Observation observation = startLlmObservation(scenario, holder, decision, fallbackFrom, attempt);
+                        try {
+                            ChatResponse response = callWithTransientRetry(holder, call);
+                            String text = response == null || response.getResult() == null
+                                    ? "" : response.getResult().getOutput().getText();
+                            Usage usage = response == null || response.getMetadata() == null
+                                    ? null : response.getMetadata().getUsage();
+                            finishLlmObservation(observation, usage, null);
+                            modelUsageRecorder.record(scenarioId(scenario), holder.getDefinition().getProvider(),
+                                    holder.getDefinition().getModel(),
+                                    usage == null ? null : usage.getPromptTokens(),
+                                    usage == null ? null : usage.getCompletionTokens(),
+                                    "SUCCESS", null);
+                            return text;
+                        } catch (Exception e) {
+                            lastError = e;
+                            fallbackFrom = modelId;
+                            finishLlmObservation(observation, null, e);
+                            modelUsageRecorder.record(scenarioId(scenario), holder.getDefinition().getProvider(),
+                                    holder.getDefinition().getModel(), null, null, "FAILED", e.getMessage());
+                        }
                     } catch (Exception e) {
                         lastError = e;
                         fallbackFrom = modelId;
-                        finishLlmObservation(observation, null, e);
-                        modelUsageRecorder.record(scenarioId(scenario), holder.getDefinition().getProvider(),
-                                holder.getDefinition().getModel(), null, null, "FAILED", e.getMessage());
+                        log.warn("模型准备失败，跳过: modelId={}, err={}", modelId, e.getMessage());
                     }
                 }
                 log.error("所有模型调用失败: scenario={}, lastError={}",
@@ -142,19 +150,21 @@ public class ResilientAiService {
 
     private CompletableFuture<Flux<String>> invokeStream(ModelScenario scenario, StreamCall call) {
         TraceContext captured = TraceContextHolder.capture();
+        Long userId = ChatUserContext.getUserId();
         return CompletableFuture.supplyAsync(() -> {
             TraceContextHolder.restore(captured);
             try {
-                RouteDecision decision = route(scenario);
+                RouteDecision decision = route(scenario, userId);
                 if (decision.getSelectedModelId() == null) {
                     return Flux.just("[ERROR]AI 助手暂时繁忙，请稍后重试。");
                 }
-                ModelClientHolder holder = modelRegistry.get(decision.getSelectedModelId());
                 try {
+                    ModelClientHolder holder = modelRegistry.get(decision.getSelectedModelId());
                     Flux<String> flux = call.call(holder);
                     AtomicReference<Usage> usageRef = new AtomicReference<>();
                     AtomicLong firstTokenMs = new AtomicLong(-1);
                     long start = System.currentTimeMillis();
+                    TraceContext streamTrace = TraceContextHolder.capture();
                     return flux
                             .doOnNext(chunk -> {
                                 if (firstTokenMs.get() < 0) {
@@ -162,31 +172,38 @@ public class ResilientAiService {
                                 }
                             })
                             .doFinally(signal -> {
-                                Usage usage = usageRef.get();
-                                Observation observation = startLlmObservation(
-                                        scenario, holder, decision, null, 1);
-                                if (usage != null) {
-                                    observation.highCardinalityKeyValue("promptTokens",
-                                            String.valueOf(usage.getPromptTokens()))
-                                            .highCardinalityKeyValue("completionTokens",
-                                                    String.valueOf(usage.getCompletionTokens()));
+                                TraceContextHolder.restore(streamTrace);
+                                try {
+                                    Usage usage = usageRef.get();
+                                    Observation observation = startLlmObservation(
+                                            scenario, holder, decision, null, 1);
+                                    if (usage != null) {
+                                        observation.highCardinalityKeyValue("promptTokens",
+                                                String.valueOf(usage.getPromptTokens()))
+                                                .highCardinalityKeyValue("completionTokens",
+                                                        String.valueOf(usage.getCompletionTokens()));
+                                    }
+                                    if (firstTokenMs.get() >= 0) {
+                                        observation.highCardinalityKeyValue("firstTokenMs",
+                                                String.valueOf(firstTokenMs.get()));
+                                    }
+                                    modelUsageRecorder.record(scenarioId(scenario),
+                                            holder.getDefinition().getProvider(),
+                                            holder.getDefinition().getModel(),
+                                            usage == null ? null : usage.getPromptTokens(),
+                                            usage == null ? null : usage.getCompletionTokens(),
+                                            signal == SignalType.ON_ERROR ? "FAILED" : "SUCCESS",
+                                            signal == SignalType.ON_ERROR ? "stream error" : null);
+                                    finishLlmObservation(observation, usage,
+                                            signal == SignalType.ON_ERROR
+                                                    ? new RuntimeException("stream error") : null);
+                                } finally {
+                                    TraceContextHolder.clear();
                                 }
-                                if (firstTokenMs.get() >= 0) {
-                                    observation.highCardinalityKeyValue("firstTokenMs",
-                                            String.valueOf(firstTokenMs.get()));
-                                }
-                                modelUsageRecorder.record(scenarioId(scenario),
-                                        holder.getDefinition().getProvider(),
-                                        holder.getDefinition().getModel(),
-                                        usage == null ? null : usage.getPromptTokens(),
-                                        usage == null ? null : usage.getCompletionTokens(),
-                                        signal == SignalType.ON_ERROR ? "FAILED" : "SUCCESS",
-                                        signal == SignalType.ON_ERROR ? "stream error" : null);
-                                finishLlmObservation(observation, usage,
-                                        signal == SignalType.ON_ERROR
-                                                ? new RuntimeException("stream error") : null);
                             });
                 } catch (Exception e) {
+                    log.warn("模型流式调用初始化失败: modelId={}, err={}",
+                            decision.getSelectedModelId(), e.getMessage());
                     return Flux.just("[ERROR]AI 助手暂时繁忙，请稍后重试。");
                 }
             } finally {
@@ -220,13 +237,22 @@ public class ResilientAiService {
             } catch (TimeoutException e) {
                 future.cancel(true);
                 throw e;
+            } catch (ExecutionException | CompletionException e) {
+                Throwable cause = e.getCause();
+                if (cause instanceof CompletionException && cause.getCause() != null) {
+                    cause = cause.getCause();
+                }
+                if (cause instanceof Exception ex) {
+                    throw ex;
+                }
+                throw new RuntimeException(cause == null ? e : cause);
             }
         });
     }
 
-    private RouteDecision route(ModelScenario scenario) {
+    private RouteDecision route(ModelScenario scenario, Long userId) {
         boolean quotaExceeded = routerProperties.getQuota().isEnabled()
-                && quotaService.check(ChatUserContext.getUserId(), scenarioId(scenario)).isExceeded();
+                && quotaService.check(userId, scenarioId(scenario)).isExceeded();
         return modelRouter.route(RouteRequest.builder()
                 .scenario(scenario)
                 .quotaExceeded(quotaExceeded)
