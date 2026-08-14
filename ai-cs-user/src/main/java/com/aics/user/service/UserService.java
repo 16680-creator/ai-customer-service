@@ -1,6 +1,8 @@
 package com.aics.user.service;
 
 import com.aics.common.result.Result;
+import com.aics.user.dto.LoginRequest;
+import com.aics.user.dto.LoginVO;
 import com.aics.user.entity.User;
 
 /**
@@ -19,11 +21,10 @@ public interface UserService {
     /**
      * 用户登录
      *
-     * @param username 用户名
-     * @param password 密码
-     * @return JWT Token
+     * @param request 登录请求（用户名+密码）
+     * @return 登录信息（含 JWT Token）
      */
-    Result<String> login(String username, String password);
+    Result<LoginVO> login(LoginRequest request);
 
     /**
      * 根据ID查询用户

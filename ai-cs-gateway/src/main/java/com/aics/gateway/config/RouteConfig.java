@@ -28,6 +28,11 @@ public class RouteConfig {
                         .path("/api/knowledge/**")
                         .filters(f -> f.stripPrefix(1))
                         .uri("lb://ai-cs-knowledge"))
+                // 向量知识库（chat 服务的 RAG 入库/检索）
+                .route("ai-cs-rag", r -> r
+                        .path("/api/rag/**")
+                        .filters(f -> f.stripPrefix(1))
+                        .uri("lb://ai-cs-chat"))
                 // AI 对话服务
                 .route("ai-cs-chat", r -> r
                         .path("/api/chat/**")
@@ -38,16 +43,39 @@ public class RouteConfig {
                         .path("/api/search/**")
                         .filters(f -> f.stripPrefix(1))
                         .uri("lb://ai-cs-search"))
-                // 消息服务
+                // 消息服务（Controller 前缀为 /api/message，无需去前缀）
                 .route("ai-cs-message", r -> r
                         .path("/api/message/**")
-                        .filters(f -> f.stripPrefix(1))
                         .uri("lb://ai-cs-message"))
-                // 通知服务
+                // 通知服务（Controller 前缀为 /api/notify，无需去前缀）
                 .route("ai-cs-notify", r -> r
                         .path("/api/notify/**")
-                        .filters(f -> f.stripPrefix(1))
                         .uri("lb://ai-cs-notify"))
+                // 订单服务
+                .route("ai-cs-order", r -> r
+                        .path("/api/order/**")
+                        .filters(f -> f.stripPrefix(1))
+                        .uri("lb://ai-cs-order"))
+                // 购物车服务（订单模块）
+                .route("ai-cs-cart", r -> r
+                        .path("/api/cart/**")
+                        .filters(f -> f.stripPrefix(1))
+                        .uri("lb://ai-cs-order"))
+                // 支付回调（订单模块）
+                .route("ai-cs-pay", r -> r
+                        .path("/api/pay/**")
+                        .filters(f -> f.stripPrefix(1))
+                        .uri("lb://ai-cs-pay"))
+                // RocketMQ 调度服务（独立 ai-cs-mq）
+                .route("ai-cs-mq", r -> r
+                        .path("/api/mq/**")
+                        .filters(f -> f.stripPrefix(1))
+                        .uri("lb://ai-cs-mq"))
+                // 商品服务
+                .route("ai-cs-product", r -> r
+                        .path("/api/product/**")
+                        .filters(f -> f.stripPrefix(1))
+                        .uri("lb://ai-cs-product"))
                 .build();
     }
 }

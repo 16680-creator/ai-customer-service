@@ -49,7 +49,7 @@ spec:
             - name: SPRING_DATASOURCE_PLATFORM
               value: "mysql"
             - name: MYSQL_SERVICE_HOST
-              value: "mysql-master"
+              value: "mysql"
             - name: MYSQL_SERVICE_PORT
               value: "3306"
             - name: MYSQL_SERVICE_DB_NAME

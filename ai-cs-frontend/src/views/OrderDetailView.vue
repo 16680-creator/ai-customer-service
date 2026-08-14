@@ -1,0 +1,172 @@
+<template>
+  <div class="order-detail-view">
+    <el-page-header @back="$router.back()" :content="`订单 ${orderNo}`" />
+
+    <template v-if="order">
+      <el-card shadow="hover" class="section">
+        <template #header>
+          <div class="card-header">
+            <span>订单信息</span>
+            <el-tag :type="statusTag(order.status)" size="large">{{ statusText(order.status) }}</el-tag>
+          </div>
+        </template>
+        <el-descriptions :column="2" border>
+          <el-descriptions-item label="订单号">{{ order.orderNo }}</el-descriptions-item>
+          <el-descriptions-item label="订单状态">{{ statusText(order.status) }}</el-descriptions-item>
+          <el-descriptions-item label="商品总额">¥{{ Number(order.totalAmount || 0).toFixed(2) }}</el-descriptions-item>
+          <el-descriptions-item label="优惠金额">-¥{{ Number(order.discountAmount || 0).toFixed(2) }}</el-descriptions-item>
+          <el-descriptions-item label="应付金额">¥{{ Number(order.payAmount || 0).toFixed(2) }}</el-descriptions-item>
+          <el-descriptions-item label="支付方式">{{ payMethodText(order.paymentMethod) }}</el-descriptions-item>
+          <el-descriptions-item label="下单时间">{{ formatTime(order.createTime) }}</el-descriptions-item>
+          <el-descriptions-item label="支付截止">{{ formatTime(order.expireTime) }}</el-descriptions-item>
+        </el-descriptions>
+      </el-card>
+
+      <el-card shadow="hover" class="section">
+        <template #header><span>商品清单</span></template>
+        <el-table :data="order.items || []" style="width: 100%">
+          <el-table-column prop="productName" label="商品名称" min-width="180" />
+          <el-table-column prop="productPrice" label="单价" width="110">
+            <template #default="{ row }">¥{{ Number(row.productPrice).toFixed(2) }}</template>
+          </el-table-column>
+          <el-table-column prop="quantity" label="数量" width="80" />
+          <el-table-column label="小计" width="110">
+            <template #default="{ row }">¥{{ Number(row.subtotal).toFixed(2) }}</template>
+          </el-table-column>
+        </el-table>
+      </el-card>
+
+      <div class="actions">
+        <template v-if="order.status === 'PENDING_PAY'">
+          <el-button type="danger" :loading="cancelling" @click="cancelOrder">取消订单</el-button>
+          <el-button type="primary" :loading="paying" @click="retryPay">立即支付</el-button>
+        </template>
+        <template v-else-if="order.status === 'PAID'">
+          <el-button type="warning" :loading="refunding" @click="refundOrder">模拟退款</el-button>
+        </template>
+      </div>
+    </template>
+    <el-empty v-else description="加载中或订单不存在" />
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { orderApi, payApi } from '../api'
+import { getUser } from '../utils/auth'
+
+const route = useRoute()
+const router = useRouter()
+const orderNo = route.params.orderNo
+const userId = ref(getUser()?.userId || localStorage.getItem('userId') || '')
+const order = ref(null)
+const cancelling = ref(false)
+const paying = ref(false)
+const refunding = ref(false)
+
+onMounted(fetchOrder)
+
+async function fetchOrder() {
+  try {
+    const { data } = await orderApi.get(`/${orderNo}`, { headers: { 'X-User-Id': userId.value } })
+    if (data.code === 200) {
+      order.value = data.data
+    } else {
+      ElMessage.error(data.message)
+    }
+  } catch (e) {
+    ElMessage.error('获取订单详情失败')
+  }
+}
+
+async function cancelOrder() {
+  try {
+    await ElMessageBox.confirm('确定取消该订单吗？', '提示', { type: 'warning' })
+    cancelling.value = true
+    const { data } = await orderApi.put(`/${orderNo}/cancel`, null, { headers: { 'X-User-Id': userId.value } })
+    if (data.code === 200) {
+      ElMessage.success('订单已取消')
+      fetchOrder()
+    } else {
+      ElMessage.error(data.message)
+    }
+  } catch (e) {
+    // 用户取消或失败
+  } finally {
+    cancelling.value = false
+  }
+}
+
+async function retryPay() {
+  paying.value = true
+  try {
+    const { data } = await payApi.post('/create', { orderNo, paymentMethod: order.value.paymentMethod || 'MOCK' }, {
+      headers: { 'X-User-Id': userId.value },
+    })
+    if (data.code === 200) {
+      const d = data.data
+      if (d.payType === 'QRCODE' && d.codeUrl) {
+        // 扫码类渠道（支付宝/微信/银联）：进入收银台渲染二维码 + 轮询
+        router.push({ path: '/mock-pay', query: { orderNo, amount: d.payAmount, payType: d.payType, codeUrl: d.codeUrl, payUrl: d.payUrl, expireTime: d.expireTime || '' } })
+      } else if (d.payUrl) {
+        // 跳转型渠道：新窗口打开收银台
+        window.open(d.payUrl, '_blank')
+      } else {
+        ElMessage.error('未获取到支付信息')
+      }
+    } else {
+      ElMessage.error(data.message)
+    }
+  } catch (e) {
+    ElMessage.error('支付失败：' + (e.response?.data?.message || e.message))
+  } finally {
+    paying.value = false
+  }
+}
+
+async function refundOrder() {
+  try {
+    await ElMessageBox.confirm('确定要模拟退款吗？退款后会回补库存并更新订单状态。', '提示', { type: 'warning' })
+    refunding.value = true
+    const { data } = await payApi.post('/mock/refund', { orderNo }, { headers: { 'X-User-Id': userId.value } })
+    if (data.code === 200) {
+      ElMessage.success('退款成功')
+      fetchOrder()
+    } else {
+      ElMessage.error(data.message)
+    }
+  } catch (e) {
+    // 用户取消或失败
+  } finally {
+    refunding.value = false
+  }
+}
+
+function statusText(status) {
+  const map = { PENDING_PAY: '待支付', PAID: '已支付', REFUNDING: '退款中', CANCELLED: '已取消', REFUNDED: '已退款' }
+  return map[status] || status
+}
+
+function statusTag(status) {
+  const map = { PENDING_PAY: 'warning', PAID: 'success', REFUNDING: 'warning', CANCELLED: 'info', REFUNDED: 'info' }
+  return map[status] || 'info'
+}
+
+function payMethodText(m) {
+  const map = { MOCK: '模拟支付', ALIPAY: '支付宝', WECHAT: '微信支付', BANK_CARD: '银行卡', UNIONPAY: '银联云闪付' }
+  return map[m] || m || '-'
+}
+
+function formatTime(t) {
+  return t ? String(t).replace('T', ' ').slice(0, 19) : '-'
+}
+</script>
+
+<style scoped>
+.order-detail-view { padding: 20px; }
+.section { margin-top: 16px; }
+.card-header { display: flex; justify-content: space-between; align-items: center; }
+.actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 16px; }
+</style>

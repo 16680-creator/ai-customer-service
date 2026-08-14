@@ -1,0 +1,46 @@
+spring:
+  ai:
+    openai:
+      api-key: sk-d62eb12cc72b48bf91b7a519b0018cab
+      base-url: https://api.deepseek.com
+      chat:
+        options:
+          model: deepseek-chat
+          temperature: 0.7
+          max-tokens: 2048
+
+# Rerank
+aics:
+  rerank:
+    base-url: https://api.siliconflow.cn
+    api-key: sk-aonceapnbwfoswegzsieghnijdddzbsccsitmndyevpfdwcs
+    model: BAAI/bge-reranker-v2-m3
+    top-n: 5
+    min-score: 0.7
+    timeout-ms: 5000
+
+  # RAG two-stage retrieval
+  rag:
+    recall-top-k: 20
+    # Broad recall threshold: recall first, quality left to Rerank (min-score 0.7)
+    recall-threshold: 0.3
+
+  # AI NL2SQL: read-only data sources for the executeReadOnlyQuery tool
+  nl2sql:
+    username: root
+    password: ${DB_PASSWORD}
+    urls:
+      user: jdbc:mysql://123.60.31.79:3306/user_db?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+      product: jdbc:mysql://123.60.31.79:3306/product_db?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+      order: jdbc:mysql://123.60.31.79:3306/ai_customer_service?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+      chat: jdbc:mysql://123.60.31.79:3306/chat_db?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+      knowledge: jdbc:mysql://123.60.31.79:3306/knowledge_db?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+
+  # Multimodal vision chat: SiliconFlow Qwen3-VL sees the image, DeepSeek answers
+  vision:
+    base-url: https://api.siliconflow.cn
+    api-key: sk-aonceapnbwfoswegzsieghnijdddzbsccsitmndyevpfdwcs
+    model: Qwen/Qwen3-VL-32B-Instruct
+    enabled: true
+    # MinIO public endpoint host (SSRF whitelist for image URLs)
+    allowed-image-host: 123.60.31.79

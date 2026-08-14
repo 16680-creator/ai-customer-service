@@ -40,10 +40,16 @@
             <artifactId>spring-cloud-starter-loadbalancer</artifactId>
         </dependency>
 
-        <!-- Common Module -->
+        <!-- Common Module（排除 Spring MVC，网关基于 WebFlux，两者不兼容） -->
         <dependency>
             <groupId>com.aics</groupId>
             <artifactId>ai-cs-common</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-web</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <!-- Lombok -->

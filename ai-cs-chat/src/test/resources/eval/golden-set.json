@@ -1,0 +1,22 @@
+[
+  { "id": "gc-001", "question": "型号 ABC-123 的保修期是多久？", "knowledgeBase": "product-manual", "expectedDocumentIds": ["101"], "referenceAnswer": "型号 ABC-123 保修期为 1 年。", "expectedKeywords": ["保修", "1 年"] },
+  { "id": "gc-002", "question": "订单怎么申请退款？", "knowledgeBase": "product-manual", "expectedDocumentIds": ["102"], "referenceAnswer": "进入订单详情页点击申请退款，填写退款原因提交即可。", "expectedKeywords": ["退款", "订单"] },
+  { "id": "gc-003", "question": "运费由谁承担？", "knowledgeBase": "product-manual", "expectedDocumentIds": ["103"], "referenceAnswer": "非质量问题退货运费由买家承担。", "expectedKeywords": ["运费", "买家"] },
+  { "id": "gc-004", "question": "支持哪些支付方式？", "knowledgeBase": "product-manual", "expectedDocumentIds": ["104"], "referenceAnswer": "支持微信、支付宝、银行卡支付。", "expectedKeywords": ["支付"] },
+  { "id": "gc-005", "question": "发货后多久能收到？", "knowledgeBase": "product-manual", "expectedDocumentIds": ["105"], "referenceAnswer": "一般 3-5 个工作日送达。", "expectedKeywords": ["发货", "3-5"] },
+  { "id": "gc-006", "question": "如何修改收货地址？", "knowledgeBase": "product-manual", "expectedDocumentIds": ["106"], "referenceAnswer": "在订单详情页修改收货地址，发货前可改。", "expectedKeywords": ["地址"] },
+  { "id": "gc-007", "question": "优惠券可以叠加使用吗？", "knowledgeBase": "product-manual", "expectedDocumentIds": ["107"], "referenceAnswer": "每笔订单限用一张优惠券，不可叠加。", "expectedKeywords": ["优惠券"] },
+  { "id": "gc-008", "question": "商品支持 7 天无理由退货吗？", "knowledgeBase": "product-manual", "expectedDocumentIds": ["108"], "referenceAnswer": "支持 15 天无理由退换货。", "expectedKeywords": ["无理由", "退货"] },
+  { "id": "gc-009", "question": "退款多久到账？", "knowledgeBase": "product-manual", "expectedDocumentIds": ["109"], "referenceAnswer": "退款审核通过后 1-3 个工作日到账。", "expectedKeywords": ["退款", "到账"] },
+  { "id": "gc-010", "question": "发票如何开具？", "knowledgeBase": "product-manual", "expectedDocumentIds": ["110"], "referenceAnswer": "下单时可选择开具电子发票。", "expectedKeywords": ["发票"] },
+  { "id": "gc-011", "question": "账号如何解绑手机？", "knowledgeBase": "product-manual", "expectedDocumentIds": ["111"], "referenceAnswer": "在账户安全中心可解绑手机。", "expectedKeywords": ["解绑", "手机"] },
+  { "id": "gc-012", "question": "会员等级如何提升？", "knowledgeBase": "product-manual", "expectedDocumentIds": ["112"], "referenceAnswer": "通过消费金额与活跃度提升会员等级。", "expectedKeywords": ["会员"] },
+  { "id": "gc-013", "question": "积分可以兑换什么？", "knowledgeBase": "product-manual", "expectedDocumentIds": ["113"], "referenceAnswer": "积分可兑换优惠券与商品。", "expectedKeywords": ["积分"] },
+  { "id": "gc-014", "question": "如何联系人工客服？", "knowledgeBase": "product-manual", "expectedDocumentIds": ["114"], "referenceAnswer": "可在客服页点击转人工。", "expectedKeywords": ["人工"] },
+  { "id": "gc-015", "question": "商品损坏如何理赔？", "knowledgeBase": "product-manual", "expectedDocumentIds": ["115"], "referenceAnswer": "签收后 48 小时内提交损坏照片申请理赔。", "expectedKeywords": ["理赔", "损坏"] },
+  { "id": "gc-016", "question": "支持货到付款吗？", "knowledgeBase": "product-manual", "expectedDocumentIds": ["116"], "referenceAnswer": "当前不支持货到付款。", "expectedKeywords": ["货到付款"] },
+  { "id": "gc-017", "question": "如何查看物流进度？", "knowledgeBase": "product-manual", "expectedDocumentIds": ["117"], "referenceAnswer": "订单详情页可查看实时物流轨迹。", "expectedKeywords": ["物流"] },
+  { "id": "gc-018", "question": "换货流程是什么？", "knowledgeBase": "product-manual", "expectedDocumentIds": ["118"], "referenceAnswer": "提交换货申请，审核通过后寄回商品。", "expectedKeywords": ["换货"] },
+  { "id": "gc-019", "question": "下单后可以取消吗？", "knowledgeBase": "product-manual", "expectedDocumentIds": ["119"], "referenceAnswer": "未发货订单可随时取消。", "expectedKeywords": ["取消"] },
+  { "id": "gc-020", "question": "如何导出订单数据？", "knowledgeBase": "product-manual", "expectedDocumentIds": ["120"], "referenceAnswer": "在订单列表页可导出近一年的订单数据。", "expectedKeywords": ["导出", "订单"] }
+]

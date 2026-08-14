@@ -1,9 +1,12 @@
 package com.aics.notify.controller;
 
 import com.aics.common.result.Result;
+import com.aics.notify.dto.HandoffNoticeDTO;
+import com.aics.notify.service.NotifyHandoffService;
 import com.aics.notify.service.NotifyService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -20,17 +23,19 @@ public class NotifyController {
 
     private final NotifyService notifyService;
 
+    private final NotifyHandoffService notifyHandoffService;
+
     @Operation(summary = "发送通知给指定用户")
     @PostMapping("/send")
-    public Result<Void> sendToUser(@RequestParam String userId,
-                                    @RequestParam String message) {
+    public Result<Void> sendToUser(@RequestParam("userId") String userId,
+                                    @RequestParam("message") String message) {
         notifyService.sendToUser(userId, message);
         return Result.success();
     }
 
     @Operation(summary = "广播通知")
     @PostMapping("/broadcast")
-    public Result<Void> broadcast(@RequestParam String message) {
+    public Result<Void> broadcast(@RequestParam("message") String message) {
         notifyService.broadcast(message);
         return Result.success();
     }
@@ -40,5 +45,14 @@ public class NotifyController {
     public Result<Integer> getOnlineCount() {
         int count = notifyService.getOnlineCount();
         return Result.success(count);
+    }
+
+    @Operation(summary = "发送转人工通知", description = "将转人工事件（含工单号、用户ID、优先级、摘要）序列化为 JSON 并定向推送给指定用户")
+    @PostMapping("/handoff")
+    public Result<Void> sendHandoffNotice(@Valid @RequestBody HandoffNoticeDTO dto) {
+        // 入参校验由 @Valid 触发（ticketNo/userId/summary 必填）
+        // 委托服务层：JSON 序列化（注入 event=HANDOFF）并经 WebSocket 定向推送给目标用户
+        notifyHandoffService.sendHandoffNotice(dto);
+        return Result.success();
     }
 }

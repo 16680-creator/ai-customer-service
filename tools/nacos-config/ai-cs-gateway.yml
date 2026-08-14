@@ -1,0 +1,13 @@
+# Gateway Configuration
+spring:
+  cloud:
+    gateway:
+      # Global CORS Configuration (frontend localhost:5173 -> gateway 8080)
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowed-origin-patterns: "*"
+            allowed-methods: "*"
+            allowed-headers: "*"
+            allow-credentials: true
+            max-age: 3600

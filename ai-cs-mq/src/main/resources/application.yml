@@ -1,0 +1,21 @@
+server:
+  port: 8090
+
+spring:
+  application:
+    name: ai-cs-mq
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+        namespace: aics
+        group: DEFAULT_GROUP
+      config:
+        server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+        namespace: aics
+        group: DEFAULT_GROUP
+        file-extension: yml
+  config:
+    import:
+      - optional:nacos:aics-shared.yml
+      - optional:nacos:ai-cs-mq.yml

@@ -45,7 +45,7 @@ spec:
             - name: NACOS_NAMESPACE
               value: ""
             - name: MYSQL_HOST
-              value: "mysql-master"
+              value: "mysql"
             - name: MYSQL_PORT
               value: "3306"
             - name: MYSQL_DB

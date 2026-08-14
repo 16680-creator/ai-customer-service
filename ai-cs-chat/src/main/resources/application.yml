@@ -4,28 +4,152 @@ server:
 spring:
   application:
     name: ai-cs-chat
-  ai:
-    openai:
-      api-key: ${OPENAI_API_KEY:sk-placeholder}
-      base-url: ${OPENAI_BASE_URL:https://api.openai.com}
-      chat:
-        options:
-          model: ${OPENAI_MODEL:gpt-3.5-turbo}
-          temperature: 0.7
-          max-tokens: 2048
+  # 彻底排除 Embedding 自动配置（与 @SpringBootApplication.exclude 双保险）
+  # 以及 JDBC 主数据源自动配置（chat 无业务主库，数据源由 Nl2SqlDataSourceConfig 手动创建）
+  autoconfigure:
+    exclude:
+      - org.springframework.ai.model.openai.autoconfigure.OpenAiEmbeddingAutoConfiguration
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
   cloud:
     nacos:
       discovery:
         server-addr: ${NACOS_ADDR:127.0.0.1:8848}
-        namespace: ${NACOS_NAMESPACE:aics}
+        namespace: aics
         group: DEFAULT_GROUP
       config:
         server-addr: ${NACOS_ADDR:127.0.0.1:8848}
-        namespace: ${NACOS_NAMESPACE:aics}
+        namespace: aics
         group: DEFAULT_GROUP
         file-extension: yml
+  config:
+    import:
+      - optional:nacos:aics-shared.yml
+      - optional:nacos:ai-cs-chat.yml
 
-logging:
-  level:
-    com.aics.chat: debug
-    org.springframework.ai: info
+  # ===== Chroma 向量库连接配置 =====
+  # 统一放在 Nacos（ai-cs-chat.yml）管理
+  ai:
+    # 禁用 Spring AI 内置 Embedding 自动装配（由 SpringAiConfig 手动提供）
+    model:
+      embedding:
+        enabled: false
+    vectorstore:
+      chroma:
+        initialize-schema: true
+        collection-name: aics-knowledge
+        client:
+          host: http://${aics.mysql.host:localhost}
+          port: ${CHROMA_PORT:8000}
+
+  # ===== Redis 配置（会话历史热缓存） =====
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
+
+# ===== RocketMQ 配置（对话消息投递/落库） =====
+rocketmq:
+  name-server: ${ROCKETMQ_NAME_SERVER:127.0.0.1:9876}
+  producer:
+    group: chat-producer-group
+
+# ===== Resilience4j 弹性容错配置 =====
+# 对应 ResilientAiService 和 Resilience4jConfig 中的注解 name
+resilience4j:
+  timelimiter:
+    instances:
+      # 非流式 LLM 调用超时（chat / chatWithRag / compressHistory）
+      chatService:
+        timeout-duration: 30s
+        cancel-running-future: true
+      # SSE 流式 LLM 调用超时（首次 token 到达限制）
+      sseChatService:
+        timeout-duration: 60s
+        cancel-running-future: true
+      # 视觉模型图片理解调用超时
+      visionService:
+        timeout-duration: 5s
+        cancel-running-future: true
+  retry:
+    instances:
+      # LLM 调用重试策略
+      chatService:
+        max-attempts: 3
+        wait-duration: 1s
+        multiplier: 2
+        retry-exceptions:
+          - java.net.SocketTimeoutException
+          - java.net.ConnectException
+          - org.springframework.web.client.ResourceAccessException
+          - java.util.concurrent.TimeoutException
+        ignore-exceptions:
+          - com.aics.common.exception.BusinessException
+          - java.lang.IllegalArgumentException
+      # 视觉模型调用重试策略
+      visionService:
+        max-attempts: 2
+        wait-duration: 1s
+        retry-exceptions:
+          - java.net.SocketTimeoutException
+          - java.net.ConnectException
+          - org.springframework.web.client.ResourceAccessException
+          - java.util.concurrent.TimeoutException
+        ignore-exceptions:
+          - java.lang.IllegalArgumentException
+  circuitbreaker:
+    instances:
+      # LLM 调用熔断器
+      chatService:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        minimum-number-of-calls: 3
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+        record-exceptions:
+          - java.util.concurrent.TimeoutException
+          - org.springframework.web.client.ResourceAccessException
+          - java.net.SocketTimeoutException
+        ignore-exceptions:
+          - com.aics.common.exception.BusinessException
+          - java.lang.IllegalArgumentException
+      # SSE 流式 LLM 调用熔断器
+      sseChatService:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        minimum-number-of-calls: 3
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+        record-exceptions:
+          - java.util.concurrent.TimeoutException
+          - org.springframework.web.client.ResourceAccessException
+          - java.net.SocketTimeoutException
+        ignore-exceptions:
+          - com.aics.common.exception.BusinessException
+          - java.lang.IllegalArgumentException
+      # 视觉模型调用熔断器
+      visionService:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        minimum-number-of-calls: 3
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+        record-exceptions:
+          - java.util.concurrent.TimeoutException
+          - org.springframework.web.client.ResourceAccessException
+          - java.net.SocketTimeoutException
+        ignore-exceptions:
+          - java.lang.IllegalArgumentException
+
+# ===== 多模态视觉模型配置 =====
+# 视觉模型（硅基流动 Qwen2.5-VL，OpenAI 兼容协议）与 DeepSeek 文本模型解耦
+# 统一放在 Nacos（ai-cs-chat.yml）管理：
+#   aics.vision.base-url: https://api.siliconflow.cn
+#   aics.vision.api-key: <密钥>
+#   aics.vision.model: Qwen/Qwen2.5-VL-72B-Instruct
+#   aics.vision.enabled: true
+#   aics.vision.allowed-image-host: <MinIO 内网地址白名单，逗号分隔>

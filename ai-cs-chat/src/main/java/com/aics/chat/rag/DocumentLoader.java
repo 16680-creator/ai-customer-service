@@ -6,6 +6,7 @@ import org.springframework.ai.document.Document;
 import org.springframework.ai.reader.TextReader;
 import org.springframework.ai.reader.pdf.PagePdfDocumentReader;
 import org.springframework.ai.reader.pdf.config.PdfDocumentReaderConfig;
+import org.springframework.ai.reader.tika.TikaDocumentReader;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 
@@ -15,6 +16,18 @@ import java.util.List;
 /**
  * 文档加载器
  * 负责从不同格式的文件中加载文档内容，用于 RAG 检索增强生成
+ *
+ * <p>提供三种加载策略，由 {@link com.aics.chat.service.KnowledgeBaseService#addFile} 按文件后缀选择：</p>
+ * <ul>
+ *   <li>{@link #loadPdf} —— PDF，使用 {@link PagePdfDocumentReader} 按页读取，
+ *       每页生成一个 Document，metadata 带 {@code page_number}（用于引用溯源）。</li>
+ *   <li>{@link #loadText} —— 纯文本（.txt/.md 等），使用 {@link TextReader} 整篇读取。</li>
+ *   <li>{@link #loadTika} —— Office/HTML 等，使用 Apache Tika（{@link TikaDocumentReader}）
+ *       解析 .docx / .xlsx / .html / .htm 等富文档格式，提取正文文本。</li>
+ * </ul>
+ *
+ * <p>加载后的原始 Document 会由 {@link com.aics.chat.service.KnowledgeBaseService#addChunks}
+ * 进一步用 {@code TokenTextSplitter} 按 token 切分成更小的片段（chunk），再向量化入库。</p>
  */
 @Component
 public class DocumentLoader {
@@ -35,8 +48,6 @@ public class DocumentLoader {
                     PdfDocumentReaderConfig.builder()
                             .withPageTopMargin(0)
                             .withPageBottomMargin(0)
-                            .withPageExtractedTextFormatter(extractedTextFormatter ->
-                                    extractedTextFormatter.withLeftAlignment(true))
                             .withPagesPerDocument(1)
                             .build()
             );
@@ -64,6 +75,23 @@ public class DocumentLoader {
             return documents;
         } catch (Exception e) {
             log.error("文本文档加载失败: {}", resource.getFilename(), e);
+            return new ArrayList<>();
+        }
+    }
+
+    /**
+     * 加载 Tika 支持的文档（docx/xlsx/html/htm 等）
+     *
+     * @param resource 文档文件资源
+     * @return 文档列表
+     */
+    public List<Document> loadTika(Resource resource) {
+        log.info("加载Tika文档: {}", resource.getFilename());
+        try {
+            TikaDocumentReader reader = new TikaDocumentReader(resource);
+            return reader.get();
+        } catch (Exception e) {
+            log.error("Tika文档加载失败: {}", resource.getFilename(), e);
             return new ArrayList<>();
         }
     }

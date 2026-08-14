@@ -40,6 +40,20 @@ public enum ResultCode {
     CHAT_MESSAGE_SEND_FAIL(3002, "消息发送失败"),
     CHAT_AI_SERVICE_UNAVAILABLE(3003, "AI服务暂不可用"),
     CHAT_CONTEXT_OVERFLOW(3004, "对话上下文超出限制"),
+    CHAT_VISION_SERVICE_UNAVAILABLE(3005, "视觉服务暂不可用，无法识别图片"),
+    CHAT_IMAGE_URL_INVALID(3006, "图片地址无效或不允许访问"),
+
+    // ==================== Agent 编排 31xx ====================
+    AGENT_SAFETY_BLOCKED(3101, "输入安全检查拦截，无法执行"),
+    AGENT_INTENT_LOW_CONFIDENCE(3102, "意图置信度不足，无法路由"),
+    AGENT_RUN_NOT_FOUND(3103, "Agent 执行记录不存在"),
+    AGENT_CONFIRMATION_INVALID(3104, "确认凭证无效或与操作不匹配"),
+    AGENT_CONFIRMATION_EXPIRED(3105, "确认已超时，请重新发起操作"),
+    AGENT_MAX_STEPS_EXCEEDED(3106, "Agent 执行超出最大步骤数，已中止"),
+    AGENT_TIMEOUT(3107, "Agent 执行超时，已中止"),
+    AGENT_WRITE_OP_NOT_CONFIRMED(3108, "高风险写操作未经用户确认，已拒绝执行"),
+    AGENT_HANDOFF_CREATE_FAIL(3109, "转人工工单创建失败"),
+    AGENT_ORDER_LOCATE_FAIL(3110, "无法定位当前用户的订单"),
 
     // ==================== 搜索模块 4xxx ====================
     SEARCH_INDEX_NOT_FOUND(4001, "搜索索引不存在"),
@@ -52,7 +66,38 @@ public enum ResultCode {
 
     // ==================== 通知模块 6xxx ====================
     NOTIFY_SEND_FAIL(6001, "通知发送失败"),
-    NOTIFY_WS_CONNECT_FAIL(6002, "WebSocket连接失败");
+    NOTIFY_WS_CONNECT_FAIL(6002, "WebSocket连接失败"),
+
+    // ==================== 订单模块 7xxx ====================
+    ORDER_STOCK_INSUFFICIENT(7001, "库存不足"),
+    ORDER_CREATE_FAIL(7002, "下单失败"),
+    ORDER_COUPON_UNAVAILABLE(7003, "优惠券不可用"),
+    ORDER_NOT_FOUND(7004, "订单不存在或状态不允许操作"),
+    ORDER_PAYMENT_METHOD_INVALID(7005, "支付方式无效"),
+    ORDER_CART_EMPTY(7006, "购物车为空或未选择商品"),
+    ORDER_PAY_AMOUNT_MISMATCH(7007, "支付金额与订单金额不一致"),
+
+    // ==================== 售后模块 71xx ====================
+    AFTER_SALE_NOT_ELIGIBLE(7101, "订单不满足售后条件"),
+    AFTER_SALE_APPLICATION_EXISTS(7102, "该订单已存在进行中的售后申请"),
+    AFTER_SALE_CREATE_FAIL(7103, "售后申请创建失败"),
+    AFTER_SALE_APPLICATION_NOT_FOUND(7104, "售后申请不存在"),
+    AFTER_SALE_ACTION_INVALID(7105, "售后动作类型无效"),
+
+    // ==================== 商品模块 8xxx ====================
+    PRODUCT_NOT_FOUND(8001, "商品不存在"),
+    PRODUCT_OFF_SHELF(8002, "商品已下架"),
+    PRODUCT_STOCK_INSUFFICIENT(8003, "商品库存不足"),
+    PRODUCT_NAME_DUPLICATE(8004, "商品名称已存在"),
+    PRODUCT_CATEGORY_NOT_FOUND(8005, "商品分类不存在"),
+    PRODUCT_IMAGE_INVALID(8006, "商品图片格式不支持"),
+    PRODUCT_IMAGE_TOO_LARGE(8007, "商品图片大小超过限制"),
+    PRODUCT_INDEX_FAIL(8008, "商品向量索引失败"),
+    PRODUCT_SIMILAR_SEARCH_FAIL(8009, "相似商品检索失败"),
+
+    // ==================== 文件存储 9xxx ====================
+    FILE_UPLOAD_FAIL(9001, "文件上传失败"),
+    FILE_DELETE_FAIL(9002, "文件删除失败");
 
     private final int code;
     private final String message;

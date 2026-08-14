@@ -8,27 +8,14 @@ spring:
     nacos:
       discovery:
         server-addr: ${NACOS_ADDR:127.0.0.1:8848}
-        namespace: ${NACOS_NAMESPACE:aics}
+        namespace: aics
         group: DEFAULT_GROUP
       config:
         server-addr: ${NACOS_ADDR:127.0.0.1:8848}
-        namespace: ${NACOS_NAMESPACE:aics}
+        namespace: aics
         group: DEFAULT_GROUP
         file-extension: yml
-    gateway:
-      discovery:
-        locator:
-          enabled: true
-          lower-case-service-id: true
-      globalcors:
-        cors-configurations:
-          '[/**]':
-            allowed-origins: "*"
-            allowed-methods: "*"
-            allowed-headers: "*"
-            allow-credentials: true
-
-logging:
-  level:
-    com.aics.gateway: debug
-    org.springframework.cloud.gateway: info
+  config:
+    import:
+      - optional:nacos:aics-shared.yml
+      - optional:nacos:ai-cs-gateway.yml

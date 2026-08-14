@@ -62,7 +62,7 @@ ON DUPLICATE KEY UPDATE role_name = VALUES(role_name);
 
 -- 初始化管理员用户（密码: admin123 的BCrypt加密）
 INSERT INTO sys_user (id, username, password, nickname, role, status) VALUES
-(1, 'admin', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', '系统管理员', 'admin', 1)
+(1, 'admin', '$2a$10$hEUYL34lpABtLWdPb.QC9uUnz0ehZwNrq9aOzdCjtmzvme0gf7.Fq', '系统管理员', 'admin', 1)
 ON DUPLICATE KEY UPDATE username = VALUES(username);
 
 INSERT INTO sys_user_role (id, user_id, role_id) VALUES
@@ -279,7 +279,7 @@ CREATE TABLE IF NOT EXISTS group_capacity (
     id                          BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     group_id                    VARCHAR(128)    NOT NULL DEFAULT '' COMMENT 'Group ID',
     quota                       INT             NOT NULL DEFAULT 0 COMMENT '配额',
-    usage                       INT             NOT NULL DEFAULT 0 COMMENT '使用量',
+    `usage`                     INT             NOT NULL DEFAULT 0 COMMENT '使用量',
     max_size                    INT             NOT NULL DEFAULT 0 COMMENT '单个配置大小上限，单位为字节',
     max_aggr_count              INT             NOT NULL DEFAULT 0 COMMENT '聚合子配置最大个数',
     max_aggr_size               INT             NOT NULL DEFAULT 0 COMMENT '聚合子配置单个大小上限',
@@ -291,7 +291,7 @@ CREATE TABLE IF NOT EXISTS group_capacity (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='集群、各Group容量信息表';
 
 CREATE TABLE IF NOT EXISTS his_config_info (
-    id                          BIGINT          NOT NULL AUTO_INCREMENT COMMENT 'id',
+    id                          BIGINT          NOT NULL COMMENT 'id',
     nid                         BIGINT          NOT NULL AUTO_INCREMENT COMMENT 'nid',
     data_id                     VARCHAR(255)    NOT NULL COMMENT 'data_id',
     group_id                    VARCHAR(128)    NOT NULL COMMENT 'group_id',
@@ -314,7 +314,7 @@ CREATE TABLE IF NOT EXISTS tenant_capacity (
     id                          BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     tenant_id                   VARCHAR(128)    NOT NULL DEFAULT '' COMMENT 'Tenant ID',
     quota                       INT             NOT NULL DEFAULT 0 COMMENT '配额',
-    usage                       INT             NOT NULL DEFAULT 0 COMMENT '使用量',
+    `usage`                     INT             NOT NULL DEFAULT 0 COMMENT '使用量',
     max_size                    INT             NOT NULL DEFAULT 0 COMMENT '单个配置大小上限',
     max_aggr_count              INT             NOT NULL DEFAULT 0 COMMENT '聚合子配置最大个数',
     max_aggr_size               INT             NOT NULL DEFAULT 0 COMMENT '聚合子配置单个大小上限',

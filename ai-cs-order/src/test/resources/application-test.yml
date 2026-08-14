@@ -1,0 +1,52 @@
+# 测试环境配置（H2 内存数据库 + 内嵌 Redis）
+server:
+  port: 0  # 随机端口
+
+spring:
+  application:
+    name: ai-cs-order-test
+  datasource:
+    driver-class-name: org.h2.Driver
+    url: jdbc:h2:mem:order_test;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=false;MODE=MySQL
+    username: sa
+    password:
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema-test.sql
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6370  # embedded-redis 使用非标准端口避免冲突
+      database: 0
+  cloud:
+    nacos:
+      discovery:
+        enabled: false
+      config:
+        enabled: false
+        import-check:
+          enabled: false
+
+# MyBatis-Plus
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: assign_id
+
+# RocketMQ（测试中 mock，不实际连接）
+rocketmq:
+  name-server: 127.0.0.1:9876
+  producer:
+    group: order-producer-group-test
+
+# 订单业务配置
+order:
+  timeout-minutes: 30
+
+logging:
+  level:
+    com.aics.order: debug

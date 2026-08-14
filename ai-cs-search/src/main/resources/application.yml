@@ -4,20 +4,40 @@ server:
 spring:
   application:
     name: ai-cs-search
-  elasticsearch:
-    uris: ${ELASTICSEARCH_URIS:http://localhost:9200}
+  # 排除 OpenAI Embedding 自动装配（由 SpringAiConfig 手动提供，走硅基流动 bge-m3）
+  autoconfigure:
+    exclude:
+      - org.springframework.ai.model.openai.autoconfigure.OpenAiEmbeddingAutoConfiguration
+      - org.springframework.ai.model.openai.autoconfigure.OpenAiAudioSpeechAutoConfiguration
+      - org.springframework.ai.model.openai.autoconfigure.OpenAiAudioTranscriptionAutoConfiguration
   cloud:
     nacos:
       discovery:
-        server-addr: ${NACOS_ADDR:localhost:8848}
-        namespace: ${NACOS_NAMESPACE:aics}
+        server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+        namespace: aics
         group: DEFAULT_GROUP
       config:
-        server-addr: ${NACOS_ADDR:localhost:8848}
-        namespace: ${NACOS_NAMESPACE:aics}
+        server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+        namespace: aics
         group: DEFAULT_GROUP
         file-extension: yml
+  config:
+    import:
+      - optional:nacos:aics-shared.yml
+      - optional:nacos:ai-cs-search.yml
 
-logging:
-  level:
-    com.aics.search: debug
+  # ===== Chroma 向量库连接配置（全文检索从 Elasticsearch 切换到 Chroma）=====
+  ai:
+    openai:
+      # 满足 OpenAI 自动装配（本服务仅用其 Embedding 客户端，key 来自 aics-shared.yml）
+      api-key: ${aics.openai.api-key:}
+    model:
+      embedding:
+        enabled: false
+    vectorstore:
+      chroma:
+        initialize-schema: true
+        collection-name: aics-knowledge
+        client:
+          host: http://${aics.mysql.host:123.60.31.79}
+          port: ${CHROMA_PORT:8000}

@@ -3,6 +3,7 @@ package com.aics.common.exception;
 import com.aics.common.result.Result;
 import com.aics.common.result.ResultCode;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -60,6 +61,20 @@ public class GlobalExceptionHandler {
         log.warn("参数绑定异常 [{}] {}: {}", request.getMethod(), request.getRequestURI(), message);
         return Result.fail(ResultCode.BAD_REQUEST.getCode(), message);
     }
+
+    /**
+     * 参数校验异常 - 方法级 @Validated + @NotBlank 等（ConstraintViolationException）
+     */
+    @ExceptionHandler(ConstraintViolationException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public Result<Void> handleConstraintViolationException(ConstraintViolationException e, HttpServletRequest request) {
+        String message = e.getConstraintViolations().stream()
+                .map(v -> v.getMessage())
+                .collect(Collectors.joining("; "));
+        log.warn("参数校验异常 [{}] {}: {}", request.getMethod(), request.getRequestURI(), message);
+        return Result.fail(ResultCode.BAD_REQUEST.getCode(), message);
+    }
+
 
     /**
      * 缺少请求参数

@@ -11,6 +11,12 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 通知 WebSocket 处理器
+
+ * <h3>学习要点（技术：WebSocket 生命周期管理）</h3>
+ * <ul>
+ *   <li>建立连接后注册会话、断开时清理，避免推送打到已断开连接导致异常。</li>
+ *   <li>消息按 userId 路由，可定向推送（如订单变更通知某用户）。</li>
+ * </ul>
  */
 @Slf4j
 public class NotifyWebSocketHandler extends TextWebSocketHandler {

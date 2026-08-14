@@ -8,9 +8,19 @@ import java.time.LocalDateTime;
 
 /**
  * 知识文档实体
+ *
+ * <p>职责：映射知识库文档表 kb_document，承载知识库 CRUD 的数据载体。</p>
+ *
+ * <p>技术要点：</p>
+ * <ul>
+ *   <li>主键策略 ASSIGN_ID：使用雪花算法分布式唯一 ID（避免自增 ID 跨库冲突）</li>
+ *   <li>create_time / update_time 由 {@link com.aics.knowledge.config.MybatisPlusConfig} 自动填充</li>
+ *   <li>deleted 字段配合 @TableLogic 实现逻辑删除（0-未删除 1-已删除）</li>
+ *   <li>status 字段标识向量化索引状态（0-待处理 1-已索引 2-索引失败）</li>
+ * </ul>
  */
 @Data
-@TableName("t_knowledge_document")
+@TableName("kb_document")
 public class KnowledgeDocument implements Serializable {
 
     private static final long serialVersionUID = 1L;
