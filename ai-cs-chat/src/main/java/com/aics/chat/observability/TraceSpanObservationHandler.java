@@ -58,6 +58,7 @@ public class TraceSpanObservationHandler implements ObservationHandler<Observati
         span.setPromptTokens(intOf(high(context, "promptTokens")));
         span.setCompletionTokens(intOf(high(context, "completionTokens")));
         span.setRetries(intOf(high(context, "retries")));
+        // 学习点：新增路由字段统一走 intOf 等空安全解析——埋点侧缺 key 或写非法值时落 null 而不是抛异常，观测消费不能反噬主链路
         span.setModelId(high(context, "modelId"));
         span.setRouteReason(high(context, "routeReason"));
         span.setFallbackFrom(high(context, "fallbackFrom"));

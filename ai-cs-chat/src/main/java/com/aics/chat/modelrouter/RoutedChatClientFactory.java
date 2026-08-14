@@ -13,6 +13,7 @@ public class RoutedChatClientFactory {
     private final ModelRouter modelRouter;
     private final ChatModelRegistry modelRegistry;
 
+    // 学习点：直连 ChatClient 的调用方也统一走模型路由——“哪个场景用哪个模型”只保留一处决策逻辑，避免各处硬编码模型
     public ChatClient chatClientFor(ModelScenario scenario) {
         RouteDecision decision = modelRouter.route(RouteRequest.builder()
                 .scenario(scenario)

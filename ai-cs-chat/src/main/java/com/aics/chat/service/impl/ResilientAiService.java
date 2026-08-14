@@ -92,6 +92,7 @@ public class ResilientAiService {
 
     private CompletableFuture<String> invokeNonStream(ModelScenario scenario, NonStreamCall call) {
         TraceContext captured = TraceContextHolder.capture();
+        // 学习点：ChatUserContext 与 TraceContext 一样是 ThreadLocal，跨 supplyAsync 异步线程不传播——必须在进入异步前捕获 userId，否则配额会按匿名用户计算
         Long userId = ChatUserContext.getUserId();
         return CompletableFuture.supplyAsync(() -> {
             TraceContextHolder.restore(captured);
@@ -108,6 +109,7 @@ public class ResilientAiService {
                 String fallbackFrom = null;
                 int attempt = 0;
                 Throwable lastError = null;
+                // 设计要点：非流式按 fallback 链逐模型尝试，并用 fallbackFrom/attempt 记录降级来源与尝试次数——观测数据才能解释为什么最终落到低优先模型
                 for (String modelId : chain) {
                     attempt++;
                     try {
@@ -166,6 +168,7 @@ public class ResilientAiService {
                     breaker = healthRegistry.breaker(holder.getDefinition().getId());
                     ModelClientHolder selectedHolder = holder;
                     CircuitBreaker selectedBreaker = breaker;
+                    // 学习点：流式在订阅前完成路由且绝不重试——Flux 一旦开始发射就无法重放，重试会导致前端收到重复 token；失败只能交给熔断和观测
                     Flux<String> flux = call.call(holder);
                     AtomicReference<Usage> usageRef = new AtomicReference<>();
                     AtomicReference<Throwable> errorRef = new AtomicReference<>();
@@ -179,6 +182,7 @@ public class ResilientAiService {
                                 }
                             })
                             .doOnError(errorRef::set)
+                            // 学习点：doFinally 可能跑在流线程而非发起线程——先 restore TraceContext 再收尾，观测/用量/熔断才会落到原始请求链；熔断成败也在这里补记，因为流结果只有结束时才可知
                             .doFinally(signal -> {
                                 TraceContextHolder.restore(streamTrace);
                                 try {
@@ -232,6 +236,7 @@ public class ResilientAiService {
         });
     }
 
+    // 学习点：只对连接/超时类瞬时故障重试且仅一次——4xx 或业务异常重试没有意义，过多重试会放大下游压力与费用
     private ChatResponse callWithTransientRetry(ModelClientHolder holder, NonStreamCall call) throws Exception {
         CircuitBreaker breaker = healthRegistry.breaker(holder.getDefinition().getId());
         try {
@@ -244,6 +249,7 @@ public class ResilientAiService {
     }
 
     private ChatResponse timedCall(CircuitBreaker breaker, ModelClientHolder holder, NonStreamCall call) throws Exception {
+        // 设计要点：熔断与超时都在单个模型粒度执行——共享熔断器会让主模型故障连累备用模型；超时后 cancel(true) 及时释放挂起调用
         return breaker.executeCallable(() -> {
             CompletableFuture<ChatResponse> future = CompletableFuture.supplyAsync(() -> {
                 try {
@@ -258,6 +264,7 @@ public class ResilientAiService {
                 future.cancel(true);
                 throw e;
             } catch (ExecutionException | CompletionException e) {
+                // 学习点：CompletableFuture 会把真实异常包成 ExecutionException/CompletionException——必须先逐层解包，否则“瞬时故障/业务失败”判定会失真，fallback 原因也会记错
                 Throwable cause = e.getCause();
                 if (cause instanceof CompletionException && cause.getCause() != null) {
                     cause = cause.getCause();
@@ -270,6 +277,7 @@ public class ResilientAiService {
         });
     }
 
+    // 设计要点：一次调用只路由一次，结果连同 fallback 链固定给整次调用使用——重试时不重新路由，避免配置/配额抖动导致同一次请求跳到不可预期模型
     private RouteDecision route(ModelScenario scenario, Long userId) {
         boolean quotaExceeded = routerProperties.getQuota().isEnabled()
                 && quotaService.check(userId, scenarioId(scenario)).isExceeded();

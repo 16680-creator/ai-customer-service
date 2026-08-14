@@ -71,6 +71,7 @@ public class LlmJudgeService implements RagAnswerJudge {
                     AI 回答：%s
                     参考答案：%s
                     """.formatted(question, answer, referenceAnswer == null ? "（无）" : referenceAnswer);
+            // 设计要点：Judge 固定走 JUDGE 场景路由，失败仍由调用方降级返回 null——评估是附加质量观测，不能因路由问题阻塞主链路
             org.springframework.ai.chat.model.ChatResponse response = routedChatClientFactory.chatClientFor(ModelScenario.JUDGE)
                     .prompt()
                     .system("你是严谨的 RAG 质量评估员，只输出 1-5 的整数分数。")

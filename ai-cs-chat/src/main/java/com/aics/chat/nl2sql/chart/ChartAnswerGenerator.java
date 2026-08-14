@@ -108,6 +108,7 @@ public class ChartAnswerGenerator {
                     用户问题：%s
                     查询结果（JSON 数组）：%s
                     """.formatted(question, rows);
+            // 设计要点：图表结论固定走 CHART 场景路由，同时保留原有 catch 模板降级——路由失败只是本地降级的一个分支，不引入额外重试复杂度
             String content = routedChatClientFactory.chatClientFor(ModelScenario.CHART)
                     .prompt()
                     .system("你是数据分析师，只输出结论。")

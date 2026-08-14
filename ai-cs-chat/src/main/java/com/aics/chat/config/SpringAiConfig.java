@@ -247,6 +247,7 @@ public class SpringAiConfig {
                 .build();
     }
 
+    // 设计要点：ChatClient 从单一 Bean 改为 Customizer——模型注册表为每个模型构建 ChatClient 时统一注入公共配置，避免多模型配置漂移
     @Bean
     public ChatClientCustomizer chatClientCustomizer(ToolCallbackProvider toolCallbackProvider,
                                                      QuestionAnswerAdvisor ragAdvisor) {
@@ -276,6 +277,7 @@ public class SpringAiConfig {
                         回答风格：简洁、准确、有亲和力，适当使用emoji增加友好感。
 
                         """ + DB_SCHEMA)
+                // 设计要点：工具回调不在此统一挂载——是否具备 TOOL_CALLING 能力由模型定义决定，注册表按能力条件装配
                 .defaultAdvisors(ragAdvisor);
     }
 }

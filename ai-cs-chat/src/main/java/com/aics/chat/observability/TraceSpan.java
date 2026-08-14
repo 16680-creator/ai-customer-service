@@ -39,6 +39,7 @@ public class TraceSpan {
     /** 重试次数 */
     private Integer retries;
 
+    // 学习点：路由元数据进 span 而非只在日志——按 modelId/routeReason/attempt 可复现“为什么选到该模型”，否则模型切换类问题只能靠猜
     /** 路由选中的模型注册表 ID（如 deepseek-chat） */
     private String modelId;
 

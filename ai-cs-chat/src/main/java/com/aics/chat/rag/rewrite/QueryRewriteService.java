@@ -118,6 +118,7 @@ public class QueryRewriteService {
 
                     用户问题：%s
                     """.formatted(3, question);
+            // 设计要点：改写固定走 REWRITE 场景路由，原有“失败降级为原始问题检索”保留——路由失败不应拖垮检索主流程
             String content = routedChatClientFactory.chatClientFor(ModelScenario.REWRITE)
                     .prompt()
                     .system("你是检索查询优化专家，只输出指定 JSON。")

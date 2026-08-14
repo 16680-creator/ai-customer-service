@@ -45,6 +45,7 @@ public class ModelUsageRecorder {
      * @param status      状态 SUCCESS/FAILED
      * @param errorSummary 错误摘要（可空）
      */
+    // 设计要点：保留旧重载并默认 pricingKey=model——存量调用方无需改动，新路由链路显式传内部模型 ID
     public void record(String scenario, String provider, String model,
                        Integer inputTokens, Integer outputTokens,
                        String status, String errorSummary) {
@@ -85,6 +86,7 @@ public class ModelUsageRecorder {
         dto.setInputTokens(in);
         dto.setOutputTokens(out);
         dto.setTotalTokens(in + out);
+        // 学习点：pricingKey 与展示 model 分离——单价配置按内部模型 id（如 siliconflow-qwen3-32b），供应商展示名（如 Qwen/Qwen3-32B）变化不会导致费用查不到单价
         dto.setEstimatedCost(estimateCost(pricingKey, in, out));
         // estimated 标记：流式调用常取不到精确 usage，此时按估算记且打标，
         // 统计时可按标记过滤，避免"估算当精确"误导成本决策

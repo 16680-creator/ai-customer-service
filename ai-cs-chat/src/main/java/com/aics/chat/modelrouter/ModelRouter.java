@@ -26,6 +26,7 @@ public class ModelRouter {
             return noEligible();
         }
 
+        // 设计要点：路由按场景链的 primary/fallbacks 顺序确定性执行，不引入 LLM 判断——模型选择必须是零成本、可解释、可复现的
         List<String> candidates = new ArrayList<>();
         candidates.add(scenarioRoute.getPrimary());
         if (scenarioRoute.getFallbacks() != null) {
@@ -33,6 +34,7 @@ public class ModelRouter {
         }
         Set<ModelCapability> required = request.getRequiredCapabilities() == null
                 ? Set.of() : request.getRequiredCapabilities();
+        // 设计要点：先按“已注册 + 未熔断 + 能力满足”过滤，再取链上第一个可用模型——fallback 永远不会选到不存在或不可用的模型
         candidates.removeIf(id -> !registry.contains(id)
                 || !healthRegistry.isAvailable(id)
                 || !hasCapabilities(id, required));
@@ -41,6 +43,7 @@ public class ModelRouter {
             return noEligible();
         }
 
+        // 设计要点：配额降级是全局扫描 cheap 档，普通路由仍严格走场景链——成本治理可以跳出场景约束，默认行为必须保持可预测
         if (request.isQuotaExceeded() && properties.getQuota().isEnabled()) {
             String cheap = cheapestEligible(required);
             if (cheap != null) {
@@ -68,6 +71,7 @@ public class ModelRouter {
                         && healthRegistry.isAvailable(id)
                         && targetTier.equals(registry.get(id).getDefinition().getTier())
                         && hasCapabilities(id, required))
+                // 学习点：降级仍要经过能力/健康过滤，再按 priority 倒序选——便宜不是唯一标准，缺能力或已熔断的模型即使再便宜也不能用
                 .sorted(Comparator.comparingInt((String id) -> registry.get(id).getDefinition().getPriority()).reversed())
                 .findFirst()
                 .orElse(null);
@@ -85,6 +89,7 @@ public class ModelRouter {
                 .build();
     }
 
+    // 学习点：无可用模型时返回 NO_ELIGIBLE_MODEL 而非抛异常——路由层失败交给上层友好兜底，不让模型选择变成 5xx
     private RouteDecision noEligible() {
         return RouteDecision.builder()
                 .selectedModelId(null)

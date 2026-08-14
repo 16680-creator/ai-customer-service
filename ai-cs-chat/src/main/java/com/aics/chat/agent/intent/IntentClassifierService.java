@@ -81,6 +81,7 @@ public class IntentClassifierService {
         if (properties.isLlmIntentEnabled()) {
             try {
                 // LLM 调用限时 10 秒，超时/异常走规则兜底
+                // 学习点：迁移路由后场景固定为 INTENT——原有 10 秒限时与规则兜底不变，路由只负责选模型，不改变调用方容错契约
                 String json = resilientAiService.callRagChat(ModelScenario.INTENT, buildPrompt(input))
                         .get(10, TimeUnit.SECONDS);
                 IntentResult parsed = parseLlmJson(json);

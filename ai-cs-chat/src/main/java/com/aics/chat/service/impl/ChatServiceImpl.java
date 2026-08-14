@@ -247,6 +247,7 @@ public class ChatServiceImpl implements ChatService {
         try {
             // 通过 ResilientAiService 调用 AI 生成摘要（带超时/重试/熔断）
             // 调 LLM 压缩旧消息为摘要（经 ResilientAiService 获得超时/重试/熔断保护）
+            // 学习点：摘要场景显式固定为 SUMMARY——压缩失败仍走原截断兜底，路由只是把模型选择交给统一策略
             String summary = resilientAiService.callSummary(ModelScenario.SUMMARY,
                     new Prompt("请将以下对话历史压缩为简洁的摘要，保留关键信息（用户名、订单号、重要决定等），"
                             + "用1-3句话概括，作为后续对话的上下文参考：\n\n" + conversation)
@@ -294,6 +295,7 @@ public class ChatServiceImpl implements ChatService {
             }
 
             // 通过 ResilientAiService 弹性调用 LLM（超时/重试/熔断）
+            // 学习点：对话场景显式传 CHAT 让路由按场景选模型——业务层不再感知具体模型，后续换模型只改配置
             String response = resilientAiService.callChat(ModelScenario.CHAT, history).get();
 
             // 过滤思考过程
@@ -504,6 +506,7 @@ public class ChatServiceImpl implements ChatService {
                         【用户问题】
                         %s
                         """.formatted(context.isBlank() ? "（未检索到相关资料）" : context, message);
+                // 设计要点：流式场景在订阅前完成路由——RAG 与普通对话分别用 RAG/CHAT 场景，保持同一次 SSE 请求的决策一致
                 futureFlux = resilientAiService.callSseRagStream(ModelScenario.RAG, ragPrompt);
                 // 缓存引用溯源，完成事件时随 done 一起推送
                 citations = buildCitations(docs);

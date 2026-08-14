@@ -17,6 +17,7 @@ import java.util.Set;
 @Getter
 @Setter
 @Component
+// 学习点：@RefreshScope + @ConfigurationProperties 绑定 Nacos 配置，变更后自动重建，路由策略免重启生效
 @RefreshScope
 @ConfigurationProperties(prefix = "aics.model-router")
 public class ModelRouterProperties {
@@ -26,6 +27,7 @@ public class ModelRouterProperties {
     private Map<ModelScenario, ScenarioRoute> scenarios = new EnumMap<>(ModelScenario.class);
     private QuotaRouteProperties quota = new QuotaRouteProperties();
 
+    // 学习点：校验独立成方法——启动时 fail-fast，刷新时由注册表捕获并保留旧配置，避免一份错误配置让线上路由整体失效
     public void validate() {
         Set<String> ids = new HashSet<>();
         for (ModelDefinition def : models) {
@@ -41,6 +43,7 @@ public class ModelRouterProperties {
                 throw new IllegalArgumentException("model " + def.getId() + " must configure base-url, api-key and model");
             }
         }
+        // 学习点：场景引用的模型 ID 必须显式校验——配置错误越早暴露越好，路由时才发现未知模型会让线上调用集体降级
         for (Map.Entry<ModelScenario, ScenarioRoute> entry : scenarios.entrySet()) {
             ModelScenario scenario = entry.getKey();
             ScenarioRoute route = entry.getValue();
