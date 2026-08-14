@@ -450,58 +450,184 @@ public class ChatServiceImpl implements ChatService {
             // 等待 Flux 就绪（受 TimeLimiter 保护，不会无限等待）
             Flux<String> flux = futureFlux.get();
 
-            // 3. 订阅流：逐 token 通过 SSE 推送，结束后更新历史
-            //    - onNext：检查是否为降级错误标记 [ERROR]，是则推送 error 事件并结束；
-            //             否则把 chunk 累积到 full 并以 {"content":"..."} 推送给前端
-            //    - onError：推送 error 事件并以异常结束 emitter
-            //    - onComplete：把累积的 full 文本清洗后入库，推送 {"done":true,"content":"...","citations":[...]}
+            // ──────────────────────────────────────────────────────────────────────────
+            // 3. 订阅 Flux 响应式流，桥接到 SSE（Server-Sent Events）推送通道
+            // ──────────────────────────────────────────────────────────────────────────
+            //
+            // 【技术背景：Reactor Flux 与 SSE 的桥接】
+            //
+            //   Flux<String> 来自 Spring WebFlux 的响应式编程模型（Reactive Streams 规范实现），
+            //   代表一个异步的、可背压的 0..N 元素数据流。在这里，每个元素就是 LLM 生成的一个
+            //   token（或一小段文本 chunk），由 ResilientAiService 内部通过 Spring AI 的
+            //   ChatClient.stream() 获得。
+            //
+            //   SseEmitter 则是 Spring MVC（Servlet 栈）提供的 SSE 发射器，基于 HTTP 长连接
+            //   实现服务端→客户端的单向推送。SSE 协议（W3C 标准）天然支持：
+            //     - 自动重连（浏览器端 EventSource API 内置重连机制）
+            //     - 文本格式（Content-Type: text/event-stream）
+            //     - 逐条事件推送（每条 data: 行就是一个事件）
+            //
+            //   这里用 flux.subscribe(onNext, onError, onComplete) 三参数订阅模式，
+            //   将 Reactive 世界的数据流手动桥接到 Servlet 世界的 SseEmitter：
+            //     ┌─────────────┐   Flux<String>    ┌──────────────┐   SSE event    ┌────────┐
+            //     │  LLM (AI)   │ ───────────────→  │  subscribe() │ ────────────→  │ 前端   │
+            //     │  token流    │  响应式异步推送     │  三个回调     │  HTTP长连接推送  │ 浏览器  │
+            //     └─────────────┘                   └──────────────┘                └────────┘
+            //
+            //   为什么不用 @ResponseBody 直接返回 Flux？
+            //   → 因为本项目是 Spring MVC（Servlet 容器），不是 WebFlux（Netty 容器）。
+            //     Spring MVC 无法直接将 Flux 渲染为 SSE 响应，必须通过 SseEmitter 手动桥接。
+            //
+            // 【技术背景：StringBuilder 累积模式】
+            //
+            //   full（StringBuilder）用于在流式过程中累积所有 chunk，流结束后得到完整回复文本。
+            //   为什么不在 onComplete 时重新调用 LLM？
+            //   → 因为每次 LLM 调用都有成本（Token 计费）和延迟，累积是最经济的方式。
+            //   注意：StringBuilder 非线程安全，但 Flux 的 subscribe 回调在同一个串行调度器上执行
+            //   （Reactive Streams 规范要求 onNext 串行调用），所以这里不存在并发写入问题。
+            //
+            // ──────────────────────────────────────────────────────────────────────────
             StringBuilder full = new StringBuilder();
             flux.subscribe(
+                    // ┌─────────────────────────────────────────────────────────────┐
+                    // │ onNext 回调：每收到一个 chunk（token）时触发                  │
+                    // │                                                             │
+                    // │ 【降级错误检测】                                              │
+                    // │ ResilientAiService 在 LLM 调用失败（熔断/超时/异常）时，       │
+                    // │ 不会让 Flux 抛 onError，而是发射一个以 "[ERROR]" 开头的        │
+                    // │ 特殊 chunk 作为"软错误"标记。这是一种"优雅降级"模式：           │
+                    // │   - 避免 SSE 连接因异常中断（用户已看到部分内容）               │
+                    // │   - 前端收到 error 事件后可展示友好提示，而非连接断开           │
+                    // │   - 后端日志仍记录降级原因，便于排查                           │
+                    // │                                                             │
+                    // │ 【SSE 事件格式】                                              │
+                    // │ 正常 chunk → {"content": "你好"}    // 前端拼接实现打字机效果  │
+                    // │ 降级错误 → {"error": "服务暂时不可用"} // 前端展示错误提示       │
+                    // └─────────────────────────────────────────────────────────────┘
                     chunk -> {
                         if (chunk != null && !chunk.isEmpty()) {
-                            // 检查是否为降级错误标记
+                            // ── 降级错误检测 ──
+                            // Resilience4j 的 CircuitBreaker 熔断 或 TimeLimiter 超时后，
+                            // ResilientAiService 将异常信息包装为 "[ERROR]xxx" 格式的 chunk，
+                            // 通过 Flux.just("[ERROR]服务繁忙") 发射，而非 Flux.error()。
+                            // 这样走 onNext 而非 onError，流正常结束（onComplete 仍会触发），
+                            // 但我们在此处拦截并提前终止 SSE 连接，避免把错误文本当正常内容推送。
                             if (chunk.startsWith("[ERROR]")) {
                                 String errorMsg = chunk.substring(7);
                                 log.warn("SSE流式降级: sessionId={}, msg={}", sessionId, errorMsg);
                                 try {
+                                    // 推送 error 事件给前端，前端据此展示友好提示
+                                    // Map.of() 生成不可变单条目 Map，Jackson 序列化为 {"error":"..."}
                                     emitter.send(SseEmitter.event().data(Map.of("error", errorMsg)));
                                 } catch (Exception ignore) {
+                                    // 客户端可能已断开连接（浏览器关闭标签页），发送失败属正常情况
+                                    // 此处不需要重试或上报，因为 SSE 本身就是"尽力推送"模式
                                     // ignore
                                 }
+                                // 正常关闭 SSE 连接（发送 HTTP 连接关闭信号）
+                                // 注意：这里用 complete() 而非 completeWithError()，
+                                // 因为降级是"预期的容错行为"，不是程序异常
                                 emitter.complete();
                                 return;
                             }
-                            full.append(chunk);   // 累积完整回复，供流结束后入库
+                            // ── 正常 token 处理 ──
+                            full.append(chunk);   // 累积到 StringBuilder，供流结束后入库（持久化历史）
                             try {
-                                // 逐 token 推送给前端（打字机效果）
+                                // 逐 token 推送给前端，实现"打字机效果"
+                                // SseEmitter.event().data(Map.of("content", chunk))
+                                //   → 序列化为 SSE 事件：data:{"content":"你"}\n\n
+                                //   → 前端 EventSource.onmessage 收到后拼接展示
                                 emitter.send(SseEmitter.event().data(Map.of("content", chunk)));
                             } catch (Exception e) {
+                                // 发送失败的常见原因：
+                                //   1. 客户端已断开（浏览器关闭/刷新）→ 连接已不可用
+                                //   2. SseEmitter 已超时（SSE_EMITTER_TIMEOUT=5min）
+                                // 不中断 Flux 订阅，因为 LLM 仍在生成内容，
+                                // 后续的 onComplete 仍需要把完整回复入库（即使前端已断开）
                                 log.warn("SSE发送失败: sessionId={}, err={}", sessionId, e.getMessage());
                             }
                         }
                     },
+                    // ┌─────────────────────────────────────────────────────────────┐
+                    // │ onError 回调：Flux 流本身发生异常时触发                       │
+                    // │                                                             │
+                    // │ 与上面的"[ERROR] 降级"不同，这里是 Reactive Streams 层面的     │
+                    // │ 真实异常（如网络中断、序列化错误、上游 Publisher 内部崩溃）。    │
+                    // │                                                             │
+                    // │ 【Reactive Streams 规范】                                    │
+                    // │ onError 被调用后，订阅自动终止，不会再收到 onNext 或           │
+                    // │ onComplete。因此必须在这里关闭 SseEmitter，否则连接会泄漏。    │
+                    // │                                                             │
+                    // │ 【completeWithError vs complete】                            │
+                    // │ completeWithError(error)：                                 │
+                    // │   - 通知 Servlet 容器"响应异常终止"                           │
+                    // │   - 容器会记录异常日志，但 HTTP 响应已部分提交（chunked），      │
+                    // │     无法再修改状态码                                          │
+                    // │   - 触发 emitter.onError() 回调（下方 534 行）                │
+                    // └─────────────────────────────────────────────────────────────┘
                     error -> {
                         log.error("SSE流式对话异常: sessionId={}", sessionId, error);
                         try {
+                            // 将异常消息转为 error 事件推送给前端
+                            // String.valueOf() 防御 getMessage() 返回 null 的情况
+                            // （如 NullPointerException 的 message 通常为 null）
                             emitter.send(SseEmitter.event().data(Map.of("error", String.valueOf(error.getMessage()))));
                         } catch (Exception ignore) {
+                            // 同上：客户端可能已断开，尽力推送
                             // ignore
                         }
+                        // 以异常状态关闭 SSE 连接
+                        // Servlet 容器会记录此异常，但不会中断已部分发送的响应
                         emitter.completeWithError(error);
                     },
+                    // ┌─────────────────────────────────────────────────────────────┐
+                    // │ onComplete 回调：Flux 流正常结束（所有 token 推送完毕）时触发  │
+                    // │                                                             │
+                    // │ 这是流式对话的"收尾阶段"，需要完成三件事：                     │
+                    // │   ① 清洗回复文本（移除 <thinking> 思考标签）                  │
+                    // │   ② 持久化到会话历史（Redis + MySQL）                        │
+                    // │   ③ 推送 done 事件通知前端"回复结束"                          │
+                    // │                                                             │
+                    // │ 【为什么 done 事件不携带完整回复正文？】                       │
+                    // │   正文已通过逐 token 的 onNext 推送给前端，前端已拼接完成。     │
+                    // │   done 事件仅作为"结束信号"，附带 citations（引用溯源列表），  │
+                    // │   避免重复传输大量文本（节省带宽、减少序列化开销）。            │
+                    // │                                                             │
+                    // │ 【done 事件格式】                                            │
+                    // │   {"done": true, "citations": [{"title":"...", ...}]}       │
+                    // │   前端收到 done=true 后：                                    │
+                    // │   - 停止"正在输入..."动画                                    │
+                    // │   - 渲染引用溯源卡片（论文/文档链接）                          │
+                    // │   - 关闭 EventSource 连接                                   │
+                    // └─────────────────────────────────────────────────────────────┘
                     () -> {
-                        String response = cleanResponse(full.toString());   // 流结束：清洗思考标签
+                        // ① 清洗思考标签：移除 <thinking>...</thinking> 内容
+                        // 某些模型（DeepSeek-R1 等推理模型）会在输出中夹杂思考过程，
+                        // 这些内容不应展示给用户（影响体验，可能泄露 Prompt 策略）
+                        String response = cleanResponse(full.toString());
                         try {
-                            chatHistoryService.append(sessionId, "assistant", response);   // 落库历史
+                            // ② 持久化会话历史
+                            // ChatHistoryService 内部采用 Redis 热缓存 + MySQL 异步落库双写策略：
+                            //   - Redis：保证下次对话能快速加载最近历史（毫秒级）
+                            //   - MySQL：保证历史数据不丢失（持久化）
+                            chatHistoryService.append(sessionId, "assistant", response);
+                            // 同时追加到内存中的 streamHistory（本次请求的上下文副本），
+                            // 供后续可能的同请求内多轮调用使用
                             streamHistory.add(new AssistantMessage(response));
-                            // done 事件仅携带引用溯源列表（正文已逐 token 推送，不再重复携带）
+                            // ③ 构建并推送 done 事件
+                            // 使用 HashMap 而非 Map.of()，因为需要 put 多个不同类型的值
+                            // （boolean + List），Map.of() 的类型推断不够灵活
                             Map<String, Object> doneEvent = new HashMap<>();
-                            doneEvent.put("done", true);
-                            doneEvent.put("citations", citations);
+                            doneEvent.put("done", true);           // 结束信号标记
+                            doneEvent.put("citations", citations); // RAG 引用溯源列表
                             emitter.send(SseEmitter.event().data(doneEvent));
                         } catch (Exception e) {
+                            // 即使发送 done 事件失败，也要执行下面的 emitter.complete()
+                            // 否则 SSE 连接会一直挂起直到超时（5分钟），浪费服务端资源
                             log.warn("SSE完成事件发送失败: sessionId={}, err={}", sessionId, e.getMessage());
                         }
+                        // 正常关闭 SSE 连接：发送 HTTP 连接关闭信号
+                        // 此后 emitter 进入"已完成"状态，再调用 send() 会抛 IllegalStateException
                         emitter.complete();
                     }
             );
