@@ -6,6 +6,7 @@ import com.aics.chat.dto.AgentRunDTO;
 import com.aics.chat.dto.AgentRunStatusDTO;
 import com.aics.chat.dto.AgentStepDTO;
 import com.aics.chat.feign.AgentTraceFeignClient;
+import com.aics.chat.util.PiiMasker;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +20,8 @@ import java.util.List;
  * Agent 轨迹记录器：把 run/step/confirmation 摘要化后经 Feign 持久化到 ai-cs-message。
  *
  * <p>审计要求：敏感参数不进普通日志，一律以 SHA-256 截断摘要落库；
+ * 3.2 F3 起，步骤输入/输出摘要落库前再经 {@link PiiMasker} 脱敏（双保险，
+ * 防止工具结果/参数中出现手机号、银行卡等明文敏感信息进入审计存储）；
  * 轨迹持久化失败只告警不阻断业务流程（审计尽力而为，业务强一致）。</p>
  */
 @Slf4j
@@ -28,6 +31,7 @@ public class AgentTraceRecorder {
 
     private final AgentTraceFeignClient agentTraceFeignClient;
     private final ObjectMapper objectMapper;
+    private final PiiMasker piiMasker;
 
     /**
      * 创建执行记录（幂等）
@@ -76,9 +80,10 @@ public class AgentTraceRecorder {
             dto.setStepNo(ctx.getSteps() + 1);
             dto.setStepType(stepType);
             dto.setToolName(toolName);
-            // 输入/输出摘要化后落库：敏感参数不落明文
-            dto.setInputDigest(truncate(inputDigest, 256));
-            dto.setOutputDigest(truncate(outputDigest, 1024));
+            // 输入/输出摘要化后落库：敏感参数不落明文；
+            // 3.2 F3 增加 PII 脱敏，防止工具参数/结果携带手机号、银行卡等明文
+            dto.setInputDigest(piiMasker.mask(truncate(inputDigest, 256)));
+            dto.setOutputDigest(piiMasker.mask(truncate(outputDigest, 1024)));
             dto.setDurationMs(durationMs);
             dto.setStatus(status);
             dto.setErrorSummary(errorSummary);

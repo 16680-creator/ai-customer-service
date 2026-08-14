@@ -3,6 +3,8 @@ package com.aics.chat.agent.tool;
 import com.aics.chat.agent.state.AgentStateMachine;
 import com.aics.chat.dto.OrderVO;
 import com.aics.chat.feign.OrderFeignClient;
+import com.aics.chat.security.SecurityAuditRecorder;
+import com.aics.chat.security.SecurityEventType;
 import com.aics.chat.util.ChatUserContext;
 import com.aics.common.result.Result;
 import lombok.RequiredArgsConstructor;
@@ -17,7 +19,7 @@ import java.util.List;
  *
  * <p>订单列表来自订单服务本人查询（服务端按 X-User-Id 过滤），
  * 归属校验由订单服务与本人查询双重保证；按订单号匹配时仅在本人列表中匹配，
- * 杜绝越权访问他人订单。</p>
+ * 杜绝越权访问他人订单。越权尝试（他人订单号）记录安全审计事件（3.2 F2/F7）。</p>
  */
 @Slf4j
 @Component
@@ -25,6 +27,8 @@ import java.util.List;
 public class OrderLocatorTool implements AgentTool {
 
     private final OrderFeignClient orderFeignClient;
+    /** 安全审计记录器（3.2 F7：越权尝试留痕） */
+    private final SecurityAuditRecorder securityAuditRecorder;
 
     @Override
     public String name() {
@@ -74,7 +78,10 @@ public class OrderLocatorTool implements AgentTool {
                 if (matched != null) {
                     return ToolResult.success("订单定位成功", matched);
                 }
-                // 非本人订单或不存在：明确拒绝，杜绝越权
+                // 非本人订单或不存在：明确拒绝，杜绝越权（审计留痕 3.2 F7）
+                securityAuditRecorder.record(SecurityEventType.TOOL_UNAUTHORIZED, "TOOL",
+                        userId, name(), orderNo, "BLOCK",
+                        "订单 " + orderNo + " 不存在或不属于当前用户，越权访问被拒绝");
                 return ToolResult.fail("订单 " + orderNo + " 不存在或不属于当前用户，无法售后");
             }
             // 未指定订单号：唯一可售后订单直接命中

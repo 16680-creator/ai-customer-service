@@ -3,8 +3,8 @@
 > 适用范围：`ai-cs-chat` / `ai-cs-order` / `ai-cs-product` / `ai-cs-message` / `ai-cs-notify` / `ai-cs-common`
 > 功能分支：`005-after-sales-agent`
 > 完成日期：2026-08-14
-> SDD 产物：[specs/005-after-sales-agent/](../specs/005-after-sales-agent/spec.md)（规格/计划/任务/契约/数据模型/快速启动）
-> 需求来源：[15-AI功能与技术缺口分析.md](15-AI功能与技术缺口分析.md) 第 3.1 节（P0）
+> SDD 产物：[specs/005-after-sales-agent/](../../../specs/005-after-sales-agent/spec.md)（规格/计划/任务/契约/数据模型/快速启动）
+> 需求来源：[15-AI功能与技术缺口分析.md](../../../docs/15-AI功能与技术缺口分析.md) 第 3.1 节（P0）
 
 ---
 
@@ -189,7 +189,7 @@ START → CLASSIFY_INTENT → LOCATE_ORDER ──多候选──> 询问用户�
 | ai-cs-message | `POST /api/agent/runs`、`PUT /api/agent/runs/{runId}/status`、`POST /api/agent/runs/{runId}/steps`、`POST /api/agent/runs/{runId}/confirmations`、`POST /api/agent/handoff-tickets`、`GET /api/agent/runs/{runId}` | 轨迹/工单持久化与查询 |
 | ai-cs-notify | `POST /api/notify/handoff` | 转人工事件通知 |
 
-完整契约（含字段/错误码/配置项）见 [specs/005-after-sales-agent/contracts/rest-api.md](../specs/005-after-sales-agent/contracts/rest-api.md)。
+完整契约（含字段/错误码/配置项）见 [specs/005-after-sales-agent/contracts/rest-api.md](../../../specs/005-after-sales-agent/contracts/rest-api.md)。
 
 ---
 
@@ -204,7 +204,7 @@ START → CLASSIFY_INTENT → LOCATE_ORDER ──多候选──> 询问用户�
 | `handoff_ticket` | chat_db | ticket_no(UNIQUE)、run_id、session_id、user_id、reason、priority、order_no、sentiment、problem_summary、executed_steps(JSON)、status、assigned_agent |
 
 另：`kb_document` 种子售后规则文档 3 条（ASR-001/002/003，knowledge_base 标识 `after-sale-rules`）。
-SQL 交付：[deploy/mysql/after-sales-agent-init.sql](../deploy/mysql/after-sales-agent-init.sql)（幂等，已并入 `all-init.sql` / `order-init.sql`）。
+SQL 交付：[deploy/mysql/after-sales-agent-init.sql](../../../deploy/mysql/after-sales-agent-init.sql)（幂等，已并入 `all-init.sql` / `order-init.sql`）。
 
 ---
 
@@ -316,11 +316,11 @@ curl http://localhost:8080/chat/agent/runs/<runId> -H "X-User-Id: 1"
 
 ## 十、相关文档
 
-- 需求来源：[15-AI功能与技术缺口分析.md](15-AI功能与技术缺口分析.md)（3.1 / 五 / 六节）
-- 功能规格：[specs/005-after-sales-agent/spec.md](../specs/005-after-sales-agent/spec.md)
-- 实施计划：[specs/005-after-sales-agent/plan.md](../specs/005-after-sales-agent/plan.md)
-- 任务清单：[specs/005-after-sales-agent/tasks.md](../specs/005-after-sales-agent/tasks.md)
-- 接口契约：[specs/005-after-sales-agent/contracts/rest-api.md](../specs/005-after-sales-agent/contracts/rest-api.md)
-- 数据模型：[specs/005-after-sales-agent/data-model.md](../specs/005-after-sales-agent/data-model.md)
-- 快速启动：[specs/005-after-sales-agent/quickstart.md](../specs/005-after-sales-agent/quickstart.md)
-- 调研报告：[specs/005-after-sales-agent/research.md](../specs/005-after-sales-agent/research.md)
+- 需求来源：[15-AI功能与技术缺口分析.md](../../../docs/15-AI功能与技术缺口分析.md)（3.1 / 五 / 六节）
+- 功能规格：[specs/005-after-sales-agent/spec.md](../../../specs/005-after-sales-agent/spec.md)
+- 实施计划：[specs/005-after-sales-agent/plan.md](../../../specs/005-after-sales-agent/plan.md)
+- 任务清单：[specs/005-after-sales-agent/tasks.md](../../../specs/005-after-sales-agent/tasks.md)
+- 接口契约：[specs/005-after-sales-agent/contracts/rest-api.md](../../../specs/005-after-sales-agent/contracts/rest-api.md)
+- 数据模型：[specs/005-after-sales-agent/data-model.md](../../../specs/005-after-sales-agent/data-model.md)
+- 快速启动：[specs/005-after-sales-agent/quickstart.md](../../../specs/005-after-sales-agent/quickstart.md)
+- 调研报告：[specs/005-after-sales-agent/research.md](../../../specs/005-after-sales-agent/research.md)

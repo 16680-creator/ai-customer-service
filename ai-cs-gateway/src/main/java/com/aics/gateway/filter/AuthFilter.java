@@ -65,9 +65,16 @@ public class AuthFilter implements GlobalFilter, Ordered {
         ServerHttpRequest request = exchange.getRequest();
         String path = request.getURI().getPath();
 
-        // 白名单放行
+        // 白名单放行（同时移除客户端伪造身份头，防止注入下游；
+        // 3.2 F2 身份可信透传对全路径生效：下游只信任网关注入的身份）
         if (isWhiteListed(path)) {
-            return chain.filter(exchange);
+            ServerHttpRequest stripped = request.mutate()
+                    .headers(headers -> {
+                        headers.remove(USER_ID_HEADER);
+                        headers.remove(USER_NAME_HEADER);
+                    })
+                    .build();
+            return chain.filter(exchange.mutate().request(stripped).build());
         }
 
         // 获取 Token
@@ -87,6 +94,12 @@ public class AuthFilter implements GlobalFilter, Ordered {
         try {
             String userId = JwtUtil.getSubject(token, jwtSecret);
             ServerHttpRequest mutatedRequest = request.mutate()
+                    // 3.2 F2 身份可信透传：先移除客户端伪造的 X-User-Id/X-User-Name，
+                    // 再注入从 JWT 解析的可信身份，下游只信任网关透传的身份头
+                    .headers(headers -> {
+                        headers.remove(USER_ID_HEADER);
+                        headers.remove(USER_NAME_HEADER);
+                    })
                     .header(USER_ID_HEADER, userId)
                     .header(USER_NAME_HEADER, String.valueOf(JwtUtil.parseToken(token, jwtSecret).get("username")))
                     .build();

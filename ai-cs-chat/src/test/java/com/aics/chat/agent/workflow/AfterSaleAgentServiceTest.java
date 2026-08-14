@@ -88,6 +88,13 @@ class AfterSaleAgentServiceTest {
     private AgentTraceFeignClient agentTraceFeignClient;
     @Mock
     private NotifyFeignClient notifyFeignClient;
+    // 3.2 安全组件（mock：内容审核放行、工具授权放行、审计静默）
+    @Mock
+    private com.aics.chat.security.ContentSafetyService contentSafetyService;
+    @Mock
+    private com.aics.chat.security.ToolAuthorizationService toolAuthorizationService;
+    @Mock
+    private com.aics.chat.security.SecurityAuditRecorder securityAuditRecorder;
 
     private final AgentProperties properties = new AgentProperties();
     private final AgentRunStore runStore = new InMemoryAgentRunStore();
@@ -110,7 +117,7 @@ class AfterSaleAgentServiceTest {
         item.setQuantity(1);
         paidOrder.setItems(List.of(item));
 
-        OrderLocatorTool orderLocatorTool = new OrderLocatorTool(orderFeignClient);
+        OrderLocatorTool orderLocatorTool = new OrderLocatorTool(orderFeignClient, securityAuditRecorder);
         PolicyCheckTool policyCheckTool = new PolicyCheckTool(new StaticRuleProvider());
         ProductRecommendTool productRecommendTool = new ProductRecommendTool(productRecommendFeignClient, properties);
         CreateAfterSaleTool createAfterSaleTool = new CreateAfterSaleTool(afterSaleFeignClient);
@@ -119,12 +126,19 @@ class AfterSaleAgentServiceTest {
         AgentToolRegistry registry = new AgentToolRegistry(stateMachine, List.of(
                 orderLocatorTool, policyCheckTool, productRecommendTool, createAfterSaleTool, handoffTool));
 
+        // 3.2 安全组件默认放行/静默：既有行为不因 Guardrail 变化
+        when(contentSafetyService.reviewInput(anyString()))
+                .thenReturn(com.aics.chat.security.ContentReviewResult.pass());
+        when(toolAuthorizationService.authorize(any(), anyString(), any()))
+                .thenReturn(com.aics.chat.security.ToolAuthResult.allowed("USER"));
+
         service = new AfterSaleAgentService(properties, new SafetyGuardService(),
                 intentClassifierService, stateMachine, registry, runStore,
                 new ConfirmationService(properties, new ObjectMapper()), traceRecorder,
                 orderLocatorTool, policyCheckTool, productRecommendTool,
                 createAfterSaleTool, handoffTool,
-                io.micrometer.observation.ObservationRegistry.create());
+                io.micrometer.observation.ObservationRegistry.create(),
+                contentSafetyService, toolAuthorizationService, securityAuditRecorder);
 
         when(orderFeignClient.listOrders(1L)).thenReturn(Result.success(List.of(paidOrder)));
         when(intentClassifierService.classify(anyString())).thenReturn(

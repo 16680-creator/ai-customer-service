@@ -134,6 +134,10 @@ public class ChatServiceImpl implements ChatService {
     private final HybridRetriever hybridRetriever;
     private final ObservationRegistry observationRegistry;
     private final OnlineEvalService onlineEvalService;
+    // ===== 3.2 AI 安全网关与 Guardrails：内容安全（F4）/ RAG ACL（F5）/ 审计（F7） =====
+    private final com.aics.chat.security.ContentSafetyService contentSafetyService;
+    private final com.aics.chat.security.RagAclFilter ragAclFilter;
+    private final com.aics.chat.security.SecurityAuditRecorder securityAuditRecorder;
 
     /** 最大历史消息数，超过时触发压缩 */
     private static final int MAX_HISTORY_SIZE = 20;
@@ -153,6 +157,30 @@ public class ChatServiceImpl implements ChatService {
     private String cleanResponse(String response) {
         if (response == null) return "";
         return THINK_PATTERN.matcher(response).replaceAll("").trim();
+    }
+
+    /**
+     * 输入 Guardrail（3.2 F4）：违规输入返回拦截提示文案（审计已记录），否则返回 null。
+     * 调用方应短路返回，不调用模型。
+     *
+     * <p>学习点：输入审核放在“加载历史/调 LLM”之前——违规输入不进历史、
+     * 不花 Token、不污染上下文；输出审核放在“清洗之后、落库之前”——
+     * 兜底文案替换后再持久化，历史里也绝不出现违规回答。</p>
+     */
+    private String guardInput(String message) {
+        com.aics.chat.security.ContentReviewResult result = contentSafetyService.reviewInput(message);
+        return result.passed() ? null : "抱歉，我无法回答这个问题。";
+    }
+
+    /**
+     * 输出 Guardrail（3.2 F4）：违规回答替换为兜底文案（审计已记录），否则原样返回。
+     */
+    private String guardOutput(String response) {
+        if (response == null) {
+            return null;
+        }
+        com.aics.chat.security.ContentReviewResult result = contentSafetyService.reviewOutput(response);
+        return result.passed() ? response : "抱歉，该回答未通过安全审核，已为您转人工处理。";
     }
 
     /**
@@ -245,6 +273,13 @@ public class ChatServiceImpl implements ChatService {
     public Result<String> chat(String sessionId, String message) {
         log.info("对话请求: sessionId={}, message={}", sessionId, message);
 
+        // 输入 Guardrail（3.2 F4）：违规输入拒答，不调用模型
+        String blockMessage = guardInput(message);
+        if (blockMessage != null) {
+            log.warn("对话输入被内容审核拦截: sessionId={}", sessionId);
+            return Result.success(blockMessage);
+        }
+
         try {
             // 从持久化历史加载（Redis 优先，未命中回源 message 表）
             List<Message> history = toSpringMessages(chatHistoryService.load(sessionId));
@@ -262,6 +297,9 @@ public class ChatServiceImpl implements ChatService {
 
             // 过滤思考过程
             response = cleanResponse(response);
+
+            // 输出 Guardrail（3.2 F4）：违规回答拦截为兜底文案
+            response = guardOutput(response);
 
             // 记录 AI 回复到历史
             chatHistoryService.append(sessionId, "assistant", response);
@@ -324,9 +362,18 @@ public class ChatServiceImpl implements ChatService {
         log.info("RAG对话请求: sessionId={}, knowledgeBase={}, hybrid={}, rewrite={}",
                 sessionId, knowledgeBase, hybrid, rewrite);
 
+        // 输入 Guardrail（3.2 F4）：违规输入拒答，不调用模型
+        String blockMessage = guardInput(message);
+        if (blockMessage != null) {
+            log.warn("RAG对话输入被内容审核拦截: sessionId={}, knowledgeBase={}", sessionId, knowledgeBase);
+            return Result.success(new ChatRagResponseDTO(blockMessage, List.of()));
+        }
+
         try {
             // 检索：纯向量 / Hybrid / 改写（增强失败自动降级纯向量）
             List<Document> docs = retrieveRagDocs(knowledgeBase, message, 5, 0.5, hybrid, rewrite);
+            // RAG ACL 过滤（3.2 F5）：按租户/角色/文档 ACL 剔除无权限文档，回答不得引用
+            docs = ragAclFilter.filter(knowledgeBase, docs, com.aics.chat.util.ChatUserContext.getUserId());
             // 把命中的知识片段拼成【知识库资料】上下文，注入 Prompt
             String context = knowledgeBaseService.buildContext(docs);
 
@@ -347,6 +394,9 @@ public class ChatServiceImpl implements ChatService {
             // 通过 ResilientAiService 弹性调用 LLM（超时/重试/熔断/降级）
             String response = resilientAiService.callRagChat(ragPrompt).get();
             response = cleanResponse(response);   // 去掉模型思考过程标签，只留正式回答
+
+            // 输出 Guardrail（3.2 F4）：违规回答拦截为兜底文案
+            response = guardOutput(response);
 
             // 从检索结果构建引用溯源列表（documentId/title/page/score/content），随回答返回前端
             List<CitationItemDTO> citations = buildCitations(docs);
@@ -406,6 +456,20 @@ public class ChatServiceImpl implements ChatService {
         // 使用合理的超时时间，替代原来的 0L（永不超时）
         SseEmitter emitter = new SseEmitter(SSE_EMITTER_TIMEOUT);
         boolean hasKb = StringUtils.hasText(knowledgeBase);
+
+        // 输入 Guardrail（3.2 F4）：违规输入直接返回拦截事件，不调用模型
+        String blockMessage = guardInput(message);
+        if (blockMessage != null) {
+            log.warn("SSE对话输入被内容审核拦截: sessionId={}", sessionId);
+            try {
+                emitter.send(SseEmitter.event().data(Map.of("content", blockMessage)));
+                emitter.send(SseEmitter.event().data(Map.of("done", true, "citations", List.of())));
+            } catch (Exception ignore) {
+                // 客户端可能已断开，尽力推送
+            }
+            emitter.complete();
+            return emitter;
+        }
 
         try {
             // 1. 维护会话历史
@@ -605,6 +669,14 @@ public class ChatServiceImpl implements ChatService {
                         // 某些模型（DeepSeek-R1 等推理模型）会在输出中夹杂思考过程，
                         // 这些内容不应展示给用户（影响体验，可能泄露 Prompt 策略）
                         String response = cleanResponse(full.toString());
+                        // 输出 Guardrail（3.2 F4）：违规回答替换为兜底文案（审计已记录），
+                        // 历史只保存兜底文案，done 事件附带 warning 提示前端
+                        String guardedResponse = guardOutput(response);
+                        boolean outputBlocked = !guardedResponse.equals(response);
+                        response = guardedResponse;
+                        if (outputBlocked) {
+                            log.warn("SSE回答未通过输出审核，已拦截: sessionId={}", sessionId);
+                        }
                         try {
                             // ② 持久化会话历史
                             // ChatHistoryService 内部采用 Redis 热缓存 + MySQL 异步落库双写策略：
@@ -620,6 +692,9 @@ public class ChatServiceImpl implements ChatService {
                             Map<String, Object> doneEvent = new HashMap<>();
                             doneEvent.put("done", true);           // 结束信号标记
                             doneEvent.put("citations", citations); // RAG 引用溯源列表
+                            if (outputBlocked) {
+                                doneEvent.put("warning", "回答未通过安全审核，已拦截");
+                            }
                             emitter.send(SseEmitter.event().data(doneEvent));
                         } catch (Exception e) {
                             // 即使发送 done 事件失败，也要执行下面的 emitter.complete()

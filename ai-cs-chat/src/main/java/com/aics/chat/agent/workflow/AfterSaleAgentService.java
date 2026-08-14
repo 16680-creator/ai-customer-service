@@ -29,6 +29,13 @@ import com.aics.chat.observability.TraceSpans;
 import com.aics.chat.dto.AfterSaleApplyVO;
 import com.aics.chat.dto.OrderVO;
 import com.aics.chat.dto.ProductRecommendVO;
+import com.aics.chat.security.ContentReviewResult;
+import com.aics.chat.security.ContentSafetyService;
+import com.aics.chat.security.SecurityAuditRecorder;
+import com.aics.chat.security.SecurityEventType;
+import com.aics.chat.security.ToolAuthResult;
+import com.aics.chat.security.ToolAuthorizationService;
+import com.aics.chat.util.ChatUserContext;
 import com.aics.common.exception.BusinessException;
 import com.aics.common.result.ResultCode;
 import io.micrometer.observation.ObservationRegistry;
@@ -76,6 +83,10 @@ public class AfterSaleAgentService {
     private final CreateAfterSaleTool createAfterSaleTool;
     private final HandoffTool handoffTool;
     private final ObservationRegistry observationRegistry;
+    // ===== 3.2 AI 安全网关与 Guardrails：内容安全（F4）/ 工具授权（F2）/ 审计（F7） =====
+    private final ContentSafetyService contentSafetyService;
+    private final ToolAuthorizationService toolAuthorizationService;
+    private final SecurityAuditRecorder securityAuditRecorder;
 
     // ==================== 对外入口 ====================
 
@@ -123,11 +134,29 @@ public class AfterSaleAgentService {
         ctx.getStepSummaries().add("安全检查: " + (safety.passed() ? "通过" : "拦截-" + safety.reason()));
         // 拦截：直接失败终止，本轮不触发任何工具调用
         if (!safety.passed()) {
+            // 审计留痕（3.2 F7）：注入拦截事件全量记录（输入仅存摘要）
+            securityAuditRecorder.record(SecurityEventType.PROMPT_INJECTION, "INPUT", userId,
+                    "SafetyGuardService", input, "BLOCK", safety.reason());
             ctx.setState(AfterSaleState.FAILED);
             ctx.setErrorSummary(safety.reason());
             traceRecorder.updateRunStatus(ctx, "FAILED", safety.reason());
             runStore.save(ctx);
             return AgentTurnResult.of(newRunId, "FAILED", List.of(), safety.reason(),
+                    false, false, null, null, List.of(), null, null, "AGENT_SAFETY_BLOCKED");
+        }
+
+        // 1.1 内容安全审核（3.2 F4 输入侧，与注入检测互补；违规拒答零模型调用）
+        // 学习点（Guardrail 链的位置）：注入检测（SafetyGuardService）与内容审核
+        // （ContentSafetyService）串成“输入 Guardrail 链”，两者职责正交——
+        // 前者防“攻击系统”（注入/越权指令），后者防“违规内容”（辱骂/违法等），
+        // 任一命中都短路终止，且本轮不触发任何工具调用（零副作用）。
+        ContentReviewResult content = contentSafetyService.reviewInput(input);
+        if (!content.passed()) {
+            ctx.setState(AfterSaleState.FAILED);
+            ctx.setErrorSummary(content.reason());
+            traceRecorder.updateRunStatus(ctx, "FAILED", content.reason());
+            runStore.save(ctx);
+            return AgentTurnResult.of(newRunId, "FAILED", List.of(), content.reason(),
                     false, false, null, null, List.of(), null, null, "AGENT_SAFETY_BLOCKED");
         }
 
@@ -418,6 +447,9 @@ public class AfterSaleAgentService {
      * 执行工具并记录 TOOL 环节 span（工具名、参数摘要、结果状态、耗时）。
      * 与 AgentTraceRecorder 的审计轨迹互补：trace span 服务线上可观测，轨迹表服务审计回放。
      *
+     * <p>3.2 F2 工具授权：执行前经 {@link ToolAuthorizationService} 做角色-权限矩阵校验，
+     * 拒绝即抛 {@link ResultCode#FORBIDDEN}，工具不执行（审计事件由授权服务记录）。</p>
+     *
      * <p>学习点：为什么工具执行要"双写"？
      * <ul>
      *   <li><b>AgentTraceRecorder</b>（agent_step 表）：面向审计——业务字段齐全、
@@ -428,6 +460,12 @@ public class AfterSaleAgentService {
      * 两者数据同源（工具调用），但消费场景不同，故分开存储。</p>
      */
     private <T> T runTool(String toolName, String inputDigest, Supplier<T> action) {
+        // 工具端授权（3.2 F2）：角色-权限矩阵校验，不能只信模型参数
+        ToolAuthResult auth = toolAuthorizationService.authorize(
+                ChatUserContext.getUserId(), toolName, inputDigest);
+        if (!auth.allowed()) {
+            throw new BusinessException(ResultCode.FORBIDDEN, auth.reason());
+        }
         return TraceSpans.observeReturn(observationRegistry, "TOOL", "agent.tool." + toolName,
                 Map.of("tool", toolName),
                 Map.of("detail", inputDigest == null ? "" : inputDigest),

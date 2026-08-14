@@ -1,6 +1,7 @@
 package com.aics.chat.nl2sql;
 
 import com.aics.chat.observability.TraceSpans;
+import com.aics.chat.security.SqlGuard;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import io.micrometer.observation.ObservationRegistry;
@@ -16,8 +17,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * AI 智能问数（NL2SQL）工具服务 —— 让大模型直接查数据库。
@@ -51,14 +50,17 @@ import java.util.regex.Pattern;
  *   </li>
  * </ul>
  *
- * <h3>【AI 技术详解】安全五道闸</h3>
+ * <h3>【AI 技术详解】安全七道闸</h3>
  * <ol>
  *   <li><b>仅 SELECT 单条</b>：拦分号/注释绕过，防止多语句注入</li>
  *   <li><b>拦写操作关键字</b>：INSERT/UPDATE/DELETE/DDL/GRANT/SHOW 等全部拦截</li>
  *   <li><b>禁系统库/危险函数</b>：information_schema/mysql/sys、sleep/benchmark 等</li>
+ *   <li><b>AST 语法树校验</b>：jsqlparser 解析，仅允许纯 SELECT（3.2 F6）</li>
+ *   <li><b>表/列白名单</b>：按库配置允许的表与列，白名单之外一律拒绝（3.2 F6）</li>
  *   <li><b>强制 LIMIT 100</b>：防止拖库，已有 LIMIT 且超过 100 则改写</li>
  *   <li><b>JDBC readOnly + 10s 超时</b>：双保险只读，即使绕过白名单也无法写入</li>
  * </ol>
+ * <p>安全校验全部委托 {@link SqlGuard}（正则初筛 + AST 白名单），命中即记录安全审计事件。</p>
  *
  * <h3>【AI 技术详解】多库路由</h3>
  * <ul>
@@ -101,28 +103,10 @@ public class Nl2SqlQueryService {
     public static final String DB_KNOWLEDGE = "knowledge";
 
     /**
-     * 危险关键字（\b 单词边界避免误伤 update_time / deleted 等列名；
-     * update/delete 后跟下划线时不属于单词边界，可安全放行列名）。
+     * 危险关键字/系统库/危险函数/注释等正则初筛与 LIMIT 强制上限
+     * 已迁移至 {@link com.aics.chat.security.SqlGuard}
+     * （3.2 F6 SQL 安全：正则初筛 + jsqlparser AST 表/列白名单双防线）。
      */
-    private static final Pattern DANGEROUS_KEYWORDS = Pattern.compile(
-            "(?i)\\b(insert|update|delete|drop|alter|truncate|create|replace|grant|revoke|call|exec|execute|"
-                    + "lock|unlock|kill|handler|load|use|show|describe|explain|rename)\\b",
-            Pattern.DOTALL);
-
-    /** 系统库探测（库名.表 引用形式） */
-    private static final Pattern SYSTEM_SCHEMA = Pattern.compile(
-            "(?i)\\b(information_schema|performance_schema|mysql|sys)\\s*\\.",
-            Pattern.DOTALL);
-
-    /** 危险函数/文件操作 */
-    private static final Pattern FUNC_ABUSE = Pattern.compile(
-            "(?i)\\b(sleep|benchmark|procedure|into\\s+(outfile|dumpfile))\\b",
-            Pattern.DOTALL);
-
-    /** SQL 注释（可被用于绕过白名单） */
-    private static final Pattern COMMENTS = Pattern.compile("--|#|/\\*|\\*/");
-
-    private static final Pattern LIMIT_PATTERN = Pattern.compile("(?i)\\blimit\\s+(\\d+)");
 
     /** 库标识 -> 只读 JdbcTemplate */
     private final Map<String, JdbcTemplate> jdbcTemplates;
@@ -131,10 +115,15 @@ public class Nl2SqlQueryService {
 
     private final ObservationRegistry observationRegistry;
 
+    /** SQL 安全守卫（3.2 F6：正则初筛 + AST 表/列白名单） */
+    private final SqlGuard sqlGuard;
+
     public Nl2SqlQueryService(Map<String, JdbcTemplate> nl2SqlJdbcTemplates,
-                              ObservationRegistry observationRegistry) {
+                              ObservationRegistry observationRegistry,
+                              SqlGuard sqlGuard) {
         this.jdbcTemplates = nl2SqlJdbcTemplates;
         this.observationRegistry = observationRegistry;
+        this.sqlGuard = sqlGuard;
         // 日期序列化为可读字符串（默认 Timestamp 序列化成时间戳数字，不利于 AI 阅读）
         this.objectMapper = new ObjectMapper()
                 .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
@@ -195,8 +184,8 @@ public class Nl2SqlQueryService {
             return "无效的数据库标识: " + database + "，可选值：user/product/order/chat/knowledge";
         }
 
-        // 2. SQL 安全校验
-        String error = validateSql(sql);
+        // 2. SQL 安全校验（委托 SqlGuard：正则初筛 + AST 表/列白名单，3.2 F6）
+        String error = sqlGuard.validate(database, sql);
         if (error != null) {
             log.warn("NL2SQL 校验拦截: db={}, sql={}, reason={}", database, sql, error);
             return "SQL 校验不通过：" + error + "。仅支持单条 SELECT 只读查询。";
@@ -229,67 +218,9 @@ public class Nl2SqlQueryService {
     }
 
     /**
-     * 只读 SQL 白名单校验。
-     *
-     * @return null 表示通过；否则返回拒绝原因
-     */
-    private String validateSql(String sql) {
-        if (sql == null || sql.isBlank()) {
-            return "SQL 不能为空";
-        }
-        String s = sql.trim();
-
-        // 注释绕过拦截
-        if (COMMENTS.matcher(s).find()) {
-            return "不允许包含 SQL 注释";
-        }
-
-        // 去除末尾分号后检查多语句
-        String noTrailing = s;
-        while (noTrailing.endsWith(";")) {
-            noTrailing = noTrailing.substring(0, noTrailing.length() - 1).trim();
-        }
-        if (noTrailing.contains(";")) {
-            return "不允许一次执行多条 SQL";
-        }
-
-        // 仅允许 SELECT 开头
-        if (!noTrailing.toUpperCase().startsWith("SELECT")) {
-            return "仅允许 SELECT 查询语句";
-        }
-
-        // 写操作 / 危险关键字拦截
-        if (DANGEROUS_KEYWORDS.matcher(noTrailing).find()) {
-            return "检测到写操作或危险关键字";
-        }
-
-        // 系统库拦截
-        if (SYSTEM_SCHEMA.matcher(noTrailing).find()) {
-            return "不允许访问系统库";
-        }
-
-        // 危险函数/文件操作拦截
-        if (FUNC_ABUSE.matcher(noTrailing).find()) {
-            return "不允许使用危险函数或文件操作";
-        }
-        return null;
-    }
-
-    /**
-     * 强制查询结果行数上限：无 LIMIT 则追加；LIMIT 超过上限则改写。
+     * 强制查询结果行数上限（委托 {@link SqlGuard#enforceLimit}，3.2 F6 防拖库）。
      */
     private String enforceLimit(String sql) {
-        String s = sql.trim();
-        while (s.endsWith(";")) {
-            s = s.substring(0, s.length() - 1).trim();
-        }
-        Matcher m = LIMIT_PATTERN.matcher(s);
-        if (m.find()) {
-            if (Integer.parseInt(m.group(1)) > MAX_ROWS) {
-                return m.replaceFirst("LIMIT " + MAX_ROWS);
-            }
-            return s;
-        }
-        return s + " LIMIT " + MAX_ROWS;
+        return sqlGuard.enforceLimit(sql, MAX_ROWS);
     }
 }

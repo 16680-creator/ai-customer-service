@@ -82,8 +82,20 @@ class ChatObservabilityIntegrationTest {
                 .thenReturn(CompletableFuture.completedFuture("可以为您办理退货"));
         OnlineEvalService onlineEval = mock(OnlineEvalService.class);
 
+        // 3.2 安全组件（mock：内容审核放行、RAG ACL 透传、审计静默）
+        com.aics.chat.security.ContentSafetyService contentSafety = mock(com.aics.chat.security.ContentSafetyService.class);
+        when(contentSafety.reviewInput(anyString()))
+                .thenReturn(com.aics.chat.security.ContentReviewResult.pass());
+        when(contentSafety.reviewOutput(anyString()))
+                .thenReturn(com.aics.chat.security.ContentReviewResult.pass());
+        com.aics.chat.security.RagAclFilter ragAclFilter = mock(com.aics.chat.security.RagAclFilter.class);
+        when(ragAclFilter.filter(anyString(), anyList(), any()))
+                .thenAnswer(inv -> inv.getArgument(1));
+        com.aics.chat.security.SecurityAuditRecorder auditRecorder =
+                mock(com.aics.chat.security.SecurityAuditRecorder.class);
+
         ChatServiceImpl chatService = new ChatServiceImpl(llm, kb, history,
-                mock(HybridRetriever.class), r, onlineEval);
+                mock(HybridRetriever.class), r, onlineEval, contentSafety, ragAclFilter, auditRecorder);
 
         // 模拟请求入口：拦截器创建上下文
         TraceContext ctx = TraceContextHolder.begin(observability, 1L, "s1", "rag");
@@ -130,7 +142,8 @@ class ChatObservabilityIntegrationTest {
         var traceFeign = mock(com.aics.chat.feign.AgentTraceFeignClient.class);
         var notifyFeign = mock(com.aics.chat.feign.NotifyFeignClient.class);
 
-        OrderLocatorTool orderLocatorTool = new OrderLocatorTool(orderFeign);
+        OrderLocatorTool orderLocatorTool = new OrderLocatorTool(orderFeign,
+                mock(com.aics.chat.security.SecurityAuditRecorder.class));
         PolicyCheckTool policyCheckTool = new PolicyCheckTool(new StaticRuleProvider());
         ProductRecommendTool productRecommendTool = new ProductRecommendTool(mock(com.aics.chat.feign.ProductRecommendFeignClient.class), agentProps);
         CreateAfterSaleTool createAfterSaleTool = new CreateAfterSaleTool(afterSaleFeign);
@@ -139,14 +152,23 @@ class ChatObservabilityIntegrationTest {
         AgentToolRegistry toolRegistry = new AgentToolRegistry(stateMachine,
                 List.of(orderLocatorTool, policyCheckTool, productRecommendTool, createAfterSaleTool, handoffTool));
         AgentRunStore runStore = new InMemoryAgentRunStore();
-        AgentTraceRecorder traceRecorder = new AgentTraceRecorder(traceFeign, new com.fasterxml.jackson.databind.ObjectMapper());
+        AgentTraceRecorder traceRecorder = new AgentTraceRecorder(traceFeign,
+                new com.fasterxml.jackson.databind.ObjectMapper(), new com.aics.chat.util.PiiMasker());
         IntentClassifierService classifier = new IntentClassifierService(agentProps,
                 mock(ResilientAiService.class), new com.fasterxml.jackson.databind.ObjectMapper(), r);
+        // 3.2 安全组件（mock：内容审核放行、工具授权放行、审计静默）
+        com.aics.chat.security.ContentSafetyService contentSafety = mock(com.aics.chat.security.ContentSafetyService.class);
+        when(contentSafety.reviewInput(anyString()))
+                .thenReturn(com.aics.chat.security.ContentReviewResult.pass());
+        com.aics.chat.security.ToolAuthorizationService toolAuth = mock(com.aics.chat.security.ToolAuthorizationService.class);
+        when(toolAuth.authorize(any(), anyString(), any()))
+                .thenReturn(com.aics.chat.security.ToolAuthResult.allowed("USER"));
         AfterSaleAgentService agentService = new AfterSaleAgentService(agentProps,
                 new SafetyGuardService(), classifier, stateMachine, toolRegistry, runStore,
                 new ConfirmationService(agentProps, new com.fasterxml.jackson.databind.ObjectMapper()),
                 traceRecorder, orderLocatorTool, policyCheckTool, productRecommendTool,
-                createAfterSaleTool, handoffTool, r);
+                createAfterSaleTool, handoffTool, r, contentSafety, toolAuth,
+                mock(com.aics.chat.security.SecurityAuditRecorder.class));
 
         ChatUserContext.setUserId(1L);
         TraceContext ctx = TraceContextHolder.begin(observability, 1L, "10", "agent");

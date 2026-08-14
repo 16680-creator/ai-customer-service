@@ -138,6 +138,15 @@
             <artifactId>spring-boot-starter-jdbc</artifactId>
         </dependency>
 
+        <!-- ===== 3.2 AI 安全网关与 Guardrails：NL2SQL AST 校验（F6） =====
+             在正则黑名单之上叠加 SQL 语法树级校验（仅 SELECT + 表/列白名单），
+             由 SqlGuard 统一封装，Nl2SqlQueryService 委托调用。 -->
+        <dependency>
+            <groupId>com.github.jsqlparser</groupId>
+            <artifactId>jsqlparser</artifactId>
+            <version>4.9</version>
+        </dependency>
+
         <!-- ===== LLM 可观测性（3.3 P0）：Micrometer Observation + OpenTelemetry =====
              版本由 spring-boot-dependencies BOM 统一管理（micrometer-tracing 1.2.x / opentelemetry 1.31.x）。
              Observation API 是埋点统一入口；bridge-otel + exporter-otlp 仅在配置
@@ -166,6 +175,28 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <!-- ===== 3.2 AI 安全网关与 Guardrails：BDD + AI（Cucumber-JVM） =====
+             7 个 Gherkin Feature（features/security/*.feature）由 Cucumber 步骤定义驱动，
+             经 SecurityGuardSuite 在 mvn test 时自动执行（junit-platform-suite 引擎）。 -->
+        <dependency>
+            <groupId>io.cucumber</groupId>
+            <artifactId>cucumber-java</artifactId>
+            <version>7.15.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.cucumber</groupId>
+            <artifactId>cucumber-junit-platform-engine</artifactId>
+            <version>7.15.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.platform</groupId>
+            <artifactId>junit-platform-suite</artifactId>
+            <version>1.10.2</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <profiles>
@@ -191,6 +222,20 @@
 
     <build>
         <plugins>
+            <!-- 3.2 BDD：surefire 同时发现 JUnit5 测试与 Cucumber Suite（*Suite.java） -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <includes>
+                        <include>**/*Test.java</include>
+                        <include>**/*Tests.java</include>
+                        <include>**/*TestCase.java</include>
+                        <include>**/Test*.java</include>
+                        <include>**/*Suite.java</include>
+                    </includes>
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
