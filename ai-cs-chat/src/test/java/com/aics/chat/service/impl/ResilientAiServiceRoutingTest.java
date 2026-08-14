@@ -144,6 +144,21 @@ class ResilientAiServiceRoutingTest {
         }
     }
 
+    @Test
+    void callSseStream_returnsFriendlyFluxWhenNoEligibleModel() throws Exception {
+        when(modelRouter.route(any(RouteRequest.class)))
+                .thenReturn(RouteDecision.builder()
+                        .selectedModelId(null)
+                        .fallbackChain(List.of())
+                        .reason(RouteReason.NO_ELIGIBLE_MODEL)
+                        .build());
+        List<String> emissions = service.callSseStream(ModelScenario.CHAT, List.of())
+                .get()
+                .collectList()
+                .block();
+        assertEquals(List.of("[ERROR]AI 助手暂时繁忙，请稍后重试。"), emissions);
+    }
+
     private static ModelClientHolder holder(String id, ChatClient client) {
         ModelDefinition def = new ModelDefinition();
         def.setId(id);

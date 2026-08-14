@@ -91,6 +91,31 @@ class ModelRouterTest {
         assertEquals(RouteReason.NO_ELIGIBLE_MODEL, decision.getReason());
     }
 
+    @Test
+    void route_returnsNoEligibleWhenRouterDisabled() {
+        props.setEnabled(false);
+        RouteDecision decision = router.route(RouteRequest.builder()
+                .scenario(ModelScenario.CHAT)
+                .quotaExceeded(false)
+                .requiredCapabilities(Set.of(ModelCapability.TOOL_CALLING))
+                .build());
+        assertNull(decision.getSelectedModelId());
+        assertEquals(RouteReason.NO_ELIGIBLE_MODEL, decision.getReason());
+    }
+
+    @Test
+    void route_returnsQuotaNoCheaperModelWhenNoCheapEligible() {
+        props.getQuota().setEnabled(true);
+        RouteDecision decision = router.route(RouteRequest.builder()
+                .scenario(ModelScenario.CHAT)
+                .quotaExceeded(true)
+                .requiredCapabilities(Set.of(ModelCapability.TOOL_CALLING))
+                .build());
+        assertEquals("deepseek-chat", decision.getSelectedModelId());
+        assertEquals(List.of("siliconflow-qwen3-32b"), decision.getFallbackChain());
+        assertEquals(RouteReason.QUOTA_NO_CHEAPER_MODEL, decision.getReason());
+    }
+
     private static ModelDefinition model(String id, String provider, String tier,
                                          Set<ModelCapability> capabilities, int priority) {
         ModelDefinition def = new ModelDefinition();

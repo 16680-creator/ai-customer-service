@@ -18,6 +18,9 @@ public class ModelRouter {
     private final ModelHealthRegistry healthRegistry;
 
     public RouteDecision route(RouteRequest request) {
+        if (!properties.isEnabled()) {
+            return noEligible();
+        }
         ScenarioRoute scenarioRoute = properties.getScenarios().get(request.getScenario());
         if (scenarioRoute == null || !StringUtils.hasText(scenarioRoute.getPrimary())) {
             return noEligible();
