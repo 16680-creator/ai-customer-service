@@ -3,6 +3,7 @@ package com.aics.chat.service.impl;
 import com.aics.chat.dto.ChatHistoryMessage;
 import com.aics.chat.dto.ChatRagResponseDTO;
 import com.aics.chat.dto.CitationItemDTO;
+import com.aics.chat.modelrouter.ModelScenario;
 import com.aics.chat.observability.OnlineEvalService;
 import com.aics.chat.observability.TraceContext;
 import com.aics.chat.observability.TraceContextHolder;
@@ -246,7 +247,7 @@ public class ChatServiceImpl implements ChatService {
         try {
             // 通过 ResilientAiService 调用 AI 生成摘要（带超时/重试/熔断）
             // 调 LLM 压缩旧消息为摘要（经 ResilientAiService 获得超时/重试/熔断保护）
-            String summary = resilientAiService.callSummary(
+            String summary = resilientAiService.callSummary(ModelScenario.SUMMARY,
                     new Prompt("请将以下对话历史压缩为简洁的摘要，保留关键信息（用户名、订单号、重要决定等），"
                             + "用1-3句话概括，作为后续对话的上下文参考：\n\n" + conversation)
             ).get();
@@ -293,7 +294,7 @@ public class ChatServiceImpl implements ChatService {
             }
 
             // 通过 ResilientAiService 弹性调用 LLM（超时/重试/熔断）
-            String response = resilientAiService.callChat(history).get();
+            String response = resilientAiService.callChat(ModelScenario.CHAT, history).get();
 
             // 过滤思考过程
             response = cleanResponse(response);
@@ -392,7 +393,7 @@ public class ChatServiceImpl implements ChatService {
                     """.formatted(context.isBlank() ? "（未检索到相关资料）" : context, message);
 
             // 通过 ResilientAiService 弹性调用 LLM（超时/重试/熔断/降级）
-            String response = resilientAiService.callRagChat(ragPrompt).get();
+            String response = resilientAiService.callRagChat(ModelScenario.RAG, ragPrompt).get();
             response = cleanResponse(response);   // 去掉模型思考过程标签，只留正式回答
 
             // 输出 Guardrail（3.2 F4）：违规回答拦截为兜底文案
@@ -503,11 +504,11 @@ public class ChatServiceImpl implements ChatService {
                         【用户问题】
                         %s
                         """.formatted(context.isBlank() ? "（未检索到相关资料）" : context, message);
-                futureFlux = resilientAiService.callSseRagStream(ragPrompt);
+                futureFlux = resilientAiService.callSseRagStream(ModelScenario.RAG, ragPrompt);
                 // 缓存引用溯源，完成事件时随 done 一起推送
                 citations = buildCitations(docs);
             } else {
-                futureFlux = resilientAiService.callSseStream(streamHistory);
+                futureFlux = resilientAiService.callSseStream(ModelScenario.CHAT, streamHistory);
                 citations = List.of();
             }
 

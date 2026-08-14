@@ -6,11 +6,9 @@ import com.aics.chat.service.OrderQueryService;
 import com.aics.chat.nl2sql.Nl2SqlQueryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
 import org.springframework.ai.document.MetadataMode;
 import org.springframework.ai.embedding.EmbeddingModel;
-import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiEmbeddingModel;
 import org.springframework.ai.openai.OpenAiEmbeddingOptions;
 import org.springframework.ai.openai.api.OpenAiApi;
@@ -45,12 +43,12 @@ import org.springframework.beans.factory.annotation.Value;
  *       {@code @Tool} 标注的方法注册成 LLM 可调用的 Function Tool。</li>
  *   <li>{@link #ragAdvisor(VectorStore)}：{@link QuestionAnswerAdvisor}，Spring AI 内置的 RAG 顾问，
  *       在每次 ChatClient 调用时自动注入向量检索结果作为上下文。</li>
- *   <li>{@link #chatClient(OpenAiChatModel, ToolCallbackProvider, QuestionAnswerAdvisor)}：
- *       {@link ChatClient}，绑定默认系统提示、工具与 RAG Advisor，是业务层 LLM 调用的统一入口。</li>
+ *   <li>{@link #chatClientCustomizer(ToolCallbackProvider, QuestionAnswerAdvisor)}：
+ *       ChatClientCustomizer，为模型路由注册的每个 ChatClient 绑定默认系统提示与 RAG Advisor。</li>
  * </ul>
  *
  * <h3>【AI 技术】ChatModel 来源（OpenAI 兼容协议对接 DeepSeek）</h3>
- * <p>{@link OpenAiChatModel} 由 Spring AI 的 {@code spring-ai-openai-spring-boot-starter} 自动装配，
+ * <p>OpenAiChatModel 由 Spring AI 的 {@code spring-ai-openai-spring-boot-starter} 自动装配，
  * 配置项见 {@code application.yml} 的 {@code spring.ai.openai.*}：
  * 通过把 {@code base-url} 指向 DeepSeek 的 OpenAI 兼容端点（{@code https://api.deepseek.com}）、
  * 使用 DeepSeek 颁发的 API Key、模型名设为 {@code deepseek-chat}，即可让 Spring AI 用调用 OpenAI 的方式
@@ -124,7 +122,7 @@ public class SpringAiConfig {
             cart_item(id, user_id, product_id, product_name, product_price, quantity, selected, create_time, update_time) 购物车
             coupon(id, user_id, coupon_name, amount, min_order_amount, status, expire_time, use_time, order_no, create_time) 优惠券
             full_reduction_rule(id, rule_name, threshold_amount, reduction_amount, start_time, end_time, enabled) 满减规则
-            pay_transaction(id, order_no, user_id, payment_method, trade_no, pay_amount, status, notify_count, pay_time, refund_time, create_time, update_time) 支付流水
+            pay_transaction(id, order_no, user_id, payment_method, pay_amount, status, notify_count, pay_time, refund_time, create_time, update_time) 支付流水
             【chat 对话消息库】
             chat_session(id, user_id, agent_id, channel, status, title, create_time, update_time, deleted) 会话
             chat_message(id, session_id, sender_type, sender_id, content, content_type, metadata, create_time, session_key, role) 消息
@@ -279,88 +277,5 @@ public class SpringAiConfig {
 
                         """ + DB_SCHEMA)
                 .defaultAdvisors(ragAdvisor);
-    }
-
-    /**
-     * 【AI 核心】注册 ChatClient Bean —— 业务层 LLM 调用的统一入口。
-     *
-     * <p>ChatClient 是业务层调用 LLM 的统一入口，此处配置三项默认值：</p>
-     * <ul>
-     *   <li>{@code defaultSystem}：系统提示词，约束 AI 的身份、能力范围与回答风格
-     *       （禁止透露底层模型名、识别当前用户、订单查询/智能问数工具调用规则、数据库 schema 等）。</li>
-     *   <li>{@code defaultToolCallbacks}：默认携带订单查询 + 智能问数工具回调。</li>
-     *   <li>{@code defaultAdvisors}：默认携带 {@link QuestionAnswerAdvisor}，
-     *       让所有 ChatClient 调用都自动走 RAG 检索增强。</li>
-     * </ul>
-     *
-     * <p><b>【AI 技术详解】System Prompt（系统提示词）设计</b>：
-     * <ul>
-     *   <li><b>身份定义</b>：告诉 AI 它是"AI客服平台的智能助手"，而非通用助手</li>
-     *   <li><b>能力边界</b>：明确告知 AI 可以做什么（订单查询、智能问数）以及怎么做</li>
-     *   <li><b>安全约束</b>：禁止透露底层模型名称（防止用户探测技术栈）</li>
-     *   <li><b>回答风格</b>：简洁、准确、有亲和力，适当使用 emoji</li>
-     *   <li><b>数据库 Schema</b>：提供完整的表结构，让 AI 知道如何组装 SQL（NL2SQL 场景）</li>
-     * </ul>
-     *
-     * <p><b>【AI 技术详解】Tool Calling（函数调用）机制</b>：
-     * <ul>
-     *   <li><b>原理</b>：LLM 不直接执行代码，而是输出"我要调用某个工具"的 JSON 指令，
-     *       Spring AI 框架拦截该指令，调用对应的 Java 方法，再把结果返回给 LLM</li>
-     *   <li><b>流程</b>：
-     *       <ol>
-     *         <li>用户问"我的订单 ORD001 什么状态？"</li>
-     *         <li>LLM 分析后决定调用 {@code queryOrderByOrderId(orderId="ORD001")}</li>
-     *         <li>Spring AI 调用 {@link OrderQueryService#queryOrderByOrderId} 方法</li>
-     *         <li>方法返回订单详情 JSON</li>
-     *         <li>LLM 基于 JSON 生成自然语言回答</li>
-     *       </ol>
-     *   </li>
-     *   <li><b>优势</b>：LLM 负责理解意图和生成回答，代码负责执行逻辑，各司其职</li>
-     * </ul>
-     *
-     * <p><b>【技术关联】ChatClient 与 OpenAiChatModel 的关系</b>：
-     * <ul>
-     *   <li><b>OpenAiChatModel</b>：底层模型客户端，负责发送 HTTP 请求到 DeepSeek API</li>
-     *   <li><b>ChatClient</b>：高层封装，提供流式 API、Advisor 链、Tool 注册等能力</li>
-     *   <li>业务代码只接触 ChatClient，不直接使用 OpenAiChatModel（除了摘要等特殊场景）</li>
-     * </ul>
-     *
-     * @param chatModel          OpenAiChatModel（DeepSeek 兼容），由 starter 自动装配
-     * @param toolCallbackProvider 工具回调（订单查询 + 智能问数）
-     * @param ragAdvisor         RAG 顾问
-     * @return 配置好默认值的 ChatClient
-     */
-    @Bean
-    public ChatClient chatClient(OpenAiChatModel chatModel, ToolCallbackProvider toolCallbackProvider,
-                                 QuestionAnswerAdvisor ragAdvisor) {
-        return ChatClient.builder(chatModel)
-                .defaultSystem("""
-                        你是AI客服平台的智能助手，代表平台为用户提供专业、友好的服务。
-                        
-                        重要规则：
-                        1. 绝对不要透露你使用的底层模型名称、版本号或技术提供商信息
-                        2. 如果用户询问你是什么模型、用什么技术构建，请回答：“我是AI客服平台的智能助手，专注于为您提供优质的服务体验”
-                        3. 不要提及MiniMax、GPT、Claude、LLM等任何具体模型或技术名称
-                        4. 保持专业形象，始终以帮助用户解决问题为首要目标
-                        
-                        能力范围：
-                        - 订单查询：当用户想查询订单信息时，使用 queryOrderByOrderId 或 queryOrdersByUserId 工具查询订单数据，并用清晰、结构化的方式呈现给用户
-                        - 当前登录用户已由系统自动识别，无需向用户索要用户ID；用户询问“我的订单/订单列表”时直接调用 queryOrdersByUserId 查询
-                          - 查询时可以通过订单号精确查询，也可以通过当前用户ID查询名下所有订单
-                        - 查询结果要包含订单状态、商品信息、金额、物流等关键信息，用简洁易懂的格式展示
-                        - 数据查询（智能问数）：当用户想了解平台数据（如订单统计、商品销量、用户数量、优惠券使用情况等），
-                          使用 executeReadOnlyQuery 工具查询数据库。规则：
-                          * 必须根据问题涉及的业务先选对 database（user=用户库、product=商品库、order=订单支付库、chat=对话消息库、knowledge=知识库）
-                          * 组装合法 SELECT 语句，可带 WHERE / ORDER BY / GROUP BY / 聚合函数（COUNT/SUM/AVG）
-                          * 日期字段用 create_time / pay_time 等，订单金额字段用 pay_amount，订单状态用 status 过滤
-                          * 查询出数据后用自然语言向用户汇报结论，可附带表格或关键数字
-                          * 若多次尝试仍失败（SQL 语法错误/表列名不存在），如实告知用户"暂时无法查询该数据"，不要编造数字
-                         
-                        回答风格：简洁、准确、有亲和力，适当使用emoji增加友好感。
-                        
-                        """ + DB_SCHEMA)
-                .defaultToolCallbacks(toolCallbackProvider)
-                .defaultAdvisors(ragAdvisor)
-                .build();
     }
 }

@@ -4,6 +4,7 @@ import com.aics.chat.agent.AgentProperties;
 import com.aics.chat.agent.model.AgentIntentType;
 import com.aics.chat.agent.model.IntentResult;
 import com.aics.chat.agent.model.SentimentType;
+import com.aics.chat.modelrouter.ModelScenario;
 import com.aics.chat.service.impl.ResilientAiService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -19,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 /**
@@ -44,7 +46,7 @@ class IntentClassifierServiceTest {
                 + "\"params\":{\"action\":\"EXCHANGE\",\"reason\":\"坏了\"}},"
                 + "{\"type\":\"PRODUCT_RECOMMEND\",\"confidence\":0.8,\"params\":{\"budget\":\"300\"}}],"
                 + "\"sentiment\":\"NEGATIVE\",\"needsHandoff\":false}";
-        when(resilientAiService.callRagChat(anyString()))
+        when(resilientAiService.callRagChat(eq(ModelScenario.INTENT), anyString()))
                 .thenReturn(CompletableFuture.completedFuture(json));
         IntentResult result = newService().classify("我昨天买的耳机坏了，想换货");
         assertEquals(2, result.intents().size());
@@ -59,7 +61,7 @@ class IntentClassifierServiceTest {
         properties.setLlmIntentEnabled(true);
         String json = "```json\n{\"intents\":[{\"type\":\"HUMAN_HANDOFF\",\"confidence\":0.9}],"
                 + "\"sentiment\":\"ANGRY\",\"needsHandoff\":true}\n```";
-        when(resilientAiService.callRagChat(anyString()))
+        when(resilientAiService.callRagChat(eq(ModelScenario.INTENT), anyString()))
                 .thenReturn(CompletableFuture.completedFuture(json));
         IntentResult result = newService().classify("转人工");
         assertEquals(AgentIntentType.HUMAN_HANDOFF, result.intents().get(0).type());
@@ -69,7 +71,7 @@ class IntentClassifierServiceTest {
     @Test
     void LLM输出垃圾JSON时降级规则分类() {
         properties.setLlmIntentEnabled(true);
-        when(resilientAiService.callRagChat(anyString()))
+        when(resilientAiService.callRagChat(eq(ModelScenario.INTENT), anyString()))
                 .thenReturn(CompletableFuture.completedFuture("这不是JSON"));
         IntentResult result = newService().classify("我要退货");
         assertEquals(AgentIntentType.AFTER_SALE, result.intents().get(0).type());
@@ -79,7 +81,7 @@ class IntentClassifierServiceTest {
     @Test
     void LLM调用异常时降级规则分类() {
         properties.setLlmIntentEnabled(true);
-        when(resilientAiService.callRagChat(anyString()))
+        when(resilientAiService.callRagChat(eq(ModelScenario.INTENT), anyString()))
                 .thenReturn(CompletableFuture.failedFuture(new RuntimeException("模型超时")));
         IntentResult result = newService().classify("帮我推荐降噪耳机");
         assertEquals(AgentIntentType.PRODUCT_RECOMMEND, result.intents().get(0).type());
@@ -127,7 +129,7 @@ class IntentClassifierServiceTest {
         properties.setIntentThreshold(0.7);
         String json = "{\"intents\":[{\"type\":\"AFTER_SALE\",\"confidence\":0.5,"
                 + "\"params\":{\"action\":\"EXCHANGE\"}}],\"sentiment\":\"NEUTRAL\",\"needsHandoff\":false}";
-        when(resilientAiService.callRagChat(anyString()))
+        when(resilientAiService.callRagChat(eq(ModelScenario.INTENT), anyString()))
                 .thenReturn(CompletableFuture.completedFuture(json));
         IntentResult result = newService().classify("随便聊聊");
         assertEquals(1, result.intents().size());
@@ -142,7 +144,7 @@ class IntentClassifierServiceTest {
                 + "\"params\":{\"action\":\"EXCHANGE\"}},"
                 + "{\"type\":\"PRODUCT_RECOMMEND\",\"confidence\":0.5,\"params\":{}}],"
                 + "\"sentiment\":\"NEUTRAL\",\"needsHandoff\":false}";
-        when(resilientAiService.callRagChat(anyString()))
+        when(resilientAiService.callRagChat(eq(ModelScenario.INTENT), anyString()))
                 .thenReturn(CompletableFuture.completedFuture(json));
         IntentResult result = newService().classify("换货加推荐");
         assertEquals(1, result.intents().size());

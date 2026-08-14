@@ -12,6 +12,7 @@ import com.aics.chat.agent.tool.*;
 import com.aics.chat.agent.trace.AgentTraceRecorder;
 import com.aics.chat.agent.workflow.AfterSaleAgentService;
 import com.aics.chat.dto.OrderVO;
+import com.aics.chat.modelrouter.ModelScenario;
 import com.aics.chat.service.ChatHistoryService;
 import com.aics.chat.service.KnowledgeBaseService;
 import com.aics.chat.service.impl.ChatServiceImpl;
@@ -78,7 +79,7 @@ class ChatObservabilityIntegrationTest {
                         Map.of("documentId", "doc-1", "title", "退货政策"))));
         when(kb.buildContext(anyList())).thenReturn("【资料】退货政策：7 天无理由退货");
         ResilientAiService llm = mock(ResilientAiService.class);
-        when(llm.callRagChat(anyString()))
+        when(llm.callRagChat(eq(ModelScenario.RAG), anyString()))
                 .thenReturn(CompletableFuture.completedFuture("可以为您办理退货"));
         OnlineEvalService onlineEval = mock(OnlineEvalService.class);
 

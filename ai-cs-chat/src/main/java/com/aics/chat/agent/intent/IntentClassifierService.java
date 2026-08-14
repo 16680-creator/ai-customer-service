@@ -5,6 +5,7 @@ import com.aics.chat.agent.model.AgentIntent;
 import com.aics.chat.agent.model.AgentIntentType;
 import com.aics.chat.agent.model.IntentResult;
 import com.aics.chat.agent.model.SentimentType;
+import com.aics.chat.modelrouter.ModelScenario;
 import com.aics.chat.observability.TraceSpans;
 import com.aics.chat.service.impl.ResilientAiService;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -80,7 +81,7 @@ public class IntentClassifierService {
         if (properties.isLlmIntentEnabled()) {
             try {
                 // LLM 调用限时 10 秒，超时/异常走规则兜底
-                String json = resilientAiService.callRagChat(buildPrompt(input))
+                String json = resilientAiService.callRagChat(ModelScenario.INTENT, buildPrompt(input))
                         .get(10, TimeUnit.SECONDS);
                 IntentResult parsed = parseLlmJson(json);
                 // 解析成功且非空：应用置信度门禁
