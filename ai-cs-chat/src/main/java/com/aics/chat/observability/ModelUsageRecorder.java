@@ -48,6 +48,24 @@ public class ModelUsageRecorder {
     public void record(String scenario, String provider, String model,
                        Integer inputTokens, Integer outputTokens,
                        String status, String errorSummary) {
+        record(scenario, provider, model, inputTokens, outputTokens, status, errorSummary, model);
+    }
+
+    /**
+     * 记录一次 LLM 调用用量（异步落库，失败仅告警）。
+     *
+     * @param scenario    场景（chat/rag/agent/summary/vision/nl2sql/eval）
+     * @param provider    模型供应商
+     * @param model       模型名（展示用）
+     * @param inputTokens 输入 Token（可空）
+     * @param outputTokens 输出 Token（可空）
+     * @param status      状态 SUCCESS/FAILED
+     * @param errorSummary 错误摘要（可空）
+     * @param pricingKey  费用查询键（通常为模型 ID，与展示模型名分离）
+     */
+    public void record(String scenario, String provider, String model,
+                       Integer inputTokens, Integer outputTokens,
+                       String status, String errorSummary, String pricingKey) {
         // 计量总开关：关闭时零开销返回（成本治理本身也要可控成本）
         if (!properties.isEnabled()) {
             return;
@@ -67,7 +85,7 @@ public class ModelUsageRecorder {
         dto.setInputTokens(in);
         dto.setOutputTokens(out);
         dto.setTotalTokens(in + out);
-        dto.setEstimatedCost(estimateCost(model, in, out));
+        dto.setEstimatedCost(estimateCost(pricingKey, in, out));
         // estimated 标记：流式调用常取不到精确 usage，此时按估算记且打标，
         // 统计时可按标记过滤，避免"估算当精确"误导成本决策
         dto.setEstimated(inputTokens == null || outputTokens == null);
@@ -89,7 +107,7 @@ public class ModelUsageRecorder {
 
     /**
      * 估算费用：输入/1e6×输入单价 + 输出/1e6×输出单价（元）。
-     * 未配置单价的模型走默认单价。
+     * 按 pricingKey 查找单价（通常为模型 ID），未配置单价的键走默认单价。
      *
      * <p>学习点：为什么用 BigDecimal 而不是 double？
      * 费用金额涉及精确计算，double 的浮点误差（如 0.1+0.2≠0.3）会污染账目；
@@ -97,9 +115,9 @@ public class ModelUsageRecorder {
      * divide 指定 10 位小数 + HALF_UP 是为了避免除不尽抛 ArithmeticException，
      * 最终结果保留 6 位小数（毫分精度）落库。</p>
      */
-    BigDecimal estimateCost(String model, int inputTokens, int outputTokens) {
+    BigDecimal estimateCost(String pricingKey, int inputTokens, int outputTokens) {
         ModelUsageProperties.ModelPrice price = properties.getPricing().getOrDefault(
-                model, properties.getDefaultPricing());
+                pricingKey, properties.getDefaultPricing());
         BigDecimal inCost = BigDecimal.valueOf(inputTokens)
                 .divide(PER_MILLION, 10, RoundingMode.HALF_UP)
                 .multiply(price.getInput());

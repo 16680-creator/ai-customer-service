@@ -105,6 +105,28 @@ class ModelUsageRecorderTest {
     }
 
     @Test
+    @DisplayName("record 使用 pricingKey 计费，展示 model 保持实际模型名")
+    void record_usesPricingKeyForCost() throws Exception {
+        properties.getPricing().put("siliconflow-qwen3-32b", price("1.0", "2.0"));
+        ModelUsageRecorder recorder = newRecorder();
+        CountDownLatch latch = new CountDownLatch(1);
+        doAnswer(inv -> {
+            latch.countDown();
+            return null;
+        }).when(feignClient).recordUsage(any());
+
+        recorder.record("chat", "siliconflow", "Qwen/Qwen3-32B", 1_000_000, 500_000,
+                "SUCCESS", null, "siliconflow-qwen3-32b");
+        assertTrue(latch.await(5, TimeUnit.SECONDS));
+
+        ArgumentCaptor<ModelUsageDTO> captor = ArgumentCaptor.forClass(ModelUsageDTO.class);
+        verify(feignClient).recordUsage(captor.capture());
+        ModelUsageDTO dto = captor.getValue();
+        assertEquals("Qwen/Qwen3-32B", dto.getModel());
+        assertEquals(0, dto.getEstimatedCost().compareTo(new BigDecimal("2.000000")));
+    }
+
+    @Test
     @DisplayName("record 失败仅告警不抛异常（落库线程内）")
     void record_failureWarnsOnly() throws Exception {
         ModelUsageRecorder recorder = newRecorder();

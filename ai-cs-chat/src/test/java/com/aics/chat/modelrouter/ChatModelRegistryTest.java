@@ -8,7 +8,10 @@ import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvi
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
@@ -45,6 +48,67 @@ class ChatModelRegistryTest {
 
         ChatClient client = registry.get("m1").getChatClient();
         assertNotNull(client);
+    }
+
+    @Test
+    void rebuild_reusesHolderWhenDefinitionUnchanged() {
+        ModelRouterProperties props = new ModelRouterProperties();
+        props.setModels(List.of(model("m1", "deepseek", true)));
+        ChatModelRegistry registry = new ChatModelRegistry(
+                props, builder -> builder.defaultSystem("test system"),
+                mock(ToolCallbackProvider.class), mock(QuestionAnswerAdvisor.class));
+        registry.init();
+        ModelClientHolder first = registry.get("m1");
+
+        registry.rebuild();
+
+        assertSame(first, registry.get("m1"));
+    }
+
+    @Test
+    void rebuild_createsNewHolderWhenModelChanges() {
+        ModelRouterProperties props = new ModelRouterProperties();
+        props.setModels(List.of(model("m1", "deepseek", true)));
+        ChatModelRegistry registry = new ChatModelRegistry(
+                props, builder -> builder.defaultSystem("test system"),
+                mock(ToolCallbackProvider.class), mock(QuestionAnswerAdvisor.class));
+        registry.init();
+        ModelClientHolder first = registry.get("m1");
+
+        ModelDefinition changed = model("m1", "deepseek", true);
+        changed.setModel("deepseek-v3");
+        props.setModels(List.of(changed));
+        registry.rebuild();
+
+        assertNotSame(first, registry.get("m1"));
+    }
+
+    @Test
+    void rebuild_keepsOldSnapshotOnInvalidConfig() {
+        ModelRouterProperties props = new ModelRouterProperties();
+        props.setModels(List.of(model("m1", "deepseek", true)));
+        ChatModelRegistry registry = new ChatModelRegistry(
+                props, builder -> builder.defaultSystem("test system"),
+                mock(ToolCallbackProvider.class), mock(QuestionAnswerAdvisor.class));
+        registry.init();
+        ModelClientHolder first = registry.get("m1");
+
+        props.setModels(List.of(model("m1", "deepseek", true), model("m1", "siliconflow", true)));
+        registry.rebuild();
+
+        assertSame(first, registry.get("m1"));
+    }
+
+    @Test
+    void rebuild_initialFailureRethrowsIllegalState() {
+        ModelRouterProperties props = new ModelRouterProperties();
+        props.setModels(List.of(model("m1", "deepseek", true), model("m1", "siliconflow", true)));
+        ChatModelRegistry registry = new ChatModelRegistry(
+                props, builder -> builder.defaultSystem("test system"),
+                mock(ToolCallbackProvider.class), mock(QuestionAnswerAdvisor.class));
+
+        assertThrows(IllegalStateException.class, registry::init);
+        assertFalse(registry.contains("m1"));
     }
 
     private static ModelDefinition model(String id, String provider, boolean enabled) {

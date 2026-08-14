@@ -18,6 +18,7 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.web.client.ResourceAccessException;
+import reactor.core.publisher.Flux;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -25,6 +26,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -114,6 +116,51 @@ class ResilientAiServiceRoutingTest {
     }
 
     @Test
+    void callChat_fallsBackAfterTransientRetriesExhausted() throws Exception {
+        ModelClientHolder primary = holder("deepseek-chat", mock(ChatClient.class, RETURNS_DEEP_STUBS));
+        ModelClientHolder fallback = holder("siliconflow-qwen3-32b", mock(ChatClient.class, RETURNS_DEEP_STUBS));
+        when(registry.get("deepseek-chat")).thenReturn(primary);
+        when(registry.get("siliconflow-qwen3-32b")).thenReturn(fallback);
+        when(modelRouter.route(any(RouteRequest.class)))
+                .thenReturn(RouteDecision.builder()
+                        .selectedModelId("deepseek-chat")
+                        .fallbackChain(List.of("siliconflow-qwen3-32b"))
+                        .reason(RouteReason.PRIMARY_UNAVAILABLE)
+                        .build());
+        when(primary.getChatClient().prompt().messages(anyList()).call().chatResponse())
+                .thenThrow(new ResourceAccessException("still down"))
+                .thenThrow(new ResourceAccessException("still down"));
+        when(fallback.getChatClient().prompt().messages(anyList()).call().chatResponse())
+                .thenReturn(chatResponse("backup after retries"));
+
+        String result = service.callChat(ModelScenario.CHAT, List.of()).get();
+
+        assertEquals("backup after retries", result);
+    }
+
+    @Test
+    void callChat_returnsFriendlyTextWhenAllModelsFail() throws Exception {
+        ModelClientHolder primary = holder("deepseek-chat", mock(ChatClient.class, RETURNS_DEEP_STUBS));
+        ModelClientHolder fallback = holder("siliconflow-qwen3-32b", mock(ChatClient.class, RETURNS_DEEP_STUBS));
+        when(registry.get("deepseek-chat")).thenReturn(primary);
+        when(registry.get("siliconflow-qwen3-32b")).thenReturn(fallback);
+        when(modelRouter.route(any(RouteRequest.class)))
+                .thenReturn(RouteDecision.builder()
+                        .selectedModelId("deepseek-chat")
+                        .fallbackChain(List.of("siliconflow-qwen3-32b"))
+                        .reason(RouteReason.PRIMARY_UNAVAILABLE)
+                        .build());
+        when(primary.getChatClient().prompt().messages(anyList()).call().chatResponse())
+                .thenThrow(new RuntimeException("primary down"));
+        when(fallback.getChatClient().prompt().messages(anyList()).call().chatResponse())
+                .thenThrow(new RuntimeException("fallback down"));
+
+        String result = service.callChat(ModelScenario.CHAT, List.of()).get();
+
+        assertEquals("AI 助手暂时繁忙，请稍后重试。", result);
+    }
+
+    @Test
     void callChat_propagatesCapturedUserIdToQuotaRouting() throws Exception {
         ChatUserContext.setUserId(1L);
         try {
@@ -157,6 +204,93 @@ class ResilientAiServiceRoutingTest {
                 .collectList()
                 .block();
         assertEquals(List.of("[ERROR]AI 助手暂时繁忙，请稍后重试。"), emissions);
+    }
+
+    @Test
+    void callSseStream_usesSelectedFallbackWithoutFetchingPrimary() throws Exception {
+        ModelClientHolder fallback = holder("siliconflow-qwen3-32b", mock(ChatClient.class, RETURNS_DEEP_STUBS));
+        when(registry.get("siliconflow-qwen3-32b")).thenReturn(fallback);
+        when(modelRouter.route(any(RouteRequest.class)))
+                .thenReturn(RouteDecision.builder()
+                        .selectedModelId("siliconflow-qwen3-32b")
+                        .fallbackChain(List.of())
+                        .reason(RouteReason.PRIMARY_UNAVAILABLE)
+                        .build());
+        when(fallback.getChatClient().prompt().messages(anyList()).stream().content())
+                .thenReturn(Flux.just("fallback stream"));
+
+        List<String> emissions = service.callSseStream(ModelScenario.CHAT, List.of())
+                .get()
+                .collectList()
+                .block();
+
+        assertEquals(List.of("fallback stream"), emissions);
+        verify(registry, never()).get("deepseek-chat");
+    }
+
+    @Test
+    void callSseStream_recordsBreakerSuccessWhenStreamCompletes() throws Exception {
+        ModelClientHolder primary = holder("deepseek-chat", mock(ChatClient.class, RETURNS_DEEP_STUBS));
+        when(registry.get("deepseek-chat")).thenReturn(primary);
+        when(modelRouter.route(any(RouteRequest.class)))
+                .thenReturn(RouteDecision.builder()
+                        .selectedModelId("deepseek-chat")
+                        .fallbackChain(List.of())
+                        .reason(RouteReason.SCENARIO_DEFAULT)
+                        .build());
+        when(primary.getChatClient().prompt().messages(anyList()).stream().content())
+                .thenReturn(Flux.just("stream answer"));
+
+        List<String> emissions = service.callSseStream(ModelScenario.CHAT, List.of())
+                .get()
+                .collectList()
+                .block();
+
+        assertEquals(List.of("stream answer"), emissions);
+        assertEquals(1, health.breaker("deepseek-chat").getMetrics().getNumberOfSuccessfulCalls());
+        assertEquals(0, health.breaker("deepseek-chat").getMetrics().getNumberOfFailedCalls());
+    }
+
+    @Test
+    void callSseStream_recordsBreakerFailureWhenStreamErrors() throws Exception {
+        ModelClientHolder primary = holder("deepseek-chat", mock(ChatClient.class, RETURNS_DEEP_STUBS));
+        when(registry.get("deepseek-chat")).thenReturn(primary);
+        when(modelRouter.route(any(RouteRequest.class)))
+                .thenReturn(RouteDecision.builder()
+                        .selectedModelId("deepseek-chat")
+                        .fallbackChain(List.of())
+                        .reason(RouteReason.SCENARIO_DEFAULT)
+                        .build());
+        when(primary.getChatClient().prompt().messages(anyList()).stream().content())
+                .thenReturn(Flux.error(new RuntimeException("stream boom")));
+
+        Flux<String> flux = service.callSseStream(ModelScenario.CHAT, List.of()).get();
+        assertThrows(RuntimeException.class, () -> flux.collectList().block());
+
+        assertEquals(1, health.breaker("deepseek-chat").getMetrics().getNumberOfFailedCalls());
+        assertEquals(0, health.breaker("deepseek-chat").getMetrics().getNumberOfSuccessfulCalls());
+    }
+
+    @Test
+    void callSseStream_recordsBreakerFailureWhenSetupThrows() throws Exception {
+        ModelClientHolder primary = holder("deepseek-chat", mock(ChatClient.class, RETURNS_DEEP_STUBS));
+        when(registry.get("deepseek-chat")).thenReturn(primary);
+        when(modelRouter.route(any(RouteRequest.class)))
+                .thenReturn(RouteDecision.builder()
+                        .selectedModelId("deepseek-chat")
+                        .fallbackChain(List.of())
+                        .reason(RouteReason.SCENARIO_DEFAULT)
+                        .build());
+        when(primary.getChatClient().prompt().messages(anyList()).stream())
+                .thenThrow(new RuntimeException("setup boom"));
+
+        List<String> emissions = service.callSseStream(ModelScenario.CHAT, List.of())
+                .get()
+                .collectList()
+                .block();
+
+        assertEquals(List.of("[ERROR]AI 助手暂时繁忙，请稍后重试。"), emissions);
+        assertEquals(1, health.breaker("deepseek-chat").getMetrics().getNumberOfFailedCalls());
     }
 
     private static ModelClientHolder holder(String id, ChatClient client) {

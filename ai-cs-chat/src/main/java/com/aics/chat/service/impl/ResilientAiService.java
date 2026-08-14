@@ -124,14 +124,15 @@ public class ResilientAiService {
                                     holder.getDefinition().getModel(),
                                     usage == null ? null : usage.getPromptTokens(),
                                     usage == null ? null : usage.getCompletionTokens(),
-                                    "SUCCESS", null);
+                                    "SUCCESS", null, holder.getDefinition().getId());
                             return text;
                         } catch (Exception e) {
                             lastError = e;
                             fallbackFrom = modelId;
                             finishLlmObservation(observation, null, e);
                             modelUsageRecorder.record(scenarioId(scenario), holder.getDefinition().getProvider(),
-                                    holder.getDefinition().getModel(), null, null, "FAILED", e.getMessage());
+                                    holder.getDefinition().getModel(), null, null, "FAILED", e.getMessage(),
+                                    holder.getDefinition().getId());
                         }
                     } catch (Exception e) {
                         lastError = e;
@@ -158,10 +159,16 @@ public class ResilientAiService {
                 if (decision.getSelectedModelId() == null) {
                     return Flux.just("[ERROR]AI 助手暂时繁忙，请稍后重试。");
                 }
+                ModelClientHolder holder = null;
+                CircuitBreaker breaker = null;
                 try {
-                    ModelClientHolder holder = modelRegistry.get(decision.getSelectedModelId());
+                    holder = modelRegistry.get(decision.getSelectedModelId());
+                    breaker = healthRegistry.breaker(holder.getDefinition().getId());
+                    ModelClientHolder selectedHolder = holder;
+                    CircuitBreaker selectedBreaker = breaker;
                     Flux<String> flux = call.call(holder);
                     AtomicReference<Usage> usageRef = new AtomicReference<>();
+                    AtomicReference<Throwable> errorRef = new AtomicReference<>();
                     AtomicLong firstTokenMs = new AtomicLong(-1);
                     long start = System.currentTimeMillis();
                     TraceContext streamTrace = TraceContextHolder.capture();
@@ -171,12 +178,21 @@ public class ResilientAiService {
                                     firstTokenMs.set(System.currentTimeMillis() - start);
                                 }
                             })
+                            .doOnError(errorRef::set)
                             .doFinally(signal -> {
                                 TraceContextHolder.restore(streamTrace);
                                 try {
+                                    long durationMs = System.currentTimeMillis() - start;
+                                    if (signal == SignalType.ON_COMPLETE) {
+                                        selectedBreaker.onSuccess(durationMs, TimeUnit.MILLISECONDS);
+                                    } else if (signal == SignalType.ON_ERROR) {
+                                        Throwable streamError = errorRef.get();
+                                        selectedBreaker.onError(durationMs, TimeUnit.MILLISECONDS,
+                                                streamError == null ? new RuntimeException("stream error") : streamError);
+                                    }
                                     Usage usage = usageRef.get();
                                     Observation observation = startLlmObservation(
-                                            scenario, holder, decision, null, 1);
+                                            scenario, selectedHolder, decision, null, 1);
                                     if (usage != null) {
                                         observation.highCardinalityKeyValue("promptTokens",
                                                 String.valueOf(usage.getPromptTokens()))
@@ -188,12 +204,13 @@ public class ResilientAiService {
                                                 String.valueOf(firstTokenMs.get()));
                                     }
                                     modelUsageRecorder.record(scenarioId(scenario),
-                                            holder.getDefinition().getProvider(),
-                                            holder.getDefinition().getModel(),
+                                            selectedHolder.getDefinition().getProvider(),
+                                            selectedHolder.getDefinition().getModel(),
                                             usage == null ? null : usage.getPromptTokens(),
                                             usage == null ? null : usage.getCompletionTokens(),
                                             signal == SignalType.ON_ERROR ? "FAILED" : "SUCCESS",
-                                            signal == SignalType.ON_ERROR ? "stream error" : null);
+                                            signal == SignalType.ON_ERROR ? "stream error" : null,
+                                            selectedHolder.getDefinition().getId());
                                     finishLlmObservation(observation, usage,
                                             signal == SignalType.ON_ERROR
                                                     ? new RuntimeException("stream error") : null);
@@ -202,6 +219,9 @@ public class ResilientAiService {
                                 }
                             });
                 } catch (Exception e) {
+                    if (breaker != null) {
+                        breaker.onError(0, TimeUnit.MILLISECONDS, e);
+                    }
                     log.warn("模型流式调用初始化失败: modelId={}, err={}",
                             decision.getSelectedModelId(), e.getMessage());
                     return Flux.just("[ERROR]AI 助手暂时繁忙，请稍后重试。");
