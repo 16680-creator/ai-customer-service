@@ -5,13 +5,10 @@
 ## 架构总览
 
 ```
-tools\start-all.ps1
-   ├─ 1. Nacos 2.3.2        (JDK8, 端口 8848/9848)   tools\nacos
-   ├─ 2. RocketMQ 5.1.4     (JDK17, 9876/10911)       tools\rocketmq
-   ├─ 3. 发布 Nacos 配置     (tenant=aics)             tools\nacos-config\*.yml
-   ├─ 4. Maven 构建后端      (mvn clean install -DskipTests)
-   ├─ 5. 启动 11 个微服务    (8081~8090 + 8080 gateway)
-   └─ 6. 启动前端 Vite      (5173)                    ai-cs-frontend
+tools\start-infra.ps1   # 基础设施：Nacos + RocketMQ(NameServer/Broker) + 发布 Nacos 配置
+tools\start-app.ps1     # 应用：Maven 构建 + 11 个微服务 + 前端 Vite
+tools\start-all.ps1     # 一键串联：依次执行 start-infra.ps1 -> start-app.ps1
+tools\stop-all.ps1      # 停止全部
 ```
 
 | 组件 | 端口 | 说明 |
@@ -38,26 +35,35 @@ tools\start-all.ps1
 # 1. 换机后先改机器相关路径（JDK8/JDK17/Maven/数据库密码）
 notepad .\tools\env.ps1
 
-# 2. 一键启动全部（首次会自动 mvn 构建，耗时较长）
-powershell -ExecutionPolicy Bypass -File .\tools\start-all.ps1
+# 2. 启动基础设施：Nacos + RocketMQ + 发布配置（首次约 1-2 分钟，之后已在跑会自动跳过）
+powershell -ExecutionPolicy Bypass -File .\tools\start-infra.ps1
 
-# 3. 停止全部
+# 3. 启动后端 Java 进程 + 前端（首次会自动 mvn 构建，较慢；日常用 -SkipBuild）
+powershell -ExecutionPolicy Bypass -File .\tools\start-app.ps1 -SkipBuild
+
+# 4. 停止全部
 powershell -ExecutionPolicy Bypass -File .\tools\stop-all.ps1
 ```
 
-也可以双击 `tools\start-all.bat` 启动（保留命令行窗口，按任意键退出）。
+也可以双击 `tools\start-all.bat` 一键启动全部（保留命令行窗口，按任意键退出）。
 
-## 常用参数（start-all.ps1）
+## 常用参数
+
+### start-app.ps1（后端 + 前端）
 
 | 参数 | 作用 |
 | --- | --- |
 | `-SkipBuild` | 跳过 `mvn clean install`（二次启动更快） |
-| `-InfraOnly` | 只启动 Nacos/RocketMQ 并发布配置，不启服务 |
-| `-SkipInfra` | 假设基础设施已启动，只启后端+前端 |
-| `-Service ai-cs-user` | 只启动单个后端服务（配合 `-SkipInfra -SkipBuild` 用于重启单个服务） |
+| `-Service ai-cs-user` | 只启动单个后端服务（配合 `-SkipBuild` 用于重启单个服务） |
 | `-NoFrontend` | 不启动前端 |
 
-脚本是**幂等**的：已在监听的端口会自动跳过，重复执行安全。
+### start-all.ps1（一键全部）
+
+| 参数 | 作用 |
+| --- | --- |
+| `-SkipBuild` / `-NoFrontend` / `-Service xxx` | 原样透传给 start-app.ps1 |
+
+脚本是**幂等**的：已在监听的端口会自动跳过，重复执行安全。日常节奏建议：基础设施只在首次或变更时执行 `start-infra.ps1`；改后端代码后直接跑 `start-app.ps1 -SkipBuild` 即可。
 
 ## 换机部署步骤（另一台电脑）
 

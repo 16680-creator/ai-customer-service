@@ -1,4 +1,5 @@
 package com.aics.chat.agent.state;
+import org.springframework.stereotype.Component;
 
 import java.util.EnumMap;
 import java.util.Map;
@@ -10,6 +11,7 @@ import java.util.Set;
  * <p>纯 Java 实现（无 Spring 依赖），便于单元测试。迁移规则集中管理，
  * 非法的状态迁移一律拒绝，保证写操作强约束。</p>
  */
+@Component
 public class AgentStateMachine {
 
     /** 状态迁移表：from → 允许的 to 集合 */

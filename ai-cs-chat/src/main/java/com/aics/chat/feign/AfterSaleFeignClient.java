@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 /**
  * 订单服务售后 Feign 客户端（调用 ai-cs-order 的售后命令）
  */
-@FeignClient(name = "ai-cs-order")
+@FeignClient(name = "ai-cs-order", contextId = "afterSale")
 public interface AfterSaleFeignClient {
 
     /**
