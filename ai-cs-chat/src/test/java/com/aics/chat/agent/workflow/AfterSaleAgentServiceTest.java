@@ -123,7 +123,8 @@ class AfterSaleAgentServiceTest {
                 intentClassifierService, stateMachine, registry, runStore,
                 new ConfirmationService(properties, new ObjectMapper()), traceRecorder,
                 orderLocatorTool, policyCheckTool, productRecommendTool,
-                createAfterSaleTool, handoffTool);
+                createAfterSaleTool, handoffTool,
+                io.micrometer.observation.ObservationRegistry.create());
 
         when(orderFeignClient.listOrders(1L)).thenReturn(Result.success(List.of(paidOrder)));
         when(intentClassifierService.classify(anyString())).thenReturn(
