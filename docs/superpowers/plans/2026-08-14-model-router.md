@@ -1162,6 +1162,7 @@ import io.micrometer.observation.ObservationRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
@@ -1224,6 +1225,8 @@ class ResilientAiServiceRoutingTest {
                         .fallbackChain(List.of("siliconflow-qwen3-32b"))
                         .reason(RouteReason.PRIMARY_UNAVAILABLE)
                         .build());
+        when(primary.getChatClient().prompt().messages(any()).call().chatResponse())
+                .thenThrow(new RuntimeException("primary down"));
         ChatResponse response = chatResponse("backup answer");
         when(fallback.getChatClient().prompt().messages(any()).call().chatResponse()).thenReturn(response);
 
@@ -1243,9 +1246,8 @@ class ResilientAiServiceRoutingTest {
     }
 
     private static ChatResponse chatResponse(String text) {
-        Generation generation = new Generation(text);
-        ChatResponse response = ChatResponse.builder().generations(List.of(generation)).build();
-        return response;
+        Generation generation = new Generation(new AssistantMessage(text));
+        return ChatResponse.builder().generations(List.of(generation)).build();
     }
 }
 ```
