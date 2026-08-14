@@ -1,8 +1,9 @@
 package com.aics.chat.rag.eval;
 
+import com.aics.chat.modelrouter.ModelScenario;
+import com.aics.chat.modelrouter.RoutedChatClientFactory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -52,7 +53,7 @@ public class LlmJudgeService implements RagAnswerJudge {
     /** 最近一次打分的总 Token（线程内传递，评估门禁读取） */
     private static final ThreadLocal<Integer> LAST_TOTAL_TOKENS = new ThreadLocal<>();
 
-    private final ChatClient chatClient;
+    private final RoutedChatClientFactory routedChatClientFactory;
 
     @Override
     public Integer score(String question, String answer, String referenceAnswer) {
@@ -70,8 +71,9 @@ public class LlmJudgeService implements RagAnswerJudge {
                     AI 回答：%s
                     参考答案：%s
                     """.formatted(question, answer, referenceAnswer == null ? "（无）" : referenceAnswer);
-            org.springframework.ai.chat.model.ChatResponse response = chatClient.prompt().system(
-                            "你是严谨的 RAG 质量评估员，只输出 1-5 的整数分数。")
+            org.springframework.ai.chat.model.ChatResponse response = routedChatClientFactory.chatClientFor(ModelScenario.JUDGE)
+                    .prompt()
+                    .system("你是严谨的 RAG 质量评估员，只输出 1-5 的整数分数。")
                     .user(prompt)
                     .call()
                     .chatResponse();

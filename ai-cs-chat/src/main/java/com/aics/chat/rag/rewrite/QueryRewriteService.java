@@ -1,10 +1,11 @@
 package com.aics.chat.rag.rewrite;
 
+import com.aics.chat.modelrouter.ModelScenario;
+import com.aics.chat.modelrouter.RoutedChatClientFactory;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -76,7 +77,7 @@ public class QueryRewriteService {
     private static final int MAX_SUB_QUERY_LENGTH = 200;
     private static final int MAX_HYDE_LENGTH = 800;
 
-    private final ChatClient chatClient;
+    private final RoutedChatClientFactory routedChatClientFactory;
     private final ObjectMapper objectMapper;
 
     /**
@@ -117,11 +118,12 @@ public class QueryRewriteService {
 
                     用户问题：%s
                     """.formatted(3, question);
-            String content = chatClient.prompt().system(
-                            "你是检索查询优化专家，只输出指定 JSON。")
+            String content = routedChatClientFactory.chatClientFor(ModelScenario.REWRITE)
+                    .prompt()
+                    .system("你是检索查询优化专家，只输出指定 JSON。")
                     .user(prompt)
                     .call()
-                    .content();   // 同步调用 DeepSeek（经 ChatClient）
+                    .content();
             result.setSubQueries(parseSubQueries(content));   // 解析并去重子查询
             result.setHydeDocument(parseHyde(content));       // 提取 HyDE 假设文档
             log.info("查询改写完成: question={}, subQueries={}, hyde={}",

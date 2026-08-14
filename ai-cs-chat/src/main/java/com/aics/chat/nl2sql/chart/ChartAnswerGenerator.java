@@ -1,8 +1,9 @@
 package com.aics.chat.nl2sql.chart;
 
+import com.aics.chat.modelrouter.ModelScenario;
+import com.aics.chat.modelrouter.RoutedChatClientFactory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -63,7 +64,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class ChartAnswerGenerator {
 
-    private final ChatClient chatClient;
+    private final RoutedChatClientFactory routedChatClientFactory;
 
     /**
      * 生成问数回答。
@@ -107,7 +108,9 @@ public class ChartAnswerGenerator {
                     用户问题：%s
                     查询结果（JSON 数组）：%s
                     """.formatted(question, rows);
-            String content = chatClient.prompt().system("你是数据分析师，只输出结论。")
+            String content = routedChatClientFactory.chatClientFor(ModelScenario.CHART)
+                    .prompt()
+                    .system("你是数据分析师，只输出结论。")
                     .user(prompt)
                     .call()
                     .content();

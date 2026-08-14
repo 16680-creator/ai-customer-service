@@ -1,5 +1,7 @@
 package com.aics.chat.nl2sql.chart;
 
+import com.aics.chat.modelrouter.ModelScenario;
+import com.aics.chat.modelrouter.RoutedChatClientFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -21,12 +23,15 @@ import static org.mockito.Mockito.when;
 class ChartAnswerGeneratorTest {
 
     private ChatClient chatClient;
+    private RoutedChatClientFactory routedChatClientFactory;
     private ChartAnswerGenerator generator;
 
     @BeforeEach
     void setUp() {
         chatClient = mock(ChatClient.class, RETURNS_DEEP_STUBS);
-        generator = new ChartAnswerGenerator(chatClient);
+        routedChatClientFactory = mock(RoutedChatClientFactory.class);
+        when(routedChatClientFactory.chatClientFor(ModelScenario.CHART)).thenReturn(chatClient);
+        generator = new ChartAnswerGenerator(routedChatClientFactory);
     }
 
     private Map<String, Object> row(String k1, Object v1, String k2, Object v2) {

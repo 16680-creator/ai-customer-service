@@ -1,5 +1,7 @@
 package com.aics.chat.rag.rewrite;
 
+import com.aics.chat.modelrouter.ModelScenario;
+import com.aics.chat.modelrouter.RoutedChatClientFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -18,12 +20,15 @@ import static org.mockito.Mockito.when;
 class QueryRewriteServiceTest {
 
     private ChatClient chatClient;
+    private RoutedChatClientFactory routedChatClientFactory;
     private QueryRewriteService service;
 
     @BeforeEach
     void setUp() {
         chatClient = mock(ChatClient.class, RETURNS_DEEP_STUBS);
-        service = new QueryRewriteService(chatClient, new ObjectMapper());
+        routedChatClientFactory = mock(RoutedChatClientFactory.class);
+        when(routedChatClientFactory.chatClientFor(ModelScenario.REWRITE)).thenReturn(chatClient);
+        service = new QueryRewriteService(routedChatClientFactory, new ObjectMapper());
     }
 
     @Test
