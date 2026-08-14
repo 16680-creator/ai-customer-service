@@ -72,6 +72,35 @@ class TraceSpanObservationHandlerTest {
     }
 
     @Test
+    @DisplayName("onStop 组装路由观测字段")
+    void onStop_assemblesRouteFields() {
+        properties.setLogExport(false);
+        ObservabilityProperties props = new ObservabilityProperties();
+        props.setEnabled(true);
+        props.setSampleRate(1.0);
+        TraceContext ctx = TraceContextHolder.begin(props, 1L, "s1", "chat");
+        ObservationRegistry registry = newRegistry();
+
+        Observation.createNotStarted("chat.llm", registry)
+                .lowCardinalityKeyValue("span.type", "LLM")
+                .lowCardinalityKeyValue("provider", "deepseek")
+                .lowCardinalityKeyValue("model", "deepseek-chat")
+                .highCardinalityKeyValue("modelId", "deepseek-chat")
+                .highCardinalityKeyValue("routeReason", "PRIMARY_UNAVAILABLE")
+                .highCardinalityKeyValue("fallbackFrom", "deepseek-chat")
+                .highCardinalityKeyValue("attempt", "2")
+                .observe(() -> {
+                });
+
+        TraceSpan span = ctx.getSpans().get(0);
+        assertEquals("deepseek-chat", span.getModelId());
+        assertEquals("PRIMARY_UNAVAILABLE", span.getRouteReason());
+        assertEquals("deepseek-chat", span.getFallbackFrom());
+        assertEquals(2, span.getAttempt());
+        TraceContextHolder.clear();
+    }
+
+    @Test
     @DisplayName("当前线程无 TraceContext 时 handler 跳过（埋点零开销）")
     void onStop_noContext_skips() {
         properties.setLogExport(false);

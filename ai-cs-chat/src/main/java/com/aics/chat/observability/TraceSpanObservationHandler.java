@@ -58,6 +58,10 @@ public class TraceSpanObservationHandler implements ObservationHandler<Observati
         span.setPromptTokens(intOf(high(context, "promptTokens")));
         span.setCompletionTokens(intOf(high(context, "completionTokens")));
         span.setRetries(intOf(high(context, "retries")));
+        span.setModelId(high(context, "modelId"));
+        span.setRouteReason(high(context, "routeReason"));
+        span.setFallbackFrom(high(context, "fallbackFrom"));
+        span.setAttempt(intOf(high(context, "attempt")));
         span.setDetail(high(context, "detail"));
 
         // 错误处理：observation.error(e) 写入的异常

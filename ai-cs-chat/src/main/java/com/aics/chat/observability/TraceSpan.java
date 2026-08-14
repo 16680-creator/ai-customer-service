@@ -39,6 +39,18 @@ public class TraceSpan {
     /** 重试次数 */
     private Integer retries;
 
+    /** 路由选中的模型注册表 ID（如 deepseek-chat） */
+    private String modelId;
+
+    /** 路由原因（SCENARIO_DEFAULT / PRIMARY_UNAVAILABLE / QUOTA_DOWNGRADE / ...） */
+    private String routeReason;
+
+    /** 降级前一个模型 ID（首次调用为空） */
+    private String fallbackFrom;
+
+    /** 本次路由中的第几次尝试（从 1 开始） */
+    private Integer attempt;
+
     /** 状态：SUCCESS / FAILED / SKIPPED */
     private String status = "SUCCESS";
 
