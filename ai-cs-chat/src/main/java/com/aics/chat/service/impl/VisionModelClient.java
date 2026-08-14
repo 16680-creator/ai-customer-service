@@ -1,12 +1,19 @@
 package com.aics.chat.service.impl;
 
 import com.aics.chat.config.VisionProperties;
+import com.aics.chat.observability.ModelUsageRecorder;
+import com.aics.chat.observability.TraceContext;
+import com.aics.chat.observability.TraceContextHolder;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
 import io.github.resilience4j.timelimiter.annotation.TimeLimiter;
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.metadata.Usage;
+import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.content.Media;
 import org.springframework.ai.openai.OpenAiChatModel;
@@ -77,12 +84,24 @@ import java.util.concurrent.CompletionException;
 public class VisionModelClient {
 
     private final VisionProperties visionProperties;
+    private final ObservationRegistry observationRegistry;
+    private final ModelUsageRecorder modelUsageRecorder;
+
+    /** 场景：图片理解（vision） */
+    private static final String SCENARIO_VISION = "vision";
+
+    /** 视觉模型供应商（硅基流动） */
+    private static final String PROVIDER = "siliconflow";
 
     /** 视觉模型（懒初始化，enabled 且配置 apiKey 时才构造） */
     private volatile OpenAiChatModel visionModel;
 
-    public VisionModelClient(VisionProperties visionProperties) {
+    public VisionModelClient(VisionProperties visionProperties,
+                             ObservationRegistry observationRegistry,
+                             ModelUsageRecorder modelUsageRecorder) {
         this.visionProperties = visionProperties;
+        this.observationRegistry = observationRegistry;
+        this.modelUsageRecorder = modelUsageRecorder;
     }
 
     /**
@@ -130,9 +149,16 @@ public class VisionModelClient {
     @Retry(name = "visionService", fallbackMethod = "fallbackDescribe")
     @CircuitBreaker(name = "visionService", fallbackMethod = "fallbackDescribe")
     public CompletableFuture<String> describeAsync(String imageUrl) {
+        // 跨异步边界捕获 TraceContext（视觉调用在独立线程执行）
+        // 学习点：与 ResilientAiService 相同的异步传播模式——capture 在调用线程、
+        // restore 在 supplyAsync 内，保证视觉 span 归属正确的请求上下文；
+        // 视觉调用与文本 LLM 调用分属不同模型通道（Qwen-VL vs DeepSeek），
+        // 但都统一走 LLM span 类型 + scenario=vision 区分，trace 图上能看清"两段式"编排
+        TraceContext captured = TraceContextHolder.capture();
         // supplyAsync：把阻塞的视觉模型调用丢到独立线程执行，
         // 返回 Future 供 @TimeLimiter 通过 Future.get(timeout) 实现 5s 超时控制
         return CompletableFuture.supplyAsync(() -> {
+            TraceContextHolder.restore(captured);
             try {
                 if (visionModel == null) {
                     // 视觉模型未初始化（未启用/未配 API Key）→ 抛异常触发降级
@@ -147,19 +173,46 @@ public class VisionModelClient {
                         .text("请描述这张图片中的关键信息（文字、型号、错误码、页面状态等），用简洁的中文概括。")
                         .media(new Media(MimeTypeUtils.IMAGE_PNG, URI.create(imageUrl)))
                         .build();
-                // call(...)：发起视觉模型调用
-                //   .getResult()：拿到完整结果
-                //   .getOutput()：拿到消息输出
-                //   .getText()：提取纯文本描述
-                String description = visionModel.call(new Prompt(List.of(userMessage)))
-                        .getResult()
-                        .getOutput()
-                        .getText();
-                log.info("视觉理解完成: 描述长度={}", description == null ? 0 : description.length());
-                return description;
+                // LLM 环节观测（scenario=vision）+ Token/费用计量
+                Observation observation = Observation.createNotStarted("chat.vision", observationRegistry)
+                        .lowCardinalityKeyValue("span.type", "LLM")
+                        .lowCardinalityKeyValue("provider", PROVIDER)
+                        .lowCardinalityKeyValue("model", visionProperties.getModel())
+                        .highCardinalityKeyValue("scenario", SCENARIO_VISION)
+                        .start();
+                try {
+                    // call(...)：发起视觉模型调用
+                    //   .getResult()：拿到完整结果
+                    //   .getOutput()：拿到消息输出
+                    //   .getText()：提取纯文本描述
+                    ChatResponse response = visionModel.call(new Prompt(List.of(userMessage)));
+                    String description = response == null || response.getResult() == null
+                            ? null : response.getResult().getOutput().getText();
+                    Usage usage = response == null || response.getMetadata() == null
+                            ? null : response.getMetadata().getUsage();
+                    if (usage != null) {
+                        observation.highCardinalityKeyValue("promptTokens", String.valueOf(usage.getPromptTokens()))
+                                .highCardinalityKeyValue("completionTokens", String.valueOf(usage.getCompletionTokens()));
+                    }
+                    modelUsageRecorder.record(SCENARIO_VISION, PROVIDER, visionProperties.getModel(),
+                            usage == null ? null : usage.getPromptTokens(),
+                            usage == null ? null : usage.getCompletionTokens(),
+                            "SUCCESS", null);
+                    log.info("视觉理解完成: 描述长度={}", description == null ? 0 : description.length());
+                    return description;
+                } catch (Exception e) {
+                    observation.error(e);
+                    modelUsageRecorder.record(SCENARIO_VISION, PROVIDER, visionProperties.getModel(),
+                            null, null, "FAILED", e.getMessage());
+                    throw e;
+                } finally {
+                    observation.stop();
+                }
             } catch (Exception e) {
                 // 包装为 CompletionException，供外层 Future.get 解包与重试判定
                 throw new CompletionException(e);
+            } finally {
+                TraceContextHolder.clear();
             }
         });
     }

@@ -19,7 +19,7 @@ import java.util.Map;
 /**
  * 消息服务 Agent 轨迹 Feign 客户端（调用 ai-cs-message 持久化执行轨迹与工单）
  */
-@FeignClient(name = "ai-cs-message")
+@FeignClient(name = "ai-cs-message", contextId = "agentTrace")
 public interface AgentTraceFeignClient {
 
     /**

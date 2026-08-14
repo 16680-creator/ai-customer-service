@@ -16,7 +16,8 @@ class IntentEvalServiceTest {
     @Test
     void 固定数据集MacroF1不低于090() {
         IntentClassifierService classifier = new IntentClassifierService(
-                new AgentProperties(), null, new ObjectMapper());
+                new AgentProperties(), null, new ObjectMapper(),
+                io.micrometer.observation.ObservationRegistry.create());
         IntentEvalService evalService = new IntentEvalService(classifier);
         IntentEvalService.EvalReport report = evalService.evaluate();
         assertEquals(24, report.sampleCount());

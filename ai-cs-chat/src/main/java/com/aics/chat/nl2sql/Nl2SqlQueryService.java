@@ -1,7 +1,9 @@
 package com.aics.chat.nl2sql;
 
+import com.aics.chat.observability.TraceSpans;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import io.micrometer.observation.ObservationRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
@@ -127,8 +129,12 @@ public class Nl2SqlQueryService {
 
     private final ObjectMapper objectMapper;
 
-    public Nl2SqlQueryService(Map<String, JdbcTemplate> nl2SqlJdbcTemplates) {
+    private final ObservationRegistry observationRegistry;
+
+    public Nl2SqlQueryService(Map<String, JdbcTemplate> nl2SqlJdbcTemplates,
+                              ObservationRegistry observationRegistry) {
         this.jdbcTemplates = nl2SqlJdbcTemplates;
+        this.observationRegistry = observationRegistry;
         // 日期序列化为可读字符串（默认 Timestamp 序列化成时间戳数字，不利于 AI 阅读）
         this.objectMapper = new ObjectMapper()
                 .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
@@ -168,6 +174,21 @@ public class Nl2SqlQueryService {
             @ToolParam(description = "数据库标识：user / product / order / chat / knowledge") String database,
             @ToolParam(description = "只读SELECT查询语句，如：SELECT * FROM orders WHERE status='PAID' LIMIT 10") String sql) {
 
+        // 工具环节观测（scenario=nl2sql）：工具名、参数摘要、结果状态、耗时
+        // SQL 摘要化（截断 + 防敏感），不落明文完整 SQL
+        // 学习点：SQL 里可能带手机号/订单号等 PII，trace 数据可能导出第三方平台，
+        // 故只留 200 字符内的摘要——可观测与数据安全在这里是同一件事的两面
+        String sqlDigest = sql == null ? "" : sql.replaceAll("\\s+", " ").trim();
+        if (sqlDigest.length() > 200) {
+            sqlDigest = sqlDigest.substring(0, 200) + "...";
+        }
+        return TraceSpans.observeReturn(observationRegistry, "TOOL", "nl2sql.query",
+                Map.of("tool", "executeReadOnlyQuery", "database", database == null ? "" : database),
+                Map.of("detail", sqlDigest),
+                () -> doExecute(database, sql));
+    }
+
+    private String doExecute(String database, String sql) {
         // 1. 数据源校验
         JdbcTemplate jdbc = database == null ? null : jdbcTemplates.get(database.trim().toLowerCase());
         if (jdbc == null) {

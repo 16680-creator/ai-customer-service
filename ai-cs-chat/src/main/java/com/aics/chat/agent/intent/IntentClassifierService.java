@@ -5,9 +5,11 @@ import com.aics.chat.agent.model.AgentIntent;
 import com.aics.chat.agent.model.AgentIntentType;
 import com.aics.chat.agent.model.IntentResult;
 import com.aics.chat.agent.model.SentimentType;
+import com.aics.chat.observability.TraceSpans;
 import com.aics.chat.service.impl.ResilientAiService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.observation.ObservationRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -34,6 +36,7 @@ public class IntentClassifierService {
     private final AgentProperties properties;
     private final ResilientAiService resilientAiService;
     private final ObjectMapper objectMapper;
+    private final ObservationRegistry observationRegistry;
 
     /** 售后关键词 */
     private static final List<String> AFTER_SALE_KEYWORDS = List.of(
@@ -59,9 +62,20 @@ public class IntentClassifierService {
     private static final Pattern ACTION_PATTERN = Pattern.compile("(换货|退货|退款)");
 
     /**
-     * 意图分类入口
+     * 意图分类入口（计入 LLM 调用链观测：intent span——类型、置信度、路由结果）
+     *
+     * <p>学习点：意图识别是 Agent 链路的第一环，把它计入 trace 的意义在于——
+     * 当 Agent 行为不符合预期时（该走售后却走了普通对话），可以先看 intent span
+     * 的置信度与降级路径（LLM 还是规则兜底），快速定位是"识别错了"还是"下游处理错了"。</p>
      */
     public IntentResult classify(String input) {
+        return TraceSpans.observeReturn(observationRegistry, "INTENT", "agent.intent",
+                Map.of(),
+                Map.of("detail", input == null ? "" : input),
+                () -> doClassify(input));
+    }
+
+    private IntentResult doClassify(String input) {
         // 开启 LLM 意图识别时优先走 LLM 路径
         if (properties.isLlmIntentEnabled()) {
             try {

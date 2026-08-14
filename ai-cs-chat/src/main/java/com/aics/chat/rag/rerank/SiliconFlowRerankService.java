@@ -1,6 +1,10 @@
 package com.aics.chat.rag.rerank;
 
+import com.aics.chat.observability.TraceContext;
+import com.aics.chat.observability.TraceContextHolder;
+import com.aics.chat.observability.TraceSpans;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.micrometer.observation.ObservationRegistry;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,6 +18,7 @@ import reactor.core.scheduler.Schedulers;
 import java.time.Duration;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 基于硅基流动（SiliconFlow）Rerank API 的重排序服务实现。
@@ -90,6 +95,9 @@ public class SiliconFlowRerankService implements RerankService {
      */
     private final RestClient.Builder restClientBuilder;
 
+    /** Observation 注册表（rerank 环节 span 埋点） */
+    private final ObservationRegistry observationRegistry;
+
     /**
      * 【AI 核心】异步执行 Rerank 调用，超时/异常时降级返回空 Mono。
      *
@@ -123,9 +131,26 @@ public class SiliconFlowRerankService implements RerankService {
             log.info("Rerank降级: apiKey为空或无待重排文档");
             return Mono.empty();
         }
+        // 跨异步边界捕获 TraceContext（Rerank 在弹性线程池执行，ThreadLocal 需显式传播）
+        TraceContext captured = TraceContextHolder.capture();
         // 注意：fromCallable 的 callable 在订阅线程同步执行，必须 subscribeOn 到弹性线程池，
         // 否则 timeout 计时器要等阻塞调用完成后才启动，超时配置不会生效
-        return Mono.fromCallable(() -> doRerank(query, documents, topN))
+        return Mono.fromCallable(() -> {
+                    // 恢复 TraceContext 并记录 rerank 环节 span（模型、前后排序、耗时）
+                    // 学习点：rerank 是"可选增强"——失败降级为向量排序，因此观测也要
+                    // 遵循同样的降级哲学：span 记录真实执行结果（成功/降级），
+                    // 但绝不因观测问题反过来阻断 rerank 或主链路
+                    TraceContextHolder.restore(captured);
+                    try {
+                        return TraceSpans.observeReturn(observationRegistry, "RERANK", "rag.rerank",
+                                Map.of("model", properties.getModel()),
+                                Map.of("beforeCount", String.valueOf(documents.size()),
+                                        "query", query == null ? "" : query),
+                                () -> doRerank(query, documents, topN));
+                    } finally {
+                        TraceContextHolder.clear();
+                    }
+                })
                 .subscribeOn(Schedulers.boundedElastic())
                 .timeout(Duration.ofMillis(properties.getTimeoutMs()))
                 .onErrorResume(e -> {

@@ -47,7 +47,8 @@ class SiliconFlowRerankServiceTest {
 
         RestClient.Builder builder = RestClient.builder();
         server = MockRestServiceServer.bindTo(builder).build();
-        service = new SiliconFlowRerankService(properties, builder);
+        service = new SiliconFlowRerankService(properties, builder,
+                io.micrometer.observation.ObservationRegistry.create());
     }
 
     private List<Document> sampleDocuments() {

@@ -3,6 +3,10 @@ package com.aics.chat.service.impl;
 import com.aics.chat.dto.ChatHistoryMessage;
 import com.aics.chat.dto.ChatRagResponseDTO;
 import com.aics.chat.dto.CitationItemDTO;
+import com.aics.chat.observability.OnlineEvalService;
+import com.aics.chat.observability.TraceContext;
+import com.aics.chat.observability.TraceContextHolder;
+import com.aics.chat.observability.TraceSpans;
 import com.aics.chat.service.ChatHistoryService;
 import com.aics.chat.service.ChatService;
 import com.aics.chat.service.KnowledgeBaseService;
@@ -13,6 +17,7 @@ import com.aics.chat.util.ChatUserContext;
 import com.aics.common.exception.BusinessException;
 import com.aics.common.result.Result;
 import com.aics.common.result.ResultCode;
+import io.micrometer.observation.ObservationRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -33,6 +38,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * AI 对话服务实现 —— 对话业务的核心编排层。
@@ -126,6 +132,8 @@ public class ChatServiceImpl implements ChatService {
     private final KnowledgeBaseService knowledgeBaseService;
     private final ChatHistoryService chatHistoryService;
     private final HybridRetriever hybridRetriever;
+    private final ObservationRegistry observationRegistry;
+    private final OnlineEvalService onlineEvalService;
 
     /** 最大历史消息数，超过时触发压缩 */
     private static final int MAX_HISTORY_SIZE = 20;
@@ -259,6 +267,10 @@ public class ChatServiceImpl implements ChatService {
             chatHistoryService.append(sessionId, "assistant", response);
             history.add(new AssistantMessage(response));
 
+            // answer 环节观测：回答长度 + 用户反馈闭环（线上采样评估）
+            recordAnswerSpan(sessionId, message, response, 0);
+            triggerOnlineEval(sessionId, message, response);
+
             log.info("对话完成: sessionId={}, responseLength={}", sessionId, response.length());
             return Result.success(response);
         } catch (ExecutionException e) {
@@ -338,6 +350,10 @@ public class ChatServiceImpl implements ChatService {
 
             // 从检索结果构建引用溯源列表（documentId/title/page/score/content），随回答返回前端
             List<CitationItemDTO> citations = buildCitations(docs);
+
+            // answer 环节观测：引用数 + 线上采样评估
+            recordAnswerSpan(sessionId, message, response, citations.size());
+            triggerOnlineEval(sessionId, message, response);
 
             log.info("RAG对话完成: sessionId={}, 检索命中{}条, 引用{}条", sessionId, docs.size(), citations.size());
             return Result.success(new ChatRagResponseDTO(response, citations));
@@ -533,21 +549,96 @@ public class ChatServiceImpl implements ChatService {
 
     /**
      * RAG 检索入口：纯向量 / Hybrid / 改写；增强失败自动降级纯向量。
+     * 检索环节计入 LLM 调用链观测（retrieval span：query、召回数、文档 ID、耗时）。
      */
     private List<Document> retrieveRagDocs(String knowledgeBase, String message, int topK, double threshold,
                                            boolean hybrid, boolean rewrite) {
-        if (!hybrid && !rewrite) {
-            return knowledgeBaseService.search(knowledgeBase, message, topK, threshold);
-        }
-        RetrievalMode mode = rewrite ? RetrievalMode.HYBRID_QUERY_REWRITE : RetrievalMode.HYBRID;
+        // retrieval 环节观测：query、召回数、文档 ID、耗时（handler 在 onStop 时组装 span）
+        io.micrometer.observation.Observation observation = io.micrometer.observation.Observation
+                .createNotStarted("rag.retrieval", observationRegistry)
+                .lowCardinalityKeyValue("span.type", "RETRIEVAL")
+                .lowCardinalityKeyValue("knowledgeBase", knowledgeBase == null ? "" : knowledgeBase)
+                .highCardinalityKeyValue("query", message)
+                .highCardinalityKeyValue("topK", String.valueOf(topK))
+                .highCardinalityKeyValue("hybrid", String.valueOf(hybrid))
+                .highCardinalityKeyValue("rewrite", String.valueOf(rewrite))
+                .start();
         try {
-            RetrieveResult result = hybridRetriever.retrieve(knowledgeBase, message, mode, topK);
-            log.info("RAG增强检索: sessionId=?, mode={}, degraded={}, hits={}",
-                    result.getMode(), result.isDegraded(), result.getDocuments().size());
-            return result.getDocuments();
+            List<Document> docs;
+            if (!hybrid && !rewrite) {
+                docs = knowledgeBaseService.search(knowledgeBase, message, topK, threshold);
+            } else {
+                RetrievalMode mode = rewrite ? RetrievalMode.HYBRID_QUERY_REWRITE : RetrievalMode.HYBRID;
+                try {
+                    RetrieveResult result = hybridRetriever.retrieve(knowledgeBase, message, mode, topK);
+                    log.info("RAG增强检索: mode={}, degraded={}, hits={}",
+                            result.getMode(), result.isDegraded(), result.getDocuments().size());
+                    docs = result.getDocuments();
+                } catch (Exception e) {
+                    log.warn("RAG增强检索失败，降级纯向量: mode={}, err={}", mode, e.getMessage());
+                    docs = knowledgeBaseService.search(knowledgeBase, message, topK, threshold);
+                }
+            }
+            // 明细：召回数 + 命中文档 ID（截断，防敏感信息进 trace）
+            // 学习点：detail 只放文档 ID 而非文档全文——trace 数据可能被导出到第三方
+            // 追踪平台（Langfuse/Phoenix），文档全文属业务敏感内容，ID 足够还原检索路径
+            String docIds = docs.stream()
+                    .map(d -> String.valueOf(d.getMetadata().getOrDefault("documentId", d.getId())))
+                    .limit(20).collect(Collectors.joining(","));
+            observation.highCardinalityKeyValue("hitCount", String.valueOf(docs.size()))
+                    .highCardinalityKeyValue("detail", docIds);
+            return docs;
         } catch (Exception e) {
-            log.warn("RAG增强检索失败，降级纯向量: mode={}, err={}", mode, e.getMessage());
-            return knowledgeBaseService.search(knowledgeBase, message, topK, threshold);
+            // 检索异常也要标记观测失败：看板上能区分"检索没命中"与"检索报错"
+            observation.error(e);
+            throw e;
+        } finally {
+            observation.stop();
+        }
+    }
+
+    /**
+     * answer 环节观测：引用数、回答长度（安全检测结果由 Agent 链路另行记录）。
+     *
+     * <p>学习点：answer span 是调用链的"终点环"——docs/15 的链路模型里
+     * answer 记录"引用数、安全结果、用户反馈"，这里用空 Runnable 只为了
+     * 让 Observation 走完 start→stop 生命周期挂一个 ANSWER span；引用数/长度
+     * 是回答质量的基础信号（引用太少可能答非所问、回答过长可能啰嗦）。</p>
+     */
+    private void recordAnswerSpan(String sessionId, String question, String answer, int citationCount) {
+        TraceSpans.observe(observationRegistry, "ANSWER", "chat.answer",
+                Map.of(),
+                Map.of("citationCount", String.valueOf(citationCount),
+                        "answerLength", String.valueOf(answer == null ? 0 : answer.length())),
+                () -> {
+                });
+    }
+
+    /**
+     * 线上采样评估触发：对本次真实回答异步执行 LLM-as-Judge 评分（未命中采样则跳过）。
+     *
+     * <p>学习点：这里把"线上真实回答"交给评估服务——与离线 golden 集评估不同，
+     * 线上评估直接拿用户实际收到的回答打分，能发现 golden 集覆盖不到的长尾质量问题；
+     * 采样判定在 OnlineEvalService 内部完成，对调用方透明。</p>
+     */
+    private void triggerOnlineEval(String sessionId, String question, String answer) {
+        TraceContext trace = TraceContextHolder.current();
+        onlineEvalService.evaluateAsync(
+                trace == null ? null : trace.getRequestId(),
+                parseSessionId(sessionId),
+                trace == null ? null : trace.getUserId(),
+                question, answer);
+    }
+
+    /** 字符串 sessionId 转 Long（非数字返回 null，Agent 流程的 Long 会话 ID 不受影响） */
+    private static Long parseSessionId(String sessionId) {
+        if (!StringUtils.hasText(sessionId)) {
+            return null;
+        }
+        try {
+            return Long.valueOf(sessionId.trim());
+        } catch (NumberFormatException e) {
+            return null;
         }
     }
 

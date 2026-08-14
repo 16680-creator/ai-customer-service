@@ -25,11 +25,13 @@ import com.aics.chat.agent.tool.PolicyCheckTool;
 import com.aics.chat.agent.tool.ProductRecommendTool;
 import com.aics.chat.agent.tool.ToolResult;
 import com.aics.chat.agent.trace.AgentTraceRecorder;
+import com.aics.chat.observability.TraceSpans;
 import com.aics.chat.dto.AfterSaleApplyVO;
 import com.aics.chat.dto.OrderVO;
 import com.aics.chat.dto.ProductRecommendVO;
 import com.aics.common.exception.BusinessException;
 import com.aics.common.result.ResultCode;
+import io.micrometer.observation.ObservationRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -41,6 +43,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 /**
  * 售后 Agent 编排器：显式状态机驱动的多轮执行。
@@ -72,6 +75,7 @@ public class AfterSaleAgentService {
     private final ProductRecommendTool productRecommendTool;
     private final CreateAfterSaleTool createAfterSaleTool;
     private final HandoffTool handoffTool;
+    private final ObservationRegistry observationRegistry;
 
     // ==================== 对外入口 ====================
 
@@ -268,7 +272,9 @@ public class AfterSaleAgentService {
     private void locateOrder(AfterSaleContext ctx) {
         long t0 = System.currentTimeMillis();
         // 定位订单：唯一命中/多候选/无订单三态
-        ToolResult result = orderLocatorTool.locate(ctx.getPendingOrderNo());
+        ToolResult result = runTool(AgentStateMachine.TOOL_ORDER_LOCATOR,
+                traceRecorder.digest(ctx.getPendingOrderNo()),
+                () -> orderLocatorTool.locate(ctx.getPendingOrderNo()));
         traceRecorder.step(ctx, "LOCATE_ORDER", AgentStateMachine.TOOL_ORDER_LOCATOR,
                 traceRecorder.digest(ctx.getPendingOrderNo()), result.message(),
                 System.currentTimeMillis() - t0, result.isFail() ? "FAILED" : "SUCCESS", null);
@@ -305,7 +311,9 @@ public class AfterSaleAgentService {
         ctx.setActionType(actionType);
         long t0 = System.currentTimeMillis();
         // 按动作类型与订单时间做规则资格校验
-        PolicyCheckResult policy = policyCheckTool.check(actionType, ctx.getOrder().getCreateTime());
+        PolicyCheckResult policy = runTool(AgentStateMachine.TOOL_POLICY_CHECK,
+                traceRecorder.digest(actionType.getCode()),
+                () -> policyCheckTool.check(actionType, ctx.getOrder().getCreateTime()));
         traceRecorder.step(ctx, "CHECK_POLICY", AgentStateMachine.TOOL_POLICY_CHECK,
                 traceRecorder.digest(actionType.getCode()), summarizePolicy(policy),
                 System.currentTimeMillis() - t0, "SUCCESS", null);
@@ -377,7 +385,9 @@ public class AfterSaleAgentService {
         ToolResult result = null;
         for (int i = 0; i <= retries; i++) {
             long t0 = System.currentTimeMillis();
-            result = createAfterSaleTool.create(ctx.getActionPlan(), ctx.getRunId());
+            result = runTool(AgentStateMachine.TOOL_CREATE_AFTER_SALE,
+                    traceRecorder.digest(ctx.getRunId() + ":" + ctx.getActionPlan().actionType().getCode()),
+                    () -> createAfterSaleTool.create(ctx.getActionPlan(), ctx.getRunId()));
             traceRecorder.step(ctx, "EXECUTE", AgentStateMachine.TOOL_CREATE_AFTER_SALE,
                     traceRecorder.digest(ctx.getRunId() + ":" + ctx.getActionPlan().actionType().getCode()),
                     result.message(), System.currentTimeMillis() - t0,
@@ -402,6 +412,28 @@ public class AfterSaleAgentService {
         }
     }
 
+    // ==================== 工具执行观测 ====================
+
+    /**
+     * 执行工具并记录 TOOL 环节 span（工具名、参数摘要、结果状态、耗时）。
+     * 与 AgentTraceRecorder 的审计轨迹互补：trace span 服务线上可观测，轨迹表服务审计回放。
+     *
+     * <p>学习点：为什么工具执行要"双写"？
+     * <ul>
+     *   <li><b>AgentTraceRecorder</b>（agent_step 表）：面向审计——业务字段齐全、
+     *       摘要化落库、可回放完整执行过程，是"合规留痕"；</li>
+     *   <li><b>TOOL span</b>（llm_trace.spans_json）：面向可观测——与 LLM/intent 等
+     *       其他环节在同一调用链上，回答"这一次请求各环节花了多久、谁慢了"。</li>
+     * </ul>
+     * 两者数据同源（工具调用），但消费场景不同，故分开存储。</p>
+     */
+    private <T> T runTool(String toolName, String inputDigest, Supplier<T> action) {
+        return TraceSpans.observeReturn(observationRegistry, "TOOL", "agent.tool." + toolName,
+                Map.of("tool", toolName),
+                Map.of("detail", inputDigest == null ? "" : inputDigest),
+                action);
+    }
+
     // ==================== 转人工 ====================
 
     /**
@@ -411,10 +443,12 @@ public class AfterSaleAgentService {
                                       String orderNo, String summary) {
         long t0 = System.currentTimeMillis();
         // 创建转人工工单（携带订单、情绪、摘要与已执行步骤）
-        ToolResult result = handoffTool.createHandoff(ctx.getRunId(), ctx.getSessionId(),
-                reason, priority, orderNo,
-                ctx.getIntentResult() == null ? null : ctx.getIntentResult().sentiment().name(),
-                summary, traceRecorder.executedStepsJson(ctx.getStepSummaries()));
+        ToolResult result = runTool(AgentStateMachine.TOOL_HANDOFF,
+                traceRecorder.digest(reason),
+                () -> handoffTool.createHandoff(ctx.getRunId(), ctx.getSessionId(),
+                        reason, priority, orderNo,
+                        ctx.getIntentResult() == null ? null : ctx.getIntentResult().sentiment().name(),
+                        summary, traceRecorder.executedStepsJson(ctx.getStepSummaries())));
         traceRecorder.step(ctx, "HANDOFF", AgentStateMachine.TOOL_HANDOFF,
                 traceRecorder.digest(reason), result.message(), System.currentTimeMillis() - t0,
                 result.isSuccess() ? "SUCCESS" : "FAILED", null);
@@ -466,7 +500,9 @@ public class AfterSaleAgentService {
     private void doRecommend(AfterSaleContext ctx, BigDecimal base, String keywords) {
         long t0 = System.currentTimeMillis();
         // 调用商品服务做同价位召回
-        ToolResult result = productRecommendTool.recommend(base, keywords, null);
+        ToolResult result = runTool(AgentStateMachine.TOOL_PRODUCT_RECOMMEND,
+                traceRecorder.digest(base.toPlainString() + (keywords == null ? "" : keywords)),
+                () -> productRecommendTool.recommend(base, keywords, null));
         traceRecorder.step(ctx, "RECOMMEND", AgentStateMachine.TOOL_PRODUCT_RECOMMEND,
                 traceRecorder.digest(base.toPlainString() + (keywords == null ? "" : keywords)),
                 result.message(), System.currentTimeMillis() - t0,

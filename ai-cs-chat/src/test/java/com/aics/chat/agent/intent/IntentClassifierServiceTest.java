@@ -33,7 +33,8 @@ class IntentClassifierServiceTest {
     private final AgentProperties properties = new AgentProperties();
 
     private IntentClassifierService newService() {
-        return new IntentClassifierService(properties, resilientAiService, new ObjectMapper());
+        return new IntentClassifierService(properties, resilientAiService, new ObjectMapper(),
+                io.micrometer.observation.ObservationRegistry.create());
     }
 
     @Test

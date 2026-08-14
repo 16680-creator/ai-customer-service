@@ -49,6 +49,9 @@ public class LlmJudgeService implements RagAnswerJudge {
 
     private static final Pattern NUMBER_PATTERN = Pattern.compile("\\d+(\\.\\d+)?");
 
+    /** 最近一次打分的总 Token（线程内传递，评估门禁读取） */
+    private static final ThreadLocal<Integer> LAST_TOTAL_TOKENS = new ThreadLocal<>();
+
     private final ChatClient chatClient;
 
     @Override
@@ -67,11 +70,15 @@ public class LlmJudgeService implements RagAnswerJudge {
                     AI 回答：%s
                     参考答案：%s
                     """.formatted(question, answer, referenceAnswer == null ? "（无）" : referenceAnswer);
-            String content = chatClient.prompt().system(
+            org.springframework.ai.chat.model.ChatResponse response = chatClient.prompt().system(
                             "你是严谨的 RAG 质量评估员，只输出 1-5 的整数分数。")
                     .user(prompt)
                     .call()
-                    .content();   // 复用 DeepSeek ChatClient 打分
+                    .chatResponse();
+            String content = response == null || response.getResult() == null
+                    ? null : response.getResult().getOutput().getText();
+            // 记录本次打分 Token 用量（供评估门禁计算单请求平均 Token）
+            recordTokenUsage(response);
             if (!StringUtils.hasText(content)) {
                 return null;
             }
@@ -85,5 +92,38 @@ public class LlmJudgeService implements RagAnswerJudge {
             log.warn("LLM Judge 打分失败，降级返回 null: err={}", e.getMessage());
             return null;
         }
+    }
+
+    @Override
+    public Integer lastTotalTokens() {
+        // 读取并清除线程内 Token 记录，避免跨用例污染
+        Integer tokens = LAST_TOTAL_TOKENS.get();
+        LAST_TOTAL_TOKENS.remove();
+        return tokens;
+    }
+
+    /**
+     * 记录最近一次打分的 Token 用量（从 ChatResponse 元数据读取 usage）。
+     * <p>非流式 {@code chatClient.call()} 返回的响应元数据携带 usage（prompt/completion tokens），
+     * 写入线程内供评估门禁读取；取不到时清空（返回 null）。</p>
+     *
+     * <p>学习点：为什么用 ThreadLocal 而不是返回值传递？
+     * {@link RagAnswerJudge#score} 接口签名只返回分数，改动签名会波及全部实现与 mock；
+     * 评估流程是单线程顺序执行的（一条用例打分完再打下一条），ThreadLocal 恰好
+     * 承担"方法间隐式传值"的角色——RagEvalServiceImpl 在 score() 之后读取，
+     * 读后即清，避免跨用例污染。这是接口稳定性与数据传递的务实折中。</p>
+     */
+    private void recordTokenUsage(org.springframework.ai.chat.model.ChatResponse response) {
+        try {
+            if (response != null && response.getMetadata() != null
+                    && response.getMetadata().getUsage() != null) {
+                int total = response.getMetadata().getUsage().getTotalTokens();
+                LAST_TOTAL_TOKENS.set(total);
+                return;
+            }
+        } catch (Exception e) {
+            log.debug("Judge Token 用量读取失败: {}", e.getMessage());
+        }
+        LAST_TOTAL_TOKENS.remove();
     }
 }

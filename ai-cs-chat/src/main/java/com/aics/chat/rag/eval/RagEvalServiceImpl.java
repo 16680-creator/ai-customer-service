@@ -79,6 +79,7 @@ public class RagEvalServiceImpl implements RagEvaluator {
     private final GoldenCaseLoader caseLoader;
     private final RagEvalDataSource dataSource;
     private final RagAnswerJudge answerJudge;
+    private final EvalGateConfig gateConfig;
 
     /**
      * 执行完整评估。
@@ -102,8 +103,13 @@ public class RagEvalServiceImpl implements RagEvaluator {
         int counted = 0;
         int llmCount = 0;
         int llmSum = 0;
+        // 门禁扩展：采集每用例耗时与 Token（spec：CI 门禁增加 P95 延迟与单请求平均 Token 上限）
+        List<Long> caseDurations = new ArrayList<>();
+        long tokenSum = 0;
+        int tokenCount = 0;
 
         for (GoldenCase c : cases) {
+            long caseStart = System.currentTimeMillis();
             // 知识库优先级：请求指定 > 用例自带 > 默认
             String caseKb = StringUtils.hasText(kb) ? kb : (StringUtils.hasText(c.getKnowledgeBase()) ? c.getKnowledgeBase() : "default");
             // 1) 检索：拿到命中文档（检索失败时 retrieveSafely 返回空，不中断评估）
@@ -137,7 +143,18 @@ public class RagEvalServiceImpl implements RagEvaluator {
                     llmSum += score;
                     llmCount++;
                 }
+                // 采集该用例 Judge 调用 Token（可空）
+                Integer tokens = answerJudge.lastTotalTokens();
+                if (tokens != null) {
+                    result.setTotalTokens(tokens);
+                    tokenSum += tokens;
+                    tokenCount++;
+                }
             }
+            // 采集该用例耗时（检索 + 打分）
+            long caseDuration = System.currentTimeMillis() - caseStart;
+            result.setDurationMs(caseDuration);
+            caseDurations.add(caseDuration);
             results.add(result);
         }
 
@@ -158,6 +175,9 @@ public class RagEvalServiceImpl implements RagEvaluator {
         report.setMetrics(overall);
         report.setAvgLlmScore(avgLlm);
         report.setCaseResults(results);
+        // 门禁扩展：P95 延迟与平均 Token
+        report.setP95LatencyMs(computeP95(caseDurations));
+        report.setAvgTokensPerRequest(tokenCount > 0 ? (double) tokenSum / tokenCount : null);
         report.setExecutedAt(Instant.now());
 
         boolean hitPass = request.getHitRateThreshold() == null
@@ -165,11 +185,39 @@ public class RagEvalServiceImpl implements RagEvaluator {
         boolean llmPass = request.getLlmScoreThreshold() == null
                 || avgLlm == null
                 || avgLlm >= request.getLlmScoreThreshold();
-        report.setPassed(hitPass && llmPass);
-        log.info("RAG 评估完成: evalId={}, mode={}, recall={}, mrr={}, hitRate={}, avgLlm={}, passed={}",
+        // 新增门禁：P95 延迟与平均 Token（阈值未配置的维度只记录不判定）
+        boolean p95Pass = gateConfig.getP95LatencyMs() == null
+                || report.getP95LatencyMs() == null
+                || report.getP95LatencyMs() <= gateConfig.getP95LatencyMs();
+        boolean tokenPass = gateConfig.getAvgTokensPerRequest() == null
+                || report.getAvgTokensPerRequest() == null
+                || report.getAvgTokensPerRequest() <= gateConfig.getAvgTokensPerRequest();
+        report.setPassed(hitPass && llmPass && p95Pass && tokenPass);
+        log.info("RAG 评估完成: evalId={}, mode={}, recall={}, mrr={}, hitRate={}, avgLlm={}, "
+                        + "p95LatencyMs={}, avgTokens={}, passed={}",
                 report.getEvalId(), request.getMode(), overall.getRecallAtK(), overall.getMrr(),
-                overall.getHitRate(), avgLlm, report.isPassed());
+                overall.getHitRate(), avgLlm, report.getP95LatencyMs(),
+                report.getAvgTokensPerRequest(), report.isPassed());
         return report;
+    }
+
+    /**
+     * 计算 P95 延迟（毫秒）：耗时升序排列后取 95% 分位；空列表返回 null。
+     *
+     * <p>学习点：P95 为什么比平均值更适合做延迟门禁？
+     * 平均值会被极端值拉偏（个别超时用例把均值抬高，掩盖"大多数请求其实很快"），
+     * 而 P95 表示"95% 的请求快于这个值"，直接对应绝大多数用户的真实体验；
+     * 这也是业界（Google SRE 等）用百分位而非均值定义 SLO 的原因。
+     * 取位算法：ceil(0.95*n)-1 保证至少 95% 的样本小于等于该值。</p>
+     */
+    private Long computeP95(List<Long> durations) {
+        if (durations == null || durations.isEmpty()) {
+            return null;
+        }
+        List<Long> sorted = new ArrayList<>(durations);
+        sorted.sort(Long::compareTo);
+        int idx = (int) Math.ceil(0.95 * sorted.size()) - 1;
+        return sorted.get(Math.max(0, idx));
     }
 
     /**

@@ -2,21 +2,31 @@ package com.aics.chat.service.impl;
 
 import com.aics.common.exception.BusinessException;
 import com.aics.common.result.ResultCode;
+import com.aics.chat.observability.ModelUsageRecorder;
+import com.aics.chat.observability.TraceContext;
+import com.aics.chat.observability.TraceContextHolder;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
 import io.github.resilience4j.timelimiter.annotation.TimeLimiter;
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.metadata.Usage;
+import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.SignalType;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * 弹性 AI 调用服务 —— 为 LLM 调用提供超时/重试/熔断/降级能力。
@@ -105,6 +115,20 @@ public class ResilientAiService {
 
     private final ChatClient chatClient;
     private final OpenAiChatModel chatModel;
+    private final ObservationRegistry observationRegistry;
+    private final ModelUsageRecorder modelUsageRecorder;
+
+    /** LLM 调用观测名（OTLP span 名） */
+    private static final String OBS_LLM = "chat.llm";
+
+    /** 场景：普通对话 */
+    private static final String SCENARIO_CHAT = "chat";
+
+    /** 场景：RAG 对话 */
+    private static final String SCENARIO_RAG = "rag";
+
+    /** 场景：摘要压缩 */
+    private static final String SCENARIO_SUMMARY = "summary";
 
     // ==================== 非流式调用（普通对话） ====================
 
@@ -130,18 +154,50 @@ public class ResilientAiService {
     @Retry(name = "chatService", fallbackMethod = "fallbackChat")
     @CircuitBreaker(name = "chatService", fallbackMethod = "fallbackChat")
     public CompletableFuture<String> callChat(List<Message> messages) {
+        // 异步边界显式传播 TraceContext（见 observability.TraceContextHolder）
+        // 学习点：这里必须在 supplyAsync 之前 capture、在 lambda 内 restore——
+        // CompletableFuture 的异步线程读不到调用线程的 ThreadLocal，不显式传播
+        // 会导致 LLM span 落不到请求的 TraceContext 上（trace 断裂）
+        TraceContext captured = TraceContextHolder.capture();
         // supplyAsync 在独立线程执行阻塞的 LLM 调用，便于 TimeLimiter 通过 Future.get(timeout) 实现超时
         return CompletableFuture.supplyAsync(() -> {
+            TraceContextHolder.restore(captured);
             try {
                 log.debug("弹性调用 LLM (非流式), messages={}", messages.size());
-                String response = chatClient.prompt()
-                        .messages(messages)   // 多轮消息直接透传给模型（含历史/系统提示）
-                        .call()
-                        .content();
-                log.debug("LLM 非流式调用成功, responseLength={}", response.length());
-                return response;
-            } catch (Exception e) {
-                throw new CompletionException(e);   // 包装为 CompletionException，供外层 Future.get 解包
+                // LLM 环节观测 + Token/费用计量（scenario=chat）
+                // 学习点：观测与计量"双轨并行"——Observation 回答"这次调用发生了什么"（span），
+                // ModelUsageRecorder 回答"这次调用花了多少钱"（usage），两者共用 TraceContext 的
+                // requestId 关联，落库后可按 requestId 把调用链与费用拼回同一张图
+                Observation observation = startLlmObservation(SCENARIO_CHAT);
+                try {
+                    ChatResponse response = chatClient.prompt()
+                            .messages(messages)   // 多轮消息直接透传给模型（含历史/系统提示）
+                            .call()
+                            .chatResponse();
+                    String text = response == null || response.getResult() == null
+                            ? "" : response.getResult().getOutput().getText();
+                    // Spring AI 非流式响应元数据携带 usage（prompt/completion tokens），
+                    // 这是 Token 计量的权威来源；流式则常取不到（见 callSseStream 的估算处理）
+                    Usage usage = response == null || response.getMetadata() == null
+                            ? null : response.getMetadata().getUsage();
+                    finishLlmObservation(observation, usage, null);
+                    modelUsageRecorder.record(SCENARIO_CHAT, provider(), model(),
+                            usage == null ? null : usage.getPromptTokens(),
+                            usage == null ? null : usage.getCompletionTokens(),
+                            "SUCCESS", null);
+                    log.debug("LLM 非流式调用成功, responseLength={}", text.length());
+                    return text;
+                } catch (Exception e) {
+                    // 失败路径同样要收尾观测与计量：span 标记 FAILED、usage 记失败次数，
+                    // 这样 trace 看板上能直接看到"哪些请求失败了、失败在哪个环节"
+                    finishLlmObservation(observation, null, e);
+                    modelUsageRecorder.record(SCENARIO_CHAT, provider(), model(),
+                            null, null, "FAILED", e.getMessage());
+                    throw new CompletionException(e);   // 包装为 CompletionException，供外层 Future.get 解包
+                }
+            } finally {
+                // 无论成功失败都清理 ThreadLocal：异步线程池复用，不清理会串上下文
+                TraceContextHolder.clear();
             }
         });
     }
@@ -153,17 +209,36 @@ public class ResilientAiService {
     @Retry(name = "chatService", fallbackMethod = "fallbackChat")
     @CircuitBreaker(name = "chatService", fallbackMethod = "fallbackChat")
     public CompletableFuture<String> callRagChat(String prompt) {
+        TraceContext captured = TraceContextHolder.capture();
         return CompletableFuture.supplyAsync(() -> {
+            TraceContextHolder.restore(captured);
             try {
                 log.debug("弹性调用 LLM (RAG 非流式)");
-                String response = chatClient.prompt()
-                        .user(prompt)
-                        .call()
-                        .content();
-                log.debug("LLM RAG 非流式调用成功, responseLength={}", response.length());
-                return response;
-            } catch (Exception e) {
-                throw new CompletionException(e);
+                Observation observation = startLlmObservation(SCENARIO_RAG);
+                try {
+                    ChatResponse response = chatClient.prompt()
+                            .user(prompt)
+                            .call()
+                            .chatResponse();
+                    String text = response == null || response.getResult() == null
+                            ? "" : response.getResult().getOutput().getText();
+                    Usage usage = response == null || response.getMetadata() == null
+                            ? null : response.getMetadata().getUsage();
+                    finishLlmObservation(observation, usage, null);
+                    modelUsageRecorder.record(SCENARIO_RAG, provider(), model(),
+                            usage == null ? null : usage.getPromptTokens(),
+                            usage == null ? null : usage.getCompletionTokens(),
+                            "SUCCESS", null);
+                    log.debug("LLM RAG 非流式调用成功, responseLength={}", text.length());
+                    return text;
+                } catch (Exception e) {
+                    finishLlmObservation(observation, null, e);
+                    modelUsageRecorder.record(SCENARIO_RAG, provider(), model(),
+                            null, null, "FAILED", e.getMessage());
+                    throw new CompletionException(e);
+                }
+            } finally {
+                TraceContextHolder.clear();
             }
         });
     }
@@ -175,15 +250,32 @@ public class ResilientAiService {
     @Retry(name = "chatService", fallbackMethod = "fallbackSummary")
     @CircuitBreaker(name = "chatService", fallbackMethod = "fallbackSummary")
     public CompletableFuture<String> callSummary(Prompt prompt) {
+        TraceContext captured = TraceContextHolder.capture();
         return CompletableFuture.supplyAsync(() -> {
+            TraceContextHolder.restore(captured);
             try {
                 log.debug("弹性调用 LLM (摘要)");
-                return chatModel.call(prompt)
-                        .getResult()
-                        .getOutput()
-                        .getText();
-            } catch (Exception e) {
-                throw new CompletionException(e);
+                Observation observation = startLlmObservation(SCENARIO_SUMMARY);
+                try {
+                    ChatResponse response = chatModel.call(prompt);
+                    String text = response == null || response.getResult() == null
+                            ? "" : response.getResult().getOutput().getText();
+                    Usage usage = response == null || response.getMetadata() == null
+                            ? null : response.getMetadata().getUsage();
+                    finishLlmObservation(observation, usage, null);
+                    modelUsageRecorder.record(SCENARIO_SUMMARY, provider(), model(),
+                            usage == null ? null : usage.getPromptTokens(),
+                            usage == null ? null : usage.getCompletionTokens(),
+                            "SUCCESS", null);
+                    return text;
+                } catch (Exception e) {
+                    finishLlmObservation(observation, null, e);
+                    modelUsageRecorder.record(SCENARIO_SUMMARY, provider(), model(),
+                            null, null, "FAILED", e.getMessage());
+                    throw new CompletionException(e);
+                }
+            } finally {
+                TraceContextHolder.clear();
             }
         });
     }
@@ -217,15 +309,61 @@ public class ResilientAiService {
     @CircuitBreaker(name = "sseChatService", fallbackMethod = "fallbackSseStream")
     public CompletableFuture<Flux<String>> callSseStream(List<Message> messages) {
         // 流式：返回 Flux<String>（逐 token）；TimeLimiter 只限制"首 token 到达"时间
+        TraceContext captured = TraceContextHolder.capture();
         return CompletableFuture.supplyAsync(() -> {
+            TraceContextHolder.restore(captured);
             try {
                 log.debug("弹性调用 LLM (SSE 流式), messages={}", messages.size());
-                return chatClient.prompt()
+                // 流式 Token 计量在流结束后通过 doFinally 统一上报（usage 取不到时按估算）
+                // 学习点：流式调用是"懒执行"——chatClient.prompt().stream() 只构建 Flux，
+                // 真正的 HTTP 请求发生在订阅（subscribe）时。所以不能像非流式那样在方法体内
+                // 同步计量，必须用 Reactor 操作符把收尾逻辑挂到流的生命周期上：
+                //   doOnNext  → 每个 chunk 到达时（这里只用于测首 Token 延迟）
+                //   doFinally → 流完成/取消/出错时（统一上报观测与用量）
+                AtomicReference<Usage> usageRef = new AtomicReference<>();
+                AtomicLong firstTokenMs = new AtomicLong(-1);
+                long start = System.currentTimeMillis();
+                Flux<String> flux = chatClient.prompt()
                         .messages(messages)
                         .stream()
-                        .content();
+                        .content()
+                        .doOnNext(chunk -> {
+                            // 记录首 Token 延迟（首次收到内容片段）
+                            // 学习点：首 Token 延迟（TTFT, Time To First Token）是流式体验的
+                            // 核心指标——用户感知的"响应快慢"取决于它，而非流式总时长；
+                            // AtomicLong 初值 -1 作为"是否已记录"的哨兵，避免每个 chunk 都判断
+                            if (firstTokenMs.get() < 0) {
+                                firstTokenMs.set(System.currentTimeMillis() - start);
+                            }
+                        })
+                        .doFinally(signal -> {
+                            // 流结束：记录 LLM 观测 + 用量（估算）
+                            Usage usage = usageRef.get();
+                            Observation observation = startLlmObservation(SCENARIO_CHAT);
+                            if (usage != null) {
+                                observation.highCardinalityKeyValue("promptTokens", String.valueOf(usage.getPromptTokens()))
+                                        .highCardinalityKeyValue("completionTokens", String.valueOf(usage.getCompletionTokens()));
+                            }
+                            if (firstTokenMs.get() >= 0) {
+                                observation.highCardinalityKeyValue("firstTokenMs", String.valueOf(firstTokenMs.get()));
+                            }
+                            // 流式 usage 通常取不到，按估算上报（estimated=true）
+                            // 学习点：OpenAI 兼容接口的流式响应通常只在最后一个 chunk 携带 usage，
+                            // 而 .content() 只保留文本丢掉了元数据；这里无法精确计量，只能按估算
+                            // 打标（estimated=true），统计时与精确值区分开
+                            modelUsageRecorder.record(SCENARIO_CHAT, provider(), model(),
+                                    usage == null ? null : usage.getPromptTokens(),
+                                    usage == null ? null : usage.getCompletionTokens(),
+                                    signal == SignalType.ON_ERROR ? "FAILED" : "SUCCESS",
+                                    signal == SignalType.ON_ERROR ? "stream error" : null);
+                            finishLlmObservation(observation, usage, signal == SignalType.ON_ERROR
+                                    ? new RuntimeException("stream error") : null);
+                        });
+                return flux;
             } catch (Exception e) {
                 throw new CompletionException(e);
+            } finally {
+                TraceContextHolder.clear();
             }
         });
     }
@@ -236,15 +374,39 @@ public class ResilientAiService {
     @TimeLimiter(name = "sseChatService", fallbackMethod = "fallbackSseStream")
     @CircuitBreaker(name = "sseChatService", fallbackMethod = "fallbackSseStream")
     public CompletableFuture<Flux<String>> callSseRagStream(String prompt) {
+        TraceContext captured = TraceContextHolder.capture();
         return CompletableFuture.supplyAsync(() -> {
+            TraceContextHolder.restore(captured);
             try {
                 log.debug("弹性调用 LLM (SSE RAG 流式)");
-                return chatClient.prompt()
+                AtomicReference<Usage> usageRef = new AtomicReference<>();
+                long start = System.currentTimeMillis();
+                Flux<String> flux = chatClient.prompt()
                         .user(prompt)
                         .stream()
-                        .content();
+                        .content()
+                        .doFinally(signal -> {
+                            Usage usage = usageRef.get();
+                            Observation observation = startLlmObservation(SCENARIO_RAG);
+                            if (usage != null) {
+                                observation.highCardinalityKeyValue("promptTokens", String.valueOf(usage.getPromptTokens()))
+                                        .highCardinalityKeyValue("completionTokens", String.valueOf(usage.getCompletionTokens()));
+                            }
+                            observation.highCardinalityKeyValue("firstTokenMs",
+                                    String.valueOf(System.currentTimeMillis() - start));
+                            modelUsageRecorder.record(SCENARIO_RAG, provider(), model(),
+                                    usage == null ? null : usage.getPromptTokens(),
+                                    usage == null ? null : usage.getCompletionTokens(),
+                                    signal == SignalType.ON_ERROR ? "FAILED" : "SUCCESS",
+                                    signal == SignalType.ON_ERROR ? "stream error" : null);
+                            finishLlmObservation(observation, usage, signal == SignalType.ON_ERROR
+                                    ? new RuntimeException("stream error") : null);
+                        });
+                return flux;
             } catch (Exception e) {
                 throw new CompletionException(e);
+            } finally {
+                TraceContextHolder.clear();
             }
         });
     }
@@ -301,5 +463,73 @@ public class ResilientAiService {
             errorMsg = "AI 助手暂时繁忙，请稍后重试。";
         }
         return CompletableFuture.completedFuture(Flux.just("[ERROR]" + errorMsg));
+    }
+
+    // ==================== LLM 观测辅助 ====================
+
+    /**
+     * 启动 LLM 环节观测（Observation 起点）。
+     *
+     * <p>low-cardinality：span.type / provider / model；high-cardinality：scenario。
+     * 由 {@code TraceSpanObservationHandler} 在 onStop 时组装为 TraceSpan 挂到当前 TraceContext；
+     * 未开启 trace（采样未命中）时 handler 自动跳过，观测零开销。</p>
+     *
+     * <p>学习点：这里的 key 分类不是随意的——
+     * <ul>
+     *   <li><b>low-cardinality</b>（provider/model/span.type）：取值集合小且稳定，
+     *       适合作为 OTLP span attribute 与日志索引维度，可安全聚合；</li>
+     *   <li><b>high-cardinality</b>（scenario）：取值稍多但仍可枚举，放 high 侧
+     *       避免污染低基数标签空间；真正的高基数明细（query、文档 ID）由各业务
+     *       埋点点用 detail key 传入。</li>
+     * </ul>
+     * 统一观测名 OBS_LLM（chat.llm）：同一类调用的 span 名保持一致，后端才能按名聚合。</p>
+     */
+    private Observation startLlmObservation(String scenario) {
+        return Observation.createNotStarted(OBS_LLM, observationRegistry)
+                .lowCardinalityKeyValue("span.type", "LLM")
+                .lowCardinalityKeyValue("provider", provider())
+                .lowCardinalityKeyValue("model", model())
+                .highCardinalityKeyValue("scenario", scenario)
+                .start();
+    }
+
+    /**
+     * 结束 LLM 环节观测（成功/失败）。
+     *
+     * <p>学习点：token 数在 stop 之前才写入 key——Observation 允许在生命周期内随时
+     * 追加 key-values，stop 时 handler 统一读取；把 usage 元数据映射为 high-cardinality key
+     * 传递，让 span 自带"这次调用消耗了多少 Token"的明细，避免二次查询。</p>
+     */
+    private void finishLlmObservation(Observation observation, Usage usage, Throwable error) {
+        try {
+            if (usage != null) {
+                observation.highCardinalityKeyValue("promptTokens", String.valueOf(usage.getPromptTokens()))
+                        .highCardinalityKeyValue("completionTokens", String.valueOf(usage.getCompletionTokens()));
+            }
+            if (error != null) {
+                // observation.error(e)：把异常"边带"进观测上下文，
+                // TraceSpanObservationHandler 在 onStop 时读取 context.getError() 标记 span 失败
+                observation.error(error);
+            }
+        } finally {
+            // 必须 stop：Observation 生命周期是 start→stop，漏 stop 会导致 span 永不落库
+            observation.stop();
+        }
+    }
+
+    /** 模型供应商（OpenAI 兼容协议，当前为 DeepSeek） */
+    private String provider() {
+        return "deepseek";
+    }
+
+    /** 当前模型名（从 ChatModel 默认选项读取，避免硬编码） */
+    // 学习点：不硬编码模型名而是从 ChatModel 配置读取——模型升级/切换时观测数据
+    // 自动跟随，否则换模型后 trace 里的 model 字段还是旧值，成本统计会失真
+    private String model() {
+        try {
+            return chatModel.getDefaultOptions().getModel();
+        } catch (Exception e) {
+            return "deepseek-chat";
+        }
     }
 }

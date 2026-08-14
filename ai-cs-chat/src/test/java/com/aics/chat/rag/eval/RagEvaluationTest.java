@@ -38,7 +38,7 @@ class RagEvaluationTest {
             return docs;
         };
         RagAnswerJudge stubJudge = (q, a, r) -> 4;
-        service = new RagEvalServiceImpl(loader, stub, stubJudge);
+        service = new RagEvalServiceImpl(loader, stub, stubJudge, new EvalGateConfig());
     }
 
     @Test
