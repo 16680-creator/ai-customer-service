@@ -54,3 +54,6 @@ tools/rocketmq-all-5.1.4-bin-release.zip
 # IDE tools
 .workbuddy/
 tools/nacos-config/lib/
+
+# 本地运行输出
+tools/nacos-start2.out
