@@ -369,29 +369,62 @@ public class ResilientAiService {
     }
 
     /**
-     * 弹性流式 RAG 调用（SSE）。
+     * 【AI 核心】弹性流式 RAG 对话调用（SSE）。
+     * 与 {@link #callSseStream(List)} 的核心区别：入参是"检索增强后的单条 prompt"——
+     * 上游（ChatServiceImpl.chatStreamSse）已完成 检索→拼装，本方法只负责纯"生成"环节。
+     *
+     * <p><b>【AI 技术详解】RAG 场景的流式调用</b>：
+     * <ul>
+     *   <li>单 prompt 而非多轮消息：RAG 把知识片段拼进一条提示词（回答规则 + 检索资料 + 用户问题），
+     *       模型按"阅读材料作答"的模式生成；{@code .user()} 只设置这一条消息，对话历史不透传</li>
+     *   <li>prompt 显著更长：携带知识片段的 prompt 往往是普通对话的数倍，
+     *       首 token 延迟（TTFT）随 prompt 变长而上升，是 RAG 流式体验的主要瓶颈</li>
+     *   <li>弹性策略与 callSseStream 完全一致：TimeLimiter（60s）只限"首 token"，
+     *       不配 Retry（流不可重放），熔断/超时统一降级到 fallbackSseStream</li>
+     * </ul>
+     *
+     * <p><b>【技术关联】RAG 数据流中的位置</b>：
+     * <pre>
+     *   用户提问（message + knowledgeBase）
+     *     → 向量检索：知识库 topK 相似片段           ← retrieveRagDocs（支持 hybrid/查询改写）
+     *     → 拼装增强 prompt：防幻觉规则 + 资料 + 问题 ← ChatServiceImpl（上游完成）
+     *     → callSseRagStream(ragPrompt)             ← 本方法：纯 LLM 生成环节
+     *     → Flux&lt;String&gt; 逐 token 返回 → SseEmitter 推给前端
+     *     → done 事件携带 citations（引用溯源）      ← buildCitations，支撑 RAG 可信度
+     * </pre>
      */
     @TimeLimiter(name = "sseChatService", fallbackMethod = "fallbackSseStream")
     @CircuitBreaker(name = "sseChatService", fallbackMethod = "fallbackSseStream")
     public CompletableFuture<Flux<String>> callSseRagStream(String prompt) {
+        // 复用 callSseStream 的模式：异步边界显式传播 TraceContext（原理见 callChat 的学习点），
+        // 保证 RAG 链路的"检索 span + 生成 span"挂在同一个 TraceContext 上
         TraceContext captured = TraceContextHolder.capture();
         return CompletableFuture.supplyAsync(() -> {
             TraceContextHolder.restore(captured);
             try {
                 log.debug("弹性调用 LLM (SSE RAG 流式)");
+                // usageRef 预留：.content() 只保留文本、丢掉元数据，流式 usage 取不到（同 callSseStream）
                 AtomicReference<Usage> usageRef = new AtomicReference<>();
                 long start = System.currentTimeMillis();
                 Flux<String> flux = chatClient.prompt()
-                        .user(prompt)
+                        .user(prompt)   // RAG 关键差异：增强 prompt 作为单条用户消息（区别于 .messages() 多轮透传）
                         .stream()
                         .content()
                         .doFinally(signal -> {
+                            // 流结束收尾：观测 + 用量计量。scenario=rag 与普通 chat 区分，
+                            // 落库后可分场景统计成本/成功率/延迟分布
+                            // 学习点：与 callSseStream 的口径差异——那里用 doOnNext + AtomicLong
+                            // 哨兵记录真实 TTFT（首个 chunk 到达时刻）；这里没有 doOnNext，
+                            // doFinally 里算出的 firstTokenMs 实际是"整条流的耗时"（含全部
+                            // token 生成时间，偏大）。对比监控数据时注意口径不一致，
+                            // 需要精确 TTFT 时可对照 callSseStream 的写法补 doOnNext
                             Usage usage = usageRef.get();
                             Observation observation = startLlmObservation(SCENARIO_RAG);
                             if (usage != null) {
                                 observation.highCardinalityKeyValue("promptTokens", String.valueOf(usage.getPromptTokens()))
                                         .highCardinalityKeyValue("completionTokens", String.valueOf(usage.getCompletionTokens()));
                             }
+                            // 注意：见上方学习点，这里的 firstTokenMs 实为整流耗时而非 TTFT
                             observation.highCardinalityKeyValue("firstTokenMs",
                                     String.valueOf(System.currentTimeMillis() - start));
                             modelUsageRecorder.record(SCENARIO_RAG, provider(), model(),
