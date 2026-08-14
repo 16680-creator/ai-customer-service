@@ -44,3 +44,83 @@ aics:
     enabled: true
     # MinIO public endpoint host (SSRF whitelist for image URLs)
     allowed-image-host: 123.60.31.79
+
+  model-router:
+    enabled: true
+    models:
+      - id: deepseek-chat
+        provider: deepseek
+        base-url: https://api.deepseek.com
+        api-key: ${DEEPSEEK_API_KEY}
+        model: deepseek-chat
+        enabled: true
+        priority: 100
+        tier: standard
+        capabilities: [tool-calling]
+        context-window: 65536
+        timeout-ms: 30000
+      - id: siliconflow-qwen3-32b
+        provider: siliconflow
+        base-url: https://api.siliconflow.cn
+        api-key: ${SILICONFLOW_API_KEY}
+        model: Qwen/Qwen3-32B
+        enabled: true
+        priority: 90
+        tier: standard
+        capabilities: [tool-calling]
+        context-window: 32768
+        timeout-ms: 30000
+      - id: siliconflow-qwen3-8b
+        provider: siliconflow
+        base-url: https://api.siliconflow.cn
+        api-key: ${SILICONFLOW_API_KEY}
+        model: Qwen/Qwen3-8B
+        enabled: true
+        priority: 80
+        tier: cheap
+        capabilities: []
+        context-window: 32768
+        timeout-ms: 15000
+    scenarios:
+      chat:
+        primary: deepseek-chat
+        fallbacks: [siliconflow-qwen3-32b]
+      rag:
+        primary: deepseek-chat
+        fallbacks: [siliconflow-qwen3-32b]
+      agent:
+        primary: deepseek-chat
+        fallbacks: [siliconflow-qwen3-32b]
+      nl2sql:
+        primary: deepseek-chat
+        fallbacks: [siliconflow-qwen3-32b]
+      judge:
+        primary: deepseek-chat
+        fallbacks: [siliconflow-qwen3-32b]
+      summary:
+        primary: siliconflow-qwen3-8b
+        fallbacks: [siliconflow-qwen3-32b]
+      intent:
+        primary: siliconflow-qwen3-8b
+        fallbacks: [siliconflow-qwen3-32b]
+      rewrite:
+        primary: siliconflow-qwen3-8b
+        fallbacks: [siliconflow-qwen3-32b]
+      chart:
+        primary: siliconflow-qwen3-8b
+        fallbacks: [siliconflow-qwen3-32b]
+    quota:
+      enabled: true
+      over-limit-fallback-tier: cheap
+
+  usage:
+    pricing:
+      deepseek-chat:
+        input: 2.0
+        output: 8.0
+      siliconflow-qwen3-32b:
+        input: 1.0
+        output: 2.0
+      siliconflow-qwen3-8b:
+        input: 0.2
+        output: 0.6
