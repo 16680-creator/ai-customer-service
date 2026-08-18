@@ -139,6 +139,7 @@ public class ChatServiceImpl implements ChatService {
     private final com.aics.chat.security.ContentSafetyService contentSafetyService;
     private final com.aics.chat.security.RagAclFilter ragAclFilter;
     private final com.aics.chat.security.SecurityAuditRecorder securityAuditRecorder;
+    private final com.aics.chat.prompt.PromptRegistry promptRegistry;
 
     /** 最大历史消息数，超过时触发压缩 */
     private static final int MAX_HISTORY_SIZE = 20;
@@ -248,9 +249,14 @@ public class ChatServiceImpl implements ChatService {
             // 通过 ResilientAiService 调用 AI 生成摘要（带超时/重试/熔断）
             // 调 LLM 压缩旧消息为摘要（经 ResilientAiService 获得超时/重试/熔断保护）
             // 学习点：摘要场景显式固定为 SUMMARY——压缩失败仍走原截断兜底，路由只是把模型选择交给统一策略
+            com.aics.chat.prompt.PromptRegistry.RenderedPrompt summaryRp = promptRegistry.render("summary",
+                    java.util.Map.of("history", conversation));
+            com.aics.chat.observability.TraceContext sc = com.aics.chat.observability.TraceContextHolder.current();
+            if (sc != null) {
+                sc.setPrompt(summaryRp.getScenario(), summaryRp.getVersion());
+            }
             String summary = resilientAiService.callSummary(ModelScenario.SUMMARY,
-                    new Prompt("请将以下对话历史压缩为简洁的摘要，保留关键信息（用户名、订单号、重要决定等），"
-                            + "用1-3句话概括，作为后续对话的上下文参考：\n\n" + conversation)
+                    new Prompt(summaryRp.text())
             ).get();
 
             summary = cleanResponse(summary);
@@ -380,19 +386,14 @@ public class ChatServiceImpl implements ChatService {
             // 把命中的知识片段拼成【知识库资料】上下文，注入 Prompt
             String context = knowledgeBaseService.buildContext(docs);
 
-            // 构建 RAG Prompt
-            String ragPrompt = """
-                    请严格基于下面的【知识库资料】回答用户问题。
-                    重要规则：
-                    1. 如果资料中没有相关信息，请如实告知："我暂时没有这方面的资料"，不要编造内容
-                    2. 回答时优先引用资料中的内容，不要提及"根据资料/检索结果"之类的表述
-
-                    【知识库资料】
-                    %s
-
-                    【用户问题】
-                    %s
-                    """.formatted(context.isBlank() ? "（未检索到相关资料）" : context, message);
+            // 构建 RAG Prompt（外置到 application-prompt.yml scenario=rag）
+            com.aics.chat.prompt.PromptRegistry.RenderedPrompt ragRp = promptRegistry.render("rag",
+                    java.util.Map.of("context", context.isBlank() ? "（未检索到相关资料）" : context, "message", message));
+            com.aics.chat.observability.TraceContext rc = com.aics.chat.observability.TraceContextHolder.current();
+            if (rc != null) {
+                rc.setPrompt(ragRp.getScenario(), ragRp.getVersion());
+            }
+            String ragPrompt = ragRp.text();
 
             // 通过 ResilientAiService 弹性调用 LLM（超时/重试/熔断/降级）
             String response = resilientAiService.callRagChat(ModelScenario.RAG, ragPrompt).get();
@@ -494,18 +495,8 @@ public class ChatServiceImpl implements ChatService {
             if (hasKb) {
                 List<Document> docs = retrieveRagDocs(knowledgeBase, message, 5, 0.5, hybrid, rewrite);
                 String context = knowledgeBaseService.buildContext(docs);
-                String ragPrompt = """
-                        请严格基于下面的【知识库资料】回答用户问题。
-                        重要规则：
-                        1. 如果资料中没有相关信息，请如实告知："我暂时没有这方面的资料"，不要编造内容
-                        2. 回答时优先引用资料中的内容，不要提及"根据资料/检索结果"之类的表述
-
-                        【知识库资料】
-                        %s
-
-                        【用户问题】
-                        %s
-                        """.formatted(context.isBlank() ? "（未检索到相关资料）" : context, message);
+                String ragPrompt = promptRegistry.render("rag",
+                        java.util.Map.of("context", context.isBlank() ? "（未检索到相关资料）" : context, "message", message)).text();
                 // 设计要点：流式场景在订阅前完成路由——RAG 与普通对话分别用 RAG/CHAT 场景，保持同一次 SSE 请求的决策一致
                 futureFlux = resilientAiService.callSseRagStream(ModelScenario.RAG, ragPrompt);
                 // 缓存引用溯源，完成事件时随 done 一起推送

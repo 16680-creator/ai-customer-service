@@ -65,6 +65,7 @@ import java.util.Map;
 public class ChartAnswerGenerator {
 
     private final RoutedChatClientFactory routedChatClientFactory;
+    private final com.aics.chat.prompt.PromptRegistry promptRegistry;
 
     /**
      * 生成问数回答。
@@ -101,17 +102,18 @@ public class ChartAnswerGenerator {
             return "查询结果为：" + sb.substring(0, sb.length() - 1) + "。";
         }
         try {
-            String prompt = """
-                    请基于下面的查询结果数据，用 1-2 句简洁的中文总结结论（面向运营人员，突出关键数字与趋势）。
-                    只输出结论，不要输出其他内容。
-
-                    用户问题：%s
-                    查询结果（JSON 数组）：%s
-                    """.formatted(question, rows);
+            // 提示词外置到 application-prompt.yml scenario=chart
+            com.aics.chat.prompt.PromptRegistry.RenderedPrompt rp = promptRegistry.render("chart",
+                    java.util.Map.of("question", question, "rows", rows));
+            String prompt = rp.text();
+            com.aics.chat.observability.TraceContext cctx = com.aics.chat.observability.TraceContextHolder.current();
+            if (cctx != null) {
+                cctx.setPrompt(rp.getScenario(), rp.getVersion());
+            }
             // 设计要点：图表结论固定走 CHART 场景路由，同时保留原有 catch 模板降级——路由失败只是本地降级的一个分支，不引入额外重试复杂度
             String content = routedChatClientFactory.chatClientFor(ModelScenario.CHART)
                     .prompt()
-                    .system("你是数据分析师，只输出结论。")
+                    .system(rp.getSystem())
                     .user(prompt)
                     .call()
                     .content();

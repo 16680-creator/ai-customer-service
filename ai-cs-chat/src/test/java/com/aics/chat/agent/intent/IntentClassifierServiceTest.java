@@ -18,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.Mockito.mock;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -35,8 +36,25 @@ class IntentClassifierServiceTest {
     private final AgentProperties properties = new AgentProperties();
 
     private IntentClassifierService newService() {
+        // 用真实 PromptRegistry（配置 intent 场景）保证 buildPrompt 返回非空文本，LLM 路径可测
+        com.aics.chat.prompt.PromptProperties props = new com.aics.chat.prompt.PromptProperties();
+        props.setEnabled(true);
+        com.aics.chat.prompt.PromptProperties.ScenarioConfig intent = new com.aics.chat.prompt.PromptProperties.ScenarioConfig();
+        intent.setActiveVersion("v1");
+        com.aics.chat.prompt.PromptProperties.RolloutConfig rollout = new com.aics.chat.prompt.PromptProperties.RolloutConfig();
+        rollout.setStrategy("pinned");
+        rollout.setPinned("v1");
+        intent.setRollout(rollout);
+        com.aics.chat.prompt.PromptProperties.VersionConfig v1 = new com.aics.chat.prompt.PromptProperties.VersionConfig();
+        v1.setSystem("意图分类提示");
+        v1.setUser("用户输入：{{input}}");
+        intent.setVersions(java.util.Map.of("v1", v1));
+        props.setScenarios(java.util.Map.of("intent", intent));
+        com.aics.chat.prompt.PromptRegistry registry =
+                new com.aics.chat.prompt.PromptRegistry(props, new com.aics.chat.prompt.PromptRouter());
+        registry.afterPropertiesSet();
         return new IntentClassifierService(properties, resilientAiService, new ObjectMapper(),
-                io.micrometer.observation.ObservationRegistry.create());
+                io.micrometer.observation.ObservationRegistry.create(), registry);
     }
 
     @Test

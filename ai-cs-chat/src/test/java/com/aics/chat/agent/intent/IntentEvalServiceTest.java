@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
 
 /**
  * 意图分类评估测试（SC-001：意图分类 Macro-F1 ≥ 0.90）
@@ -17,7 +18,8 @@ class IntentEvalServiceTest {
     void 固定数据集MacroF1不低于090() {
         IntentClassifierService classifier = new IntentClassifierService(
                 new AgentProperties(), null, new ObjectMapper(),
-                io.micrometer.observation.ObservationRegistry.create());
+                io.micrometer.observation.ObservationRegistry.create(),
+                mock(com.aics.chat.prompt.PromptRegistry.class));
         IntentEvalService evalService = new IntentEvalService(classifier);
         IntentEvalService.EvalReport report = evalService.evaluate();
         assertEquals(24, report.sampleCount());

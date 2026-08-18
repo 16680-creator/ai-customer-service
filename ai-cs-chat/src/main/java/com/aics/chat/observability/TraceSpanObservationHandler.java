@@ -64,6 +64,10 @@ public class TraceSpanObservationHandler implements ObservationHandler<Observati
         span.setFallbackFrom(high(context, "fallbackFrom"));
         span.setAttempt(intOf(high(context, "attempt")));
         span.setDetail(high(context, "detail"));
+        // Prompt 效果关联：把调用点写入 TraceContext 的 promptScenario/promptVersion 关联到 LLM span
+        // 复用现有 TraceContextHolder，不新增 Observation key——调用方在 render 后调用 ctx.setPrompt(...)
+        span.setPromptScenario(trace.getPromptScenario());
+        span.setPromptVersion(trace.getPromptVersion());
 
         // 错误处理：observation.error(e) 写入的异常
         // 学习点：Observation 的错误传播是"边带"机制——业务代码 catch 到异常后调用

@@ -38,6 +38,7 @@ public class IntentClassifierService {
     private final ResilientAiService resilientAiService;
     private final ObjectMapper objectMapper;
     private final ObservationRegistry observationRegistry;
+    private final com.aics.chat.prompt.PromptRegistry promptRegistry;
 
     /** 售后关键词 */
     private static final List<String> AFTER_SALE_KEYWORDS = List.of(
@@ -116,19 +117,16 @@ public class IntentClassifierService {
     }
 
     /**
-     * 构建 LLM 结构化输出提示词
+     * 构建 LLM 结构化输出提示词（外置到 application-prompt.yml scenario=intent）
      */
     String buildPrompt(String input) {
-        return """
-                你是智能客服的意图识别器。请对用户输入进行意图分类，只输出 JSON，不要输出任何其他内容。
-                意图类型（type）只能是：AFTER_SALE（售后：换货/退货/退款/保修）、PRODUCT_RECOMMEND（商品推荐）、NORMAL_CHAT（普通咨询）、HUMAN_HANDOFF（转人工）、OTHER（其他）。
-                输出格式：
-                {"intents":[{"type":"AFTER_SALE","confidence":0.95,"params":{"action":"EXCHANGE","reason":"质量问题"}}],"sentiment":"NEUTRAL","needsHandoff":false}
-                - intents：可能包含多个意图（如用户同时要售后和推荐）
-                - params：抽取结构化参数（action 取值 EXCHANGE/RETURN/REFUND；budget 为预算金额数字字符串；keywords 为商品特性关键词，逗号分隔；reason 为售后原因）
-                - sentiment：POSITIVE/NEUTRAL/NEGATIVE/ANGRY（用户明显愤怒时填 ANGRY 且 needsHandoff=true）
-                用户输入：%s
-                """.formatted(input);
+        com.aics.chat.prompt.PromptRegistry.RenderedPrompt rp = promptRegistry
+                .render("intent", java.util.Map.of("input", input));
+        com.aics.chat.observability.TraceContext ctx = com.aics.chat.observability.TraceContextHolder.current();
+        if (ctx != null) {
+            ctx.setPrompt(rp.getScenario(), rp.getVersion());
+        }
+        return rp.text();
     }
 
     /**

@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.mock;
@@ -31,7 +32,10 @@ class ChartAnswerGeneratorTest {
         chatClient = mock(ChatClient.class, RETURNS_DEEP_STUBS);
         routedChatClientFactory = mock(RoutedChatClientFactory.class);
         when(routedChatClientFactory.chatClientFor(ModelScenario.CHART)).thenReturn(chatClient);
-        generator = new ChartAnswerGenerator(routedChatClientFactory);
+        com.aics.chat.prompt.PromptRegistry registry = mock(com.aics.chat.prompt.PromptRegistry.class);
+        when(registry.render(anyString(), anyMap())).thenReturn(
+                new com.aics.chat.prompt.PromptRegistry.RenderedPrompt("sys", "user-text", "chart", "v1"));
+        generator = new ChartAnswerGenerator(routedChatClientFactory, registry);
     }
 
     private Map<String, Object> row(String k1, Object v1, String k2, Object v2) {

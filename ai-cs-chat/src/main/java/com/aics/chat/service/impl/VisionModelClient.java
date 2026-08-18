@@ -86,6 +86,7 @@ public class VisionModelClient {
     private final VisionProperties visionProperties;
     private final ObservationRegistry observationRegistry;
     private final ModelUsageRecorder modelUsageRecorder;
+    private final com.aics.chat.prompt.PromptRegistry promptRegistry;
 
     /** 场景：图片理解（vision） */
     private static final String SCENARIO_VISION = "vision";
@@ -98,10 +99,12 @@ public class VisionModelClient {
 
     public VisionModelClient(VisionProperties visionProperties,
                              ObservationRegistry observationRegistry,
-                             ModelUsageRecorder modelUsageRecorder) {
+                             ModelUsageRecorder modelUsageRecorder,
+                             com.aics.chat.prompt.PromptRegistry promptRegistry) {
         this.visionProperties = visionProperties;
         this.observationRegistry = observationRegistry;
         this.modelUsageRecorder = modelUsageRecorder;
+        this.promptRegistry = promptRegistry;
     }
 
     /**
@@ -169,8 +172,17 @@ public class VisionModelClient {
                 // - .text(...)：给视觉模型的指令，让它聚焦"提取关键信息"
                 // - .media(new Media(mimeType, URI))：把图片 URL 包装成 Media，
                 //   OpenAiChatModel 会自动转成 OpenAI 协议的 image_url 字段
+                // 视觉指令外置到 application-prompt.yml scenario=vision（{{instruction}}）
+                com.aics.chat.prompt.PromptRegistry.RenderedPrompt visionRp = promptRegistry
+                        .render("vision", java.util.Map.of("instruction",
+                                "请描述这张图片中的关键信息（文字、型号、错误码、页面状态等），用简洁的中文概括。"));
+                String visionInstruction = visionRp.text();
+                com.aics.chat.observability.TraceContext vctx = com.aics.chat.observability.TraceContextHolder.current();
+                if (vctx != null) {
+                    vctx.setPrompt(visionRp.getScenario(), visionRp.getVersion());
+                }
                 UserMessage userMessage = UserMessage.builder()
-                        .text("请描述这张图片中的关键信息（文字、型号、错误码、页面状态等），用简洁的中文概括。")
+                        .text(visionInstruction)
                         .media(new Media(MimeTypeUtils.IMAGE_PNG, URI.create(imageUrl)))
                         .build();
                 // LLM 环节观测（scenario=vision）+ Token/费用计量

@@ -95,8 +95,36 @@ class ChatObservabilityIntegrationTest {
         com.aics.chat.security.SecurityAuditRecorder auditRecorder =
                 mock(com.aics.chat.security.SecurityAuditRecorder.class);
 
+        // 真实 PromptRegistry（配置 rag/summary 场景），保证 RAG prompt 渲染非空
+        com.aics.chat.prompt.PromptProperties pp = new com.aics.chat.prompt.PromptProperties();
+        pp.setEnabled(true);
+        com.aics.chat.prompt.PromptProperties.ScenarioConfig ragCfg = new com.aics.chat.prompt.PromptProperties.ScenarioConfig();
+        ragCfg.setActiveVersion("v1");
+        com.aics.chat.prompt.PromptProperties.RolloutConfig rl = new com.aics.chat.prompt.PromptProperties.RolloutConfig();
+        rl.setStrategy("pinned");
+        rl.setPinned("v1");
+        ragCfg.setRollout(rl);
+        com.aics.chat.prompt.PromptProperties.VersionConfig ragV = new com.aics.chat.prompt.PromptProperties.VersionConfig();
+        ragV.setSystem("RAG系统提示");
+        ragV.setUser("RAG用户提示 {{context}} {{message}}");
+        ragCfg.setVersions(Map.of("v1", ragV));
+        com.aics.chat.prompt.PromptProperties.ScenarioConfig sumCfg = new com.aics.chat.prompt.PromptProperties.ScenarioConfig();
+        sumCfg.setActiveVersion("v1");
+        com.aics.chat.prompt.PromptProperties.RolloutConfig sr = new com.aics.chat.prompt.PromptProperties.RolloutConfig();
+        sr.setStrategy("pinned");
+        sr.setPinned("v1");
+        sumCfg.setRollout(sr);
+        com.aics.chat.prompt.PromptProperties.VersionConfig sumV = new com.aics.chat.prompt.PromptProperties.VersionConfig();
+        sumV.setUser("摘要提示 {{history}}");
+        sumCfg.setVersions(Map.of("v1", sumV));
+        pp.setScenarios(Map.of("rag", ragCfg, "summary", sumCfg));
+        com.aics.chat.prompt.PromptRegistry promptRegistry =
+                new com.aics.chat.prompt.PromptRegistry(pp, new com.aics.chat.prompt.PromptRouter());
+        promptRegistry.afterPropertiesSet();
+
         ChatServiceImpl chatService = new ChatServiceImpl(llm, kb, history,
-                mock(HybridRetriever.class), r, onlineEval, contentSafety, ragAclFilter, auditRecorder);
+                mock(HybridRetriever.class), r, onlineEval, contentSafety, ragAclFilter, auditRecorder,
+                promptRegistry);
 
         // 模拟请求入口：拦截器创建上下文
         TraceContext ctx = TraceContextHolder.begin(observability, 1L, "s1", "rag");
@@ -156,7 +184,8 @@ class ChatObservabilityIntegrationTest {
         AgentTraceRecorder traceRecorder = new AgentTraceRecorder(traceFeign,
                 new com.fasterxml.jackson.databind.ObjectMapper(), new com.aics.chat.util.PiiMasker());
         IntentClassifierService classifier = new IntentClassifierService(agentProps,
-                mock(ResilientAiService.class), new com.fasterxml.jackson.databind.ObjectMapper(), r);
+                mock(ResilientAiService.class), new com.fasterxml.jackson.databind.ObjectMapper(), r,
+                mock(com.aics.chat.prompt.PromptRegistry.class));
         // 3.2 安全组件（mock：内容审核放行、工具授权放行、审计静默）
         com.aics.chat.security.ContentSafetyService contentSafety = mock(com.aics.chat.security.ContentSafetyService.class);
         when(contentSafety.reviewInput(anyString()))

@@ -54,6 +54,7 @@ public class LlmJudgeService implements RagAnswerJudge {
     private static final ThreadLocal<Integer> LAST_TOTAL_TOKENS = new ThreadLocal<>();
 
     private final RoutedChatClientFactory routedChatClientFactory;
+    private final com.aics.chat.prompt.PromptRegistry promptRegistry;
 
     @Override
     public Integer score(String question, String answer, String referenceAnswer) {
@@ -61,20 +62,19 @@ public class LlmJudgeService implements RagAnswerJudge {
             return null;
         }
         try {
-            // 提示词明确评分维度 + 只输出数字，降低模型自由发挥导致的解析失败
-            String prompt = """
-                    你是一名 RAG 回答质量评估员。请根据参考答案对 AI 客服的回答打分（1-5 分，5 为最佳）。
-                    评分维度：准确性（是否与参考答案一致、有无编造）、完整性（是否覆盖要点）、简洁性。
-                    只输出一个数字分数，不要输出其他内容。
-
-                    问题：%s
-                    AI 回答：%s
-                    参考答案：%s
-                    """.formatted(question, answer, referenceAnswer == null ? "（无）" : referenceAnswer);
+            // 提示词明确评分维度 + 只输出数字，降低模型自由发挥导致的解析失败（外置到 application-prompt.yml scenario=judge）
+            com.aics.chat.prompt.PromptRegistry.RenderedPrompt rp = promptRegistry.render("judge",
+                    java.util.Map.of("question", question, "answer", answer,
+                            "reference", referenceAnswer == null ? "（无）" : referenceAnswer));
+            String prompt = rp.text();
+            com.aics.chat.observability.TraceContext jctx = com.aics.chat.observability.TraceContextHolder.current();
+            if (jctx != null) {
+                jctx.setPrompt(rp.getScenario(), rp.getVersion());
+            }
             // 设计要点：Judge 固定走 JUDGE 场景路由，失败仍由调用方降级返回 null——评估是附加质量观测，不能因路由问题阻塞主链路
             org.springframework.ai.chat.model.ChatResponse response = routedChatClientFactory.chatClientFor(ModelScenario.JUDGE)
                     .prompt()
-                    .system("你是严谨的 RAG 质量评估员，只输出 1-5 的整数分数。")
+                    .system(rp.getSystem())
                     .user(prompt)
                     .call()
                     .chatResponse();

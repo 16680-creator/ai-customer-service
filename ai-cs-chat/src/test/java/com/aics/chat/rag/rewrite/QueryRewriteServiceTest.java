@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.client.ChatClient;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.mock;
@@ -28,7 +29,10 @@ class QueryRewriteServiceTest {
         chatClient = mock(ChatClient.class, RETURNS_DEEP_STUBS);
         routedChatClientFactory = mock(RoutedChatClientFactory.class);
         when(routedChatClientFactory.chatClientFor(ModelScenario.REWRITE)).thenReturn(chatClient);
-        service = new QueryRewriteService(routedChatClientFactory, new ObjectMapper());
+        com.aics.chat.prompt.PromptRegistry registry = mock(com.aics.chat.prompt.PromptRegistry.class);
+        when(registry.render(anyString(), anyMap())).thenReturn(
+                new com.aics.chat.prompt.PromptRegistry.RenderedPrompt("sys", "user-text", "rewrite", "v1"));
+        service = new QueryRewriteService(routedChatClientFactory, new ObjectMapper(), registry);
     }
 
     @Test

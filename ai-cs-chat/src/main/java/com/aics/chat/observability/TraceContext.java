@@ -51,6 +51,27 @@ public class TraceContext {
     // volatile 保证跨线程可见性：异步线程 markFailed 后，主线程 afterCompletion 能立即读到
     private volatile String errorSummary;
 
+    // ===== Prompt 效果关联（OpenSpec change 2026-08-18-prompt-config）=====
+    /** 本次请求当前生效的 Prompt 场景（由调用点在 render 后写入，供 LLM span 关联） */
+    private volatile String promptScenario;
+
+    /** 本次请求当前生效的 Prompt 版本 */
+    private volatile String promptVersion;
+
+    /** 写入本次 LLM 调用使用的 Prompt 场景与版本（效果关联：promptVersion → 评估质量分） */
+    public void setPrompt(String scenario, String version) {
+        this.promptScenario = scenario;
+        this.promptVersion = version;
+    }
+
+    public String getPromptScenario() {
+        return promptScenario;
+    }
+
+    public String getPromptVersion() {
+        return promptVersion;
+    }
+
     public TraceContext(String requestId, Long userId, String sessionId, String scenario) {
         this.requestId = requestId;
         this.userId = userId;

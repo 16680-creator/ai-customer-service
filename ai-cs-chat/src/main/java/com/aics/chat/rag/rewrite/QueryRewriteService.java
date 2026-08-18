@@ -79,6 +79,7 @@ public class QueryRewriteService {
 
     private final RoutedChatClientFactory routedChatClientFactory;
     private final ObjectMapper objectMapper;
+    private final com.aics.chat.prompt.PromptRegistry promptRegistry;
 
     /**
      * 【AI 核心】改写查询：LLM 生成子查询 + HyDE 文档。
@@ -109,19 +110,18 @@ public class QueryRewriteService {
             return result;                         // 空问题直接返回，不发 LLM 请求
         }
         try {
-            // 提示词要求 LLM 只输出 JSON：子查询数组 + HyDE 假设文档，便于程序化解析
-            String prompt = """
-                    请把下面的用户问题改写成 %d 个更精确、适合知识库检索的子查询，并生成一条假设性的标准答案文档（HyDE），
-                    用于提升检索召回。
-                    输出 JSON，格式严格如下（不要输出其他内容）：
-                    {"subQueries": ["子查询1", "子查询2", ...], "hydeDocument": "假设性文档内容"}
-
-                    用户问题：%s
-                    """.formatted(3, question);
+            // 提示词要求 LLM 只输出 JSON：子查询数组 + HyDE 假设文档，便于程序化解析（外置到 application-prompt.yml scenario=rewrite）
+            com.aics.chat.prompt.PromptRegistry.RenderedPrompt rp = promptRegistry.render("rewrite",
+                    java.util.Map.of("count", 3, "question", question));
+            String prompt = rp.text();
+            com.aics.chat.observability.TraceContext ctx = com.aics.chat.observability.TraceContextHolder.current();
+            if (ctx != null) {
+                ctx.setPrompt(rp.getScenario(), rp.getVersion());
+            }
             // 设计要点：改写固定走 REWRITE 场景路由，原有“失败降级为原始问题检索”保留——路由失败不应拖垮检索主流程
             String content = routedChatClientFactory.chatClientFor(ModelScenario.REWRITE)
                     .prompt()
-                    .system("你是检索查询优化专家，只输出指定 JSON。")
+                    .system(rp.getSystem())
                     .user(prompt)
                     .call()
                     .content();

@@ -60,4 +60,11 @@ public class TraceSpan {
 
     /** 环节明细（JSON 字符串：检索文档 ID、工具参数摘要、安全结果等） */
     private String detail;
+
+    // ===== Prompt 效果关联（OpenSpec change 2026-08-18-prompt-config）=====
+    /** 本次 LLM 调用使用的 Prompt 场景（如 rag / intent / judge），关联 prompt 配置化版本 */
+    private String promptScenario;
+
+    /** 本次 LLM 调用使用的 Prompt 版本（如 v1 / v2），用于按版本聚合评估质量分 */
+    private String promptVersion;
 }
