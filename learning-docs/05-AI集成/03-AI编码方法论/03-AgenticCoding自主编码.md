@@ -36,14 +36,13 @@ Agent 自我验证（检查结果是否符合目标）
 
 ## 三、典型工具
 
-| 工具 | 特点 |
-|------|------|
-| **Devin** | 首个"AI 软件工程师"，可独立完成 PR |
-| **OpenHands** | 开源 Agent，支持浏览器端操作 |
-| **Qoder Agent** | 商汤出品，多模式切换（Agent/Plan/Debug） |
-| **Claude Code** | Anthropic 的终端 Agent，自主搜索、编辑、测试 |
-| **Cursor Agent** | IDE 内 Agent 模式，自主跨文件操作 |
-| **GitHub Copilot Workspace** | 从 Issue 到 PR 的全自动流程 |
+| 工具形态 | 特点 |
+|----------|------|
+| **专用软件工程 Agent** | 可独立完成 PR 的端到端 Agent（如 Devin） |
+| **开源 Agent 框架** | 支持在浏览器/终端自主操作代码库（如 OpenHands） |
+| **IDE 内置 Agent 模式** | 在编辑器内自主跨文件搜索、编辑、运行测试 |
+| **终端式 Agent** | 在命令行中自主搜索、编辑、测试、提交 |
+| **Issue→PR 全自动工作流** | 从需求到拉取请求的全流程自动化（如 Copilot Workspace） |
 
 ---
 
@@ -139,7 +138,7 @@ Agent 的核心能力在于**自主决策循环**：
 
 ## 九、实战示例
 
-### 场景：用 Claude Code 修复一个 Bug
+### 场景：用 IDE 内置 Agent 修复一个 Bug
 
 **Issue 描述：**
 ```
@@ -178,10 +177,10 @@ Agent 的核心能力在于**自主决策循环**：
 
 ## 十一、在本项目中的实践
 
-本项目使用 Qoder 的 Agent 模式处理以下任务：
+本项目当前运行在 CodeBuddy（Qoder 一系）环境中，同时挂载了 `.claude/` 与 `.qoder/` 两套 Agent harness（共用同一套 spec-kit / openspec 命令）。Agent 模式常用于：
 
 - 跨模块的代码搜索和分析
 - 重复性代码生成（如批量创建 CRUD 接口）
 - 简单的 Bug 修复（有明确错误信息）
 
-对于复杂任务，仍然使用 Plan-First 或 SDD，避免 Agent 在复杂场景下"跑偏"。
+> 规范事实来源是 `CLAUDE.md`（`QODER.md` 仅作为当前 harness 的入口桥接，不重复维护规则）。对于复杂任务，仍然使用 Plan-First 或 SDD，避免 Agent 在复杂场景下"跑偏"。

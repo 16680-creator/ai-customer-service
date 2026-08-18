@@ -189,7 +189,7 @@ AI 生成完整实施计划
 本项目（ai-customer-service）中，中等复杂度的日常任务默认使用 Plan-First 模式：
 
 ```
-Rules-Driven：QODER.md 定义规范
+Rules-Driven：CLAUDE.md 定义项目规范（QODER.md 作为当前 CodeBuddy/Qoder harness 的入口桥接，不重复维护规则）
        ↓
 Plan-First：生成计划 → 审核 → 逐步执行
        ↓

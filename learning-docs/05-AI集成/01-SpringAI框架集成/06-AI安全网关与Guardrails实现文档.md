@@ -102,7 +102,7 @@ ai-cs-message（8085）
 
 | 模块 | 新增/修改 | 关键类 |
 |---|---|---|
-| `ai-cs-chat` | `com.aics.chat.security` 包（7 个生产类 + 配置） | `SafetyGuardService`（扩展）、`PiiMasker`（扩展）、`ContentSafetyService`、`ToolAuthorizationService`、`RagAclFilter`、`SqlGuard`、`SecurityAuditRecorder`、`SecurityProperties`、`UserRoleResolver` |
+| `ai-cs-chat` | `com.aics.chat.security` 包（11 个类）+ `com.aics.chat.util.PiiMasker`（共用） | `ContentReviewer`、`ContentReviewResult`、`ContentSafetyService`、`RagAclFilter`、`RegexContentReviewer`、`SecurityAuditRecorder`、`SecurityEventType`、`SecurityProperties`、`SqlGuard`、`ToolAuthorizationService`、`ToolAuthResult`、`UserRoleResolver`；另含 `util/PiiMasker`（5 类脱敏，与 03-VLM 章节共用）、`util/ImageUrlValidator`（SSRF 白名单） |
 | `ai-cs-chat` | Guardrail 接入既有链路 | `AfterSaleAgentService`（输入审核 + 工具授权）、`ChatServiceImpl`（输入/输出审核 + ACL）、`AgentTraceRecorder`（PII 脱敏）、`Nl2SqlQueryService`（委托 SqlGuard）、`OrderLocatorTool`（越权审计） |
 | `ai-cs-gateway` | 认证透传加固 + 限流 | `AuthFilter`（移除伪造身份头）、`RateLimitFilter`、`SlidingWindowRateLimiter` |
 | `ai-cs-message` | 安全事件审计 | `SecurityEvent` 实体 / Mapper / Service / Controller / DTO |

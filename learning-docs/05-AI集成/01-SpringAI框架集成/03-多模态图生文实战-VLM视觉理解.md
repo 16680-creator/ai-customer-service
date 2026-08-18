@@ -1,8 +1,10 @@
 # 多模态图生文实战（VLM 视觉理解）
 
 > 让 AI 客服"看懂"用户上传的图片，再结合知识库回答。
-> 对应项目文件：`ai-cs-chat` 模块的 `VisionModelClient`、`VisionChatServiceImpl`、`ImageUrlValidator`、`PiiMasker`；`ai-cs-product` 模块的 `SiliconFlowImageDescriptionService`
+> 对应项目文件：`ai-cs-chat` 模块的 `VisionModelClient`、`VisionChatServiceImpl`、`util/ImageUrlValidator`、`util/PiiMasker`；`ai-cs-product` 模块的 `SiliconFlowImageDescriptionService`
 > 功能分支：`004-vlm-multimodal`
+
+> **模型版本说明**：文档早期示例写的是 `Qwen2.5-VL`（代码内 `VisionModelClient` Javadoc 仍有滞后注释），但当前 `VisionProperties.model` 默认值为 **`Qwen/Qwen3-VL-32B-Instruct`**，可在 Nacos 配置覆盖。下文统一以当前默认值为准。
 
 ---
 
@@ -37,12 +39,12 @@ DeepSeek 的 `deepseek-chat` 模型**只支持文本输入**，不支持图片�
 
 ```
 DeepSeek（本项目回答模型）：只吃文本，不吃图片
-硅基流动 Qwen2.5-VL       ：吃图片 + 文字，但回答能力弱于 DeepSeek
+硅基流动 Qwen3-VL（默认 Qwen/Qwen3-VL-32B-Instruct）：吃图片 + 文字，但回答能力弱于 DeepSeek
 ```
 
-**解决方案**：两者分工 —— Qwen2.5-VL 负责"看图"，DeepSeek 负责"回答"。这就是下面的两段式架构。
+**解决方案**：两者分工 —— Qwen3-VL 负责"看图"，DeepSeek 负责"回答"。这就是下面的两段式架构。
 
-关键点：硅基流动聚合的 Qwen2.5-VL 走 **OpenAI 兼容协议**，和项目里对接 DeepSeek 的方式完全一致，所以 Spring AI 一行配置就能接入，零新增 SDK。
+关键点：硅基流动聚合的 Qwen3-VL 走 **OpenAI 兼容协议**，和项目里对接 DeepSeek 的方式完全一致，所以 Spring AI 一行配置就能接入，零新增 SDK。
 
 ---
 
@@ -94,7 +96,7 @@ void init() {
             .baseUrl(visionProperties.getBaseUrl())   // https://api.siliconflow.cn
             .apiKey(visionProperties.getApiKey())
             .build();
-    // OpenAiChatModel：视觉模型，model 用 Qwen2.5-VL
+    // OpenAiChatModel：视觉模型，model 默认 Qwen/Qwen3-VL-32B-Instruct（可配）
     this.visionModel = OpenAiChatModel.builder()
             .openAiApi(api)
             .defaultOptions(OpenAiChatOptions.builder().model(visionProperties.getModel()).build())
@@ -197,12 +199,22 @@ for (String allowed : allowedHosts) {
         return true;
     }
 }
-return false;
+return false;   // 白名单未配置时，循环不命中 → 拒绝所有地址（安全默认）
 ```
+
+> 配置项 `aics.vision.allowed-image-host`（逗号分隔）。**若未配置任何白名单，则默认拒绝所有图片地址**，避免 SSRF 探测内网。
 
 **② PII 脱敏（PiiMasker）**
 
-视觉描述可能含截图中的手机号、身份证号。注入 Prompt 前先脱敏：
+`PiiMasker` 位于 `com.aics.chat.util` 包，覆盖 **5 类**敏感信息（均带数字边界 `(?<!\d)(?!\d)`）：
+
+| 类型 | 规则要点 |
+|------|---------|
+| 身份证 | 18 位 → 110101********1234 |
+| 银行卡 | 13–19 位 + Luhn 校验 |
+| 手机号 | 11 位 → 138****5678 |
+| 邮箱 | 邮箱地址打码 |
+| 地址门牌号 | 推断门牌号打码 |
 
 ```java
 // 身份证：110101199001011234 → 110101********1234
@@ -211,7 +223,7 @@ ID_CARD.matcher(text).replaceAll("$1********$2");
 PHONE.matcher(masked).replaceAll("$1****$2");
 ```
 
-**关键理解**：先脱敏身份证（更长更具体）再脱敏手机号，避免手机号正则误匹配身份证里的数字片段。
+**关键理解**：先脱敏身份证（更长更具体）再脱敏手机号，避免手机号正则误匹配身份证里的数字片段；`util` 包下的 `PiiMasker` 同时在 06 安全网关章节被引用，属全局共用工具。
 
 ---
 
@@ -226,6 +238,28 @@ PHONE.matcher(masked).replaceAll("$1****$2");
 原来 `ImageDescriptionService` 是 Noop 占位（返回 null），现在接入视觉模型后，商品"以图搜文/相似商品"能识别图片外观特征。
 
 **降级**：视觉不可用返回 null，商品创建/更新流程不中断。
+
+---
+
+## 五（补）、对外接口与可观测
+
+### 5.1 对外接口
+
+除 `POST /chat/vision`（同步、上文 4.3 的 `chatWithVision`）外，本项目还提供：
+
+| 接口 | 说明 |
+|------|------|
+| `POST /chat/vision` | 同步图片对话（校验→看图→RAG 回答） |
+| `POST /chat/vision/sse` | **流式**图片对话（`chatWithVisionSse`），降级时直接转 `chatService.chatStreamSse` |
+| `POST /chat/upload-image` | 图片上传到 MinIO（`chat/images` 目录，支持 jpg/jpeg/png/webp/gif，5MB 上限）后返回可访问 URL，再交给 `/chat/vision` 使用 |
+
+### 5.2 可观测接入
+
+视觉调用已纳入统一可观测体系：
+
+- `Observation("chat.vision")`，`span.type=LLM`、`provider=siliconflow`、`scenario=vision`；
+- 经 `ModelUsageRecorder.record("vision", ...)` 计量 Token / 费用；
+- 跨 `supplyAsync` 线程用 `TraceContextHolder.capture()/restore()` 传播 TraceContext。
 
 ---
 

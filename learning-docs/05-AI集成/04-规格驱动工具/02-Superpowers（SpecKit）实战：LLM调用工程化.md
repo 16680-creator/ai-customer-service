@@ -261,7 +261,7 @@ resilience4j:
 
 #### T3：创建 ResilientAiService ✅
 
-**操作**：新建弹性包装类，通过注解组合弹性能力
+**操作（v1 初始设计稿）**：SDD 规划阶段的弹性包装类，通过注解组合弹性能力
 
 ```java
 @Service
@@ -298,12 +298,19 @@ public class ResilientAiService {
 }
 ```
 
+> **与最终实现（v2）的差异说明**：上方为 SDD 规划时「注解式容错（@TimeLimiter + @Retry + @CircuitBreaker + 固定 fallbackChat/fallbackSseStream）」的初始设计稿。**项目真实实现已演进为「模型路由 + 多模型降级链 + 模型粒度熔断/超时 + 观测」**：
+> - 所有方法首参为 `ModelScenario scenario`（`callChat` / `callRagChat` / `callSummary` / `callSseStream` / `callSseRagStream`），方法与规划名一致但多了场景参数；
+> - 熔断改为**模型粒度**（`ModelHealthRegistry.breaker(modelId)`），超时按**模型 `timeoutMs`** 用 `CompletableFuture.get(timeoutMs)` + `cancel(true)` 实现；
+> - 失败按 `fallbackChain` 逐模型降级，最终 `fallbackText(scenario)` 返回 "AI 助手暂时繁忙，请稍后重试。"（SUMMARY 返回空），**不是**规划里的 `fallbackChat` / `fallbackSseStream` / `fallbackSummary`；
+> - 仅对 `ResourceAccessException / SocketTimeoutException / TimeoutException` **重试一次**（`callWithTransientRetry`）；流式（`callSseStream` / `callSseRagStream`）**绝不重试**（Flux 不可重放）；
+> - 全程接入 `Observation` + `ModelUsageRecorder` 做可观测与用量计量。
+> - 注意：`application.yml` 中 `resilience4j.chatService` / `sseChatService` 实例已成残留配置；仅视觉模型 `visionService` 仍由 `VisionModelClient` 的注解使用。
+
 **关键设计决策**：
 - **为什么返回 CompletableFuture？** `@TimeLimiter` 通过 `Future.get(timeout)` 实现超时，要求方法返回 `Future` 类型
 - **为什么用包装层而非直接改 ChatServiceImpl？** 分离关注点，弹性逻辑与业务逻辑解耦
 - **ResilientAiService 还提供 RAG / 摘要 / 流式 RAG 的重载**：`callRagChat`、`callSummary`、`callSseRagStream`
-  （及对应 `fallbackSummary`），均复用相同的 `@TimeLimiter + @Retry + @CircuitBreaker` 注解组合，
-  只是底层 `ChatClient` 调用方式不同（带 RAG Advisor / 摘要提示 / 流式）。
+  （及对应 `fallbackSummary`），均复用相同的弹性能力，只是底层 `ChatClient` 调用方式不同（带 RAG Advisor / 摘要提示 / 流式）。
 
 #### T4：改造 ChatServiceImpl ✅
 

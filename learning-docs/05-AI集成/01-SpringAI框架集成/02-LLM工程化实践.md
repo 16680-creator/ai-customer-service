@@ -74,7 +74,9 @@ public String chat(String question) {
 
 ## 三、稳定性保障
 
-### 3.1 超时与重试
+### 3.1 超时与重试（教学示意）
+
+> 下面是一段**通用教学示意**代码（用 Spring Retry 注解演示思路）。本项目真实实现已演进为「模型路由 + 编程式熔断/超时 + 仅瞬时故障重试一次」，见 3.4 节。
 
 ```java
 @Service
@@ -104,7 +106,7 @@ public class ResilientChatService {
 }
 ```
 
-### 3.2 多模型降级
+### 3.2 多模型降级（教学示意）
 
 ```java
 // 主模型不可用时切换备用模型
@@ -125,6 +127,39 @@ public class MultiModelChatService {
     }
 }
 ```
+
+### 3.3 限流保护（教学示意）
+
+```java
+// 防止单个用户刷爆 Token 预算
+@Component
+public class AiRateLimiter {
+
+    @Autowired
+    private StringRedisTemplate redis;
+
+    public boolean isAllowed(Long userId) {
+        String key = "ai:rate:" + userId + ":" + currentDate();
+        Long count = redis.opsForValue().increment(key);
+        if (count == 1) {
+            redis.expire(key, 1, TimeUnit.DAYS);
+        }
+        return count <= 100;  // 每人每天最多 100 次
+    }
+}
+```
+
+### 3.4 本项目真实实现：模型路由 + 弹性调用
+
+生产实现位于 `ai-cs-chat` 的 `modelrouter/` 与 `service/ResilientAiService`，与上面的示意代码有本质区别：
+
+- **多模型路由 / 降级链**：`ModelRouter` 按 `ModelScenario`（CHAT / RAG / SUMMARY / INTENT / AGENT / NL2SQL / REWRITE / CHART / JUDGE 共 9 个场景）选择主模型与 `fallbacks` 降级链，`RouteReason` 记录路由原因（SCENARIO_DEFAULT / PRIMARY_UNAVAILABLE / QUOTA_DOWNGRADE / …）。
+- **模型粒度熔断 / 超时**：`ModelHealthRegistry.breaker(modelId)` 取**模型粒度**熔断器；超时按 `ModelDefinition.timeoutMs` 用 `CompletableFuture.get(timeoutMs)` + `cancel(true)` 实现。
+- **仅瞬时故障重试一次**：`callWithTransientRetry` 仅对 `ResourceAccessException / SocketTimeoutException / TimeoutException` 重试一次；**流式（`invokeStream`）绝不重试**（Flux 不可重放）。
+- **队列 / 配额驱动的模型降级**：`QuotaService` 超配额时驱动 `ModelRouter` 走 `QUOTA_DOWNGRADE` 切到 `cheap` 档。
+- **可观测**：`startLlmObservation` 写入 `modelId / routeReason / fallbackFrom / attempt / firstTokenMs`；`ModelUsageRecorder.record(...)` 按内部 `pricingKey` 计量 Token/费用（展示名与计费名解耦）。
+
+> 注意：`application.yml` 中 `resilience4j.*` 的 `chatService` / `sseChatService` 实例已成为残留配置；视觉模型（`visionService`）仍由 `VisionModelClient` 的 `@TimeLimiter/@Retry/@CircuitBreaker` 注解使用。
 
 ### 3.3 限流保护
 

@@ -34,8 +34,11 @@ ai-cs-chat                                    ai-cs-message
 └─────────────────────────────┘              └──────────────────────────┘
 ```
 
-- **埋点统一入口**：Micrometer Observation（`Observation.createNotStarted`），`TraceSpanObservationHandler` 在 `onStop` 时把 observation 组装为 `TraceSpan` 挂到当前 `TraceContext`。
-- **异步传播**：`TraceContextHolder.capture()/restore()` 显式跨线程传播（LLM 调用的 `supplyAsync`、SSE 订阅回调、Rerank 的弹性线程池）。
+- **埋点统一入口**：Micrometer Observation（`Observation.createNotStarted`），`TraceSpanObservationHandler` 在 `onStop` 时把 observation 组装为 `TraceSpan` 挂到当前 `TraceContext`；统一封装入口为 `TraceSpans.observe` / `observeReturn`。
+- **与模型路由联动**：`ResilientAiService.startLlmObservation` 除常规字段外，额外写入 `modelId` / `routeReason` / `fallbackFrom` / `attempt` / `firstTokenMs` 五个 high-cardinality key；`ModelUsageRecorder.record(...)` 提供 8 参重载（按内部 `pricingKey` 查单价，与展示 `model` 名解耦）。
+- **配额驱动模型降级**：`QuotaService.check()` 结果会驱动 `ModelRouter` 走 `QUOTA_DOWNGRADE` 自动切到 `cheap` 档（不仅是"支持配额管控"，而是会自动降级模型）。
+- **场景推导**：`TraceInterceptor` 按入口推导 6 类场景用于埋点分类：agent / vision / rag / sse / history / chat。
+- **异步传播**：`TraceContextHolder.capture()/restore()` 显式跨线程传播（LLM 调用的 `supplyAsync`、SSE 订阅回调、Rerank 的弹性线程池）；异步线程池由 `ObservabilityExecutorConfig` 提供（`usageExecutor` 1/4/1000、`evalExecutor` 1/2/500）。
 - **审计尽力而为**：trace/用量/评估落库失败只告警，绝不阻断主业务链路。
 
 ---
@@ -179,6 +182,8 @@ aics:
 | 线上采样评估 | `.../observability/OnlineEvalService.java`、`OnlineEvalSampler.java`、`OnlineEvalProperties.java` |
 | 用户反馈接口 | `ai-cs-chat/.../controller/ChatFeedbackController.java` |
 | 埋点接入点 | `service/impl/ResilientAiService.java`、`ChatServiceImpl.java`、`VisionModelClient.java`、`rag/rerank/SiliconFlowRerankService.java`、`rag/eval/LlmJudgeService.java`、`nl2sql/Nl2SqlQueryService.java`、`agent/*` |
+| 统一埋点入口 | `.../observability/TraceSpans.java`（`observe` / `observeReturn` 统一封装）、`.../observability/TraceSpanObservationHandler.java` |
+| 异步线程池配置 | `config/ObservabilityExecutorConfig.java`（`usageExecutor` 1/4/1000、`evalExecutor` 1/2/500，均 `waitForTasksToCompleteOnShutdown`） |
 | CI 门禁扩展 | `rag/eval/EvalGateConfig.java`、`RagEvalServiceImpl.java`、`RagEvalReport.java` |
 | message 侧持久化 | `ai-cs-message/.../controller/LlmTraceController.java`、`ModelUsageController.java`、`ModelUsageQuotaController.java`、`OnlineEvalController.java` |
 
