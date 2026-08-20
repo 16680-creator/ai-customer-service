@@ -134,14 +134,25 @@ public class ResilientAiService {
     /**
      * SSE 流式对话：返回 CompletableFuture<Flux<String>>，外层 Future 用于异步路由，内层 Flux 是 token 流。
      * 学习点：双层异步结构 —— supplyAsync 里做路由选模型（同步），返回的 Flux 才是真正的 token 流（异步 reactive）
+     *
+     * 【工具调用（Tool Call）标注】流式场景下 toolcall 的执行点不在此处、也不在 ChatServiceImpl，
+     * 而在 Spring AI 框架内部（ChatModel 层的 ToolCallingManager）：
+     *   ① LLM 响应携带 tool_calls 时，Spring AI 收集流式 chunk 并识别工具调用请求；
+     *   ② 在订阅线程上同步执行对应的 ToolCallback（即 @Tool 标注的方法，如订单查询/SQL 执行）；
+     *   ③ 工具结果作为 ToolResponseMessage 追加进消息后重新请求模型，循环直到输出纯文本；
+     *   ④ 只有最终文本才经 .content() 发射 —— 下游 subscribe() 对工具执行全程无感知。
+     * 注意：工具执行耗时被包含在 Flux 内部，会导致 TTFT（首 token 延迟）变长。
+     * 工具回调的挂载点在 ChatModelRegistry.rebuild()（仅 TOOL_CALLING 能力的模型挂 defaultToolCallbacks），
+     * 工具注册点在 SpringAiConfig.toolCallbackProvider()。
      */
     public CompletableFuture<Flux<String>> callSseStream(ModelScenario scenario, List<org.springframework.ai.chat.messages.Message> messages) {
         return invokeStream(scenario,
-                holder -> holder.getChatClient().prompt().messages(messages).stream().content()); // .stream() 返回 Flux<ChatResponse>；.content() 只提取文本内容部分，丢弃元数据
+                holder -> holder.getChatClient().prompt().messages(messages).stream().content()); // .stream() 返回 Flux<ChatResponse>；.content() 只提取文本内容部分，丢弃元数据（含 tool_calls 中间过程）
     }
 
     /**
      * SSE 流式 RAG：与 callSseStream 类似，但入参为单条 prompt。
+     * 【工具调用标注】同 callSseStream —— toolcall 由 Spring AI 在 .stream() 内部自动执行，见上方方法注释。
      */
     public CompletableFuture<Flux<String>> callSseRagStream(ModelScenario scenario, String prompt) {
         return invokeStream(scenario,
@@ -258,6 +269,9 @@ public class ResilientAiService {
                     ModelClientHolder selectedHolder = holder;       // 赋值给 effectively final 变量，才能在 lambda 里引用
                     CircuitBreaker selectedBreaker = breaker;        // 同上，lambda 捕获的变量必须是 final 或 effectively final
                     // ③ 发起流式调用：返回 Flux，此时还没真正请求 LLM（lazy），订阅后才开始
+                    // 【工具调用标注】若模型响应携带 tool_calls，Spring AI 会在订阅后的流内部
+                    //   自动执行 ToolCallback 并带结果重新请求模型（可能多轮），这些过程不产生 content chunk，
+                    //   所以下游管道只看到最终文本流；这里的 TTFT/耗时统计隐含了工具执行时间
                     Flux<String> flux = call.call(holder);
                     // ④ 准备三个"跨管道传递状态"的容器：流式场景里结果只能在 doFinally 里拿到
                     AtomicReference<Usage> usageRef = new AtomicReference<>();      // 流式场景里 Usage 只能在最后一个 chunk 里拿到，用 AtomicReference 跨 reactive 管道传递

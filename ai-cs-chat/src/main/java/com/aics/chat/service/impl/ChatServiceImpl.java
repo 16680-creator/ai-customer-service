@@ -545,6 +545,11 @@ public class ChatServiceImpl implements ChatService {
             //   注意：StringBuilder 非线程安全，但 Flux 的 subscribe 回调在同一个串行调度器上执行
             //   （Reactive Streams 规范要求 onNext 串行调用），所以这里不存在并发写入问题。
             //
+            // 【工具调用（Tool Call）标注】流式场景下，若模型决定调用工具（如订单查询/SQL 执行），
+            //   执行点在 Spring AI 框架内部（ChatModel 层的 ToolCallingManager），不在本类：
+            //   工具调用/结果回传/重新请求模型都在 Flux 内部完成，本处 subscribe 收到的 chunk
+            //   永远是最终文本，对工具执行全程无感知。详见 ResilientAiService.callSseStream 注释。
+            //
             // ──────────────────────────────────────────────────────────────────────────
             StringBuilder full = new StringBuilder();
             flux.subscribe(

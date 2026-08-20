@@ -39,11 +39,11 @@ import org.springframework.beans.factory.annotation.Value;
  * <ul>
  *   <li>{@link #siliconFlowEmbeddingModel()}：向量模型（EmbeddingModel），{@code @Primary} 标注，
  *       指向硅基流动 {@code https://api.siliconflow.cn}，模型 {@code BAAI/bge-m3}。</li>
- *   <li>{@link #orderToolCallbackProvider(OrderQueryService)}：把 {@link OrderQueryService} 上
+ *   <li>{@link #toolCallbackProvider(OrderQueryService, Nl2SqlQueryService)}：把 {@link OrderQueryService} 上
  *       {@code @Tool} 标注的方法注册成 LLM 可调用的 Function Tool。</li>
  *   <li>{@link #ragAdvisor(VectorStore)}：{@link QuestionAnswerAdvisor}，Spring AI 内置的 RAG 顾问，
  *       在每次 ChatClient 调用时自动注入向量检索结果作为上下文。</li>
- *   <li>{@link #chatClientCustomizer(ToolCallbackProvider, QuestionAnswerAdvisor)}：
+ *   <li>{@link #chatClientCustomizer(ToolCallbackProvider, QuestionAnswerAdvisor, com.aics.chat.prompt.PromptRegistry)}：
  *       ChatClientCustomizer，为模型路由注册的每个 ChatClient 绑定默认系统提示与 RAG Advisor。</li>
  * </ul>
  *
@@ -188,6 +188,10 @@ public class SpringAiConfig {
      * （AI 智能问数）作为工具对象注册，Spring AI 会扫描其上
      * {@link org.springframework.ai.tool.annotation.Tool} 注解的方法，
      * 包装成 {@code ToolCallback} 暴露给 LLM；当 LLM 决定调用工具时，会回调到这些方法。</p>
+     *
+     * <p>【工具调用标注】这里是 toolcall 的注册点；挂载点在 ChatModelRegistry.rebuild()
+     * （defaultToolCallbacks）；流式场景下工具的实际执行由 Spring AI 在 .stream() 内部自动完成，
+     * 详见 ResilientAiService.callSseStream 注释。</p>
      *
      * @param orderQueryService 订单查询服务（含 {@code @Tool} 方法）
      * @param nl2SqlQueryService AI 智能问数服务（含 {@code @Tool} 方法）

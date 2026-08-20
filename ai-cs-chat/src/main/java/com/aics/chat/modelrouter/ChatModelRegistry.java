@@ -65,6 +65,8 @@ public class ChatModelRegistry {
                         .build();
                 ChatClient.Builder builder = chatClientCustomizer.customize(ChatClient.builder(chatModel));
                 // 设计要点：只有声明 TOOL_CALLING 能力的模型才挂工具回调，避免不支持函数调用的模型收到工具声明后报错
+                // 【工具调用标注】这里是 toolcall 的挂载点 —— 流式（.stream()）与非流式（.call()）共用该 ChatClient；
+                //   流式时工具的实际执行发生在 Spring AI 内部（见 ResilientAiService.callSseStream 注释）
                 if (definition.getCapabilities().contains(ModelCapability.TOOL_CALLING)) {
                     builder = builder.defaultToolCallbacks(toolCallbackProvider);
                 }
