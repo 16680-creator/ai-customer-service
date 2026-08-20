@@ -2,8 +2,8 @@ package com.aics.chat.observability;
 
 import com.aics.chat.dto.ModelUsageDTO;
 import com.aics.chat.feign.ModelUsageFeignClient;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
 
@@ -25,7 +25,6 @@ import java.math.RoundingMode;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class ModelUsageRecorder {
 
     private static final BigDecimal PER_MILLION = new BigDecimal("1000000");
@@ -33,6 +32,14 @@ public class ModelUsageRecorder {
     private final ModelUsageProperties properties;
     private final ModelUsageFeignClient modelUsageFeignClient;
     private final ThreadPoolTaskExecutor usageExecutor;
+
+    public ModelUsageRecorder(ModelUsageProperties properties,
+                              ModelUsageFeignClient modelUsageFeignClient,
+                              @Qualifier("usageExecutor") ThreadPoolTaskExecutor usageExecutor) {
+        this.properties = properties;
+        this.modelUsageFeignClient = modelUsageFeignClient;
+        this.usageExecutor = usageExecutor;
+    }
 
     /**
      * 记录一次 LLM 调用用量（异步落库，失败仅告警）。

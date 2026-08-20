@@ -3,8 +3,8 @@ package com.aics.chat.observability;
 import com.aics.chat.dto.OnlineEvalRecordDTO;
 import com.aics.chat.feign.OnlineEvalFeignClient;
 import com.aics.chat.rag.eval.LlmJudgeService;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -22,7 +22,6 @@ import org.springframework.util.StringUtils;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class OnlineEvalService {
 
     private final OnlineEvalProperties properties;
@@ -30,6 +29,18 @@ public class OnlineEvalService {
     private final LlmJudgeService llmJudgeService;
     private final OnlineEvalFeignClient onlineEvalFeignClient;
     private final ThreadPoolTaskExecutor evalExecutor;
+
+    public OnlineEvalService(OnlineEvalProperties properties,
+                             OnlineEvalSampler sampler,
+                             LlmJudgeService llmJudgeService,
+                             OnlineEvalFeignClient onlineEvalFeignClient,
+                             @Qualifier("evalExecutor") ThreadPoolTaskExecutor evalExecutor) {
+        this.properties = properties;
+        this.sampler = sampler;
+        this.llmJudgeService = llmJudgeService;
+        this.onlineEvalFeignClient = onlineEvalFeignClient;
+        this.evalExecutor = evalExecutor;
+    }
 
     /**
      * 对一次线上回答执行采样评估（未启用/未命中采样时静默跳过）。

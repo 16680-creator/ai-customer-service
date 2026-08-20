@@ -10,7 +10,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -136,5 +141,45 @@ class OnlineEvalServiceTest {
 
         assertDoesNotThrow(() -> newService().evaluateAsync("req-6", null, null, "问题", "回答"));
         assertTrue(latch.await(5, TimeUnit.SECONDS));
+    }
+
+    @Test
+    @DisplayName("存在多个观测线程池时使用 evalExecutor 装配")
+    void context_usesEvalExecutorWhenMultipleExecutorsExist() {
+        new ApplicationContextRunner()
+                .withUserConfiguration(OnlineEvalServiceContextConfig.class)
+                .run(context -> {
+                    assertNull(context.getStartupFailure());
+                    OnlineEvalService service = context.getBean(OnlineEvalService.class);
+                    ThreadPoolTaskExecutor evalExecutor = context.getBean("evalExecutor",
+                            ThreadPoolTaskExecutor.class);
+
+                    assertSame(evalExecutor, ReflectionTestUtils.getField(service, "evalExecutor"));
+                });
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    @Import({com.aics.chat.config.ObservabilityExecutorConfig.class, OnlineEvalService.class})
+    static class OnlineEvalServiceContextConfig {
+
+        @Bean
+        OnlineEvalProperties onlineEvalProperties() {
+            return new OnlineEvalProperties();
+        }
+
+        @Bean
+        OnlineEvalSampler onlineEvalSampler() {
+            return new OnlineEvalSampler();
+        }
+
+        @Bean
+        LlmJudgeService llmJudgeService() {
+            return mock(LlmJudgeService.class);
+        }
+
+        @Bean
+        OnlineEvalFeignClient onlineEvalFeignClient() {
+            return mock(OnlineEvalFeignClient.class);
+        }
     }
 }

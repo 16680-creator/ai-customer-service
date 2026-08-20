@@ -23,6 +23,7 @@ spring:
         file-extension: yml
   config:
     import:
+      - optional:classpath:application-prompt.yml
       - optional:nacos:aics-shared.yml
       - optional:nacos:ai-cs-chat.yml
 

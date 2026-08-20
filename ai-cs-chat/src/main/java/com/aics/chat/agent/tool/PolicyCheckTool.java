@@ -4,8 +4,8 @@ import com.aics.chat.agent.model.AfterSaleActionType;
 import com.aics.chat.agent.model.PolicyCheckResult;
 import com.aics.chat.agent.model.PolicyRule;
 import com.aics.chat.agent.state.AgentStateMachine;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
@@ -19,10 +19,13 @@ import java.util.List;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class PolicyCheckTool implements AgentTool {
 
     private final RuleProvider ruleProvider;
+
+    public PolicyCheckTool(@Qualifier("knowledgeRuleProvider") RuleProvider ruleProvider) {
+        this.ruleProvider = ruleProvider;
+    }
 
     @Override
     public String name() {

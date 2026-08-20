@@ -4,6 +4,7 @@ import com.aics.chat.observability.ObservabilityProperties;
 import com.aics.chat.observability.TraceInterceptor;
 import com.aics.chat.observability.TraceRecorder;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectFactory;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
@@ -27,13 +28,13 @@ public class ObservabilityWebConfig implements WebMvcConfigurer {
     // 拦截器所需依赖通过构造器注入（@RequiredArgsConstructor）：采样配置用于决定
     // 本次请求是否开启 trace，TraceRecorder 负责组装 span 链并异步上报
     private final ObservabilityProperties observabilityProperties;
-    private final TraceRecorder traceRecorder;
+    private final ObjectFactory<TraceRecorder> traceRecorderFactory;
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         // 仅拦截对话与 Agent 相关接口：这两类是 LLM 调用链的主要入口；
         // 静态资源/健康检查不参与 trace，避免无谓的 span 开销与监控噪音
-        registry.addInterceptor(new TraceInterceptor(observabilityProperties, traceRecorder))
+        registry.addInterceptor(new TraceInterceptor(observabilityProperties, traceRecorderFactory))
                 .addPathPatterns("/chat/**", "/agent/**");
     }
 }

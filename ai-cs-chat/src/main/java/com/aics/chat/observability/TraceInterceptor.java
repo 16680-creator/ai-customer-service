@@ -4,6 +4,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectFactory;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 /**
@@ -25,7 +26,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
 public class TraceInterceptor implements HandlerInterceptor {
 
     private final ObservabilityProperties properties;
-    private final TraceRecorder traceRecorder;
+    private final ObjectFactory<TraceRecorder> traceRecorderFactory;
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
@@ -74,8 +75,13 @@ public class TraceInterceptor implements HandlerInterceptor {
             ctx.markFailed("HTTP " + response.getStatus());
         }
         // 落库（失败仅告警），并清理线程上下文与 MDC
-        traceRecorder.record(ctx);
-        TraceContextHolder.clear();
+        try {
+            traceRecorderFactory.getObject().record(ctx);
+        } catch (Exception e) {
+            log.warn("LLM trace 落库失败: requestId={}, err={}", ctx.getRequestId(), e.getMessage());
+        } finally {
+            TraceContextHolder.clear();
+        }
     }
 
     /** 按 URI 推导场景标识（用于用量与 trace 统计） */

@@ -3,7 +3,6 @@ package com.aics.chat.observability;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.stereotype.Component;
 
 /**
  * LLM 可观测性配置项（前缀 aics.observability）
@@ -20,7 +19,6 @@ import org.springframework.stereotype.Component;
  */
 @Getter
 @Setter
-@Component
 @ConfigurationProperties(prefix = "aics.observability")
 public class ObservabilityProperties {
 

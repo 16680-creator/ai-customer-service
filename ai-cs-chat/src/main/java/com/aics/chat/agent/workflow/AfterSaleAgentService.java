@@ -39,8 +39,8 @@ import com.aics.chat.util.ChatUserContext;
 import com.aics.common.exception.BusinessException;
 import com.aics.common.result.ResultCode;
 import io.micrometer.observation.ObservationRegistry;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -66,7 +66,6 @@ import java.util.function.Supplier;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class AfterSaleAgentService {
 
     private final AgentProperties properties;
@@ -87,6 +86,42 @@ public class AfterSaleAgentService {
     private final ContentSafetyService contentSafetyService;
     private final ToolAuthorizationService toolAuthorizationService;
     private final SecurityAuditRecorder securityAuditRecorder;
+
+    public AfterSaleAgentService(AgentProperties properties,
+                                 SafetyGuardService safetyGuardService,
+                                 IntentClassifierService intentClassifierService,
+                                 AgentStateMachine stateMachine,
+                                 AgentToolRegistry toolRegistry,
+                                 @Qualifier("redisAgentRunStore") AgentRunStore runStore,
+                                 ConfirmationService confirmationService,
+                                 AgentTraceRecorder traceRecorder,
+                                 OrderLocatorTool orderLocatorTool,
+                                 PolicyCheckTool policyCheckTool,
+                                 ProductRecommendTool productRecommendTool,
+                                 CreateAfterSaleTool createAfterSaleTool,
+                                 HandoffTool handoffTool,
+                                 ObservationRegistry observationRegistry,
+                                 ContentSafetyService contentSafetyService,
+                                 ToolAuthorizationService toolAuthorizationService,
+                                 SecurityAuditRecorder securityAuditRecorder) {
+        this.properties = properties;
+        this.safetyGuardService = safetyGuardService;
+        this.intentClassifierService = intentClassifierService;
+        this.stateMachine = stateMachine;
+        this.toolRegistry = toolRegistry;
+        this.runStore = runStore;
+        this.confirmationService = confirmationService;
+        this.traceRecorder = traceRecorder;
+        this.orderLocatorTool = orderLocatorTool;
+        this.policyCheckTool = policyCheckTool;
+        this.productRecommendTool = productRecommendTool;
+        this.createAfterSaleTool = createAfterSaleTool;
+        this.handoffTool = handoffTool;
+        this.observationRegistry = observationRegistry;
+        this.contentSafetyService = contentSafetyService;
+        this.toolAuthorizationService = toolAuthorizationService;
+        this.securityAuditRecorder = securityAuditRecorder;
+    }
 
     // ==================== 对外入口 ====================
 

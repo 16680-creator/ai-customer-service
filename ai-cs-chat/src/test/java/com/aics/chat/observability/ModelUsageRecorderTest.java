@@ -9,6 +9,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.math.BigDecimal;
@@ -169,10 +173,36 @@ class ModelUsageRecorderTest {
         assertEquals("eval", captor.getValue().getScenario());
     }
 
+    @Test
+    @DisplayName("存在多个观测线程池时使用 usageExecutor 装配")
+    void context_usesUsageExecutorWhenMultipleExecutorsExist() {
+        new ApplicationContextRunner()
+                .withUserConfiguration(ModelUsageRecorderContextConfig.class)
+                .run(context -> {
+                    assertNull(context.getStartupFailure());
+                    assertNotNull(context.getBean(ModelUsageRecorder.class));
+                });
+    }
+
     private static ModelUsageProperties.ModelPrice price(String input, String output) {
         ModelUsageProperties.ModelPrice p = new ModelUsageProperties.ModelPrice();
         p.setInput(new BigDecimal(input));
         p.setOutput(new BigDecimal(output));
         return p;
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    @Import({com.aics.chat.config.ObservabilityExecutorConfig.class, ModelUsageRecorder.class})
+    static class ModelUsageRecorderContextConfig {
+
+        @Bean
+        ModelUsageProperties modelUsageProperties() {
+            return new ModelUsageProperties();
+        }
+
+        @Bean
+        ModelUsageFeignClient modelUsageFeignClient() {
+            return mock(ModelUsageFeignClient.class);
+        }
     }
 }

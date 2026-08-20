@@ -53,7 +53,7 @@ public class KnowledgeRuleProvider implements RuleProvider {
         }
         // 未命中任何规则：静态种子兜底
         if (rules.isEmpty()) {
-            rules = staticRuleProvider.loadRules(actionType);
+            rules = new ArrayList<>(staticRuleProvider.loadRules(actionType));
         }
         // 按期限升序排列，校验时取最短期限判定
         rules.sort(Comparator.comparingInt(PolicyRule::days));

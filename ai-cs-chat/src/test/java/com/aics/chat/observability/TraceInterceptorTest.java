@@ -3,8 +3,11 @@ package com.aics.chat.observability;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectFactory;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -20,7 +23,7 @@ class TraceInterceptorTest {
         public void record(TraceContext ctx) {
         }
     };
-    private final TraceInterceptor interceptor = new TraceInterceptor(properties, recorder);
+    private final TraceInterceptor interceptor = new TraceInterceptor(properties, () -> recorder);
 
     @AfterEach
     void tearDown() {
@@ -70,6 +73,24 @@ class TraceInterceptorTest {
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/chat/send");
         interceptor.preHandle(request, new MockHttpServletResponse(), new Object());
         assertNull(TraceContextHolder.current());
+    }
+
+    @Test
+    @DisplayName("preHandle 不解析 TraceRecorder，避免启动期提前创建 Feign 客户端")
+    void preHandle_doesNotResolveTraceRecorder() {
+        properties.setSampleRate(1.0);
+        AtomicBoolean resolved = new AtomicBoolean(false);
+        ObjectFactory<TraceRecorder> recorderProvider = () -> {
+            resolved.set(true);
+            throw new IllegalStateException("TraceRecorder should be lazy");
+        };
+        TraceInterceptor lazyInterceptor = new TraceInterceptor(properties, recorderProvider);
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/chat/send");
+
+        assertTrue(lazyInterceptor.preHandle(request, new MockHttpServletResponse(), new Object()));
+
+        assertFalse(resolved.get());
+        assertNotNull(TraceContextHolder.current());
     }
 
     @Test

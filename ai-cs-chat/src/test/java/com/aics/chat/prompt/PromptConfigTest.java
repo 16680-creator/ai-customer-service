@@ -1,8 +1,13 @@
 package com.aics.chat.prompt;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.env.YamlPropertySourceLoader;
+import org.springframework.core.env.PropertySource;
+import org.springframework.core.io.ClassPathResource;
 
+import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -117,5 +122,21 @@ class PromptConfigTest {
         // 旧版本仍在，可切回
         reg.setActiveVersion("intent", "v1");
         assertEquals("v1", reg.getActiveVersion("intent"));
+    }
+
+    @Test
+    void applicationPromptYaml_loadsWithSpringYamlLoader() throws IOException {
+        YamlPropertySourceLoader loader = new YamlPropertySourceLoader();
+        List<PropertySource<?>> sources = loader.load("application-prompt",
+                new ClassPathResource("application-prompt.yml"));
+
+        assertEquals(1, sources.size());
+        PropertySource<?> source = sources.get(0);
+        assertEquals(true, source.getProperty("aics.prompt.enabled"));
+        assertEquals("v1", source.getProperty(
+                "aics.prompt.scenarios.default-system.activeVersion"));
+        assertTrue(String.valueOf(source.getProperty(
+                "aics.prompt.scenarios.default-system.versions.v1.system"))
+                .contains("{{dbSchema}}"));
     }
 }
