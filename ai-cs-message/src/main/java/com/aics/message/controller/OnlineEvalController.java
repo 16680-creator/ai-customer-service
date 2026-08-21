@@ -66,8 +66,8 @@ public class OnlineEvalController {
     @Operation(summary = "统计线上评估与反馈")
     @GetMapping("/online-records/stats")
     public Result<OnlineEvalStatsVO> stats(
-            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startTime,
-            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endTime) {
+            @RequestParam(name = "startTime", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startTime,
+            @RequestParam(name = "endTime", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endTime) {
         // 统计：时间范围为空时不参与过滤
         return Result.success(onlineEvalService.stats(startTime, endTime));
     }
@@ -98,9 +98,9 @@ public class OnlineEvalController {
     @Operation(summary = "查询用户反馈列表")
     @GetMapping("/feedback")
     public Result<List<UserFeedbackVO>> listFeedback(
-            @RequestParam(required = false) String requestId,
-            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startTime,
-            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endTime) {
+            @RequestParam(name = "requestId", required = false) String requestId,
+            @RequestParam(name = "startTime", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startTime,
+            @RequestParam(name = "endTime", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endTime) {
         // 条件查询：requestId/时间范围为空时不参与过滤
         return Result.success(onlineEvalService.listFeedback(requestId, startTime, endTime));
     }

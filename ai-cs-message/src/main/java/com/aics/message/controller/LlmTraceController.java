@@ -79,10 +79,10 @@ public class LlmTraceController {
     @Operation(summary = "分页查询 LLM 调用链追踪")
     @GetMapping("/traces")
     public Result<PageResult<LlmTraceVO>> pageTraces(
-            @RequestParam(required = false) Long userId,
-            @RequestParam(required = false) String scenario,
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(name = "userId", required = false) Long userId,
+            @RequestParam(name = "scenario", required = false) String scenario,
+            @RequestParam(name = "page", defaultValue = "1") int page,
+            @RequestParam(name = "size", defaultValue = "20") int size) {
         // required=false：查询参数可空，为 null 时服务层跳过对应过滤；
         // defaultValue 保证 page/size 永远有合法值，避免前端漏传导致分页异常
         // 分页查询：userId/scenario 为空时不参与过滤

@@ -64,14 +64,14 @@ public class ModelUsageController {
     @Operation(summary = "统计模型用量")
     @GetMapping("/stats")
     public Result<ModelUsageStatsVO> stats(
-            @RequestParam(required = false) Long userId,
-            @RequestParam(required = false) String scenario,
-            @RequestParam(required = false) String model,
+            @RequestParam(name = "userId", required = false) Long userId,
+            @RequestParam(name = "scenario", required = false) String scenario,
+            @RequestParam(name = "model", required = false) String model,
             // @DateTimeFormat 为什么必须显式声明：Spring 默认只支持 ISO 格式解析 LocalDateTime，
             // 而前端/运维习惯传 "yyyy-MM-dd HH:mm:ss"，不注解会直接 400；
             // 与查询串"&"分隔的 QueryParam 配合，格式可读、可缓存
-            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startTime,
-            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endTime) {
+            @RequestParam(name = "startTime", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startTime,
+            @RequestParam(name = "endTime", required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endTime) {
         // 统计：过滤条件均为空值时可跳过对应过滤
         return Result.success(modelUsageService.stats(userId, scenario, model, startTime, endTime));
     }
