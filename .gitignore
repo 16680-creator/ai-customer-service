@@ -58,3 +58,6 @@ tools/nacos-config/lib/
 # ±¾µØÔËĞĞÊä³ö
 tools/nacos-start2.out
 .worktrees/
+
+# æœ¬æœºç§å¯†é…ç½®ï¼ˆLLM å¯†é’¥ç­‰ï¼‰ï¼Œä¸¥ç¦æäº¤
+tools/env.local.ps1

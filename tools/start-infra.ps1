@@ -12,7 +12,8 @@ Write-Host "===== [1/3] Infra: Nacos (JDK8) ====="
 if (Test-PortListening 8848) {
     Write-Host "  [Skip] Nacos already running on 8848"
 } else {
-    Start-Process cmd -ArgumentList "/c", "set `"JAVA_HOME=$jdk8`" && cd /d $nacosBin && startup.cmd -m standalone" -WindowStyle Hidden
+    # ".\" 前缀：NoDefaultCurrentDirectoryInExePath=1 时 cmd 不再从当前目录解析裸命令名
+    Start-Process cmd -ArgumentList "/c", "set `"JAVA_HOME=$jdk8`" && cd /d $nacosBin && .\startup.cmd -m standalone" -WindowStyle Hidden
     Wait-Port 8848 120 "Nacos" | Out-Null
 }
 
@@ -21,14 +22,14 @@ Write-Host "===== [2/3] Infra: RocketMQ NameServer + Broker (JDK17) ====="
 if (Test-PortListening 9876) {
     Write-Host "  [Skip] NameServer already running on 9876"
 } else {
-    Start-Process cmd -ArgumentList "/c", "set `"JAVA_HOME=$jdk17`" && set `"ROCKETMQ_HOME=$mqHome`" && cd /d $mqBin && mqnamesrv.cmd" -WindowStyle Hidden
+    Start-Process cmd -ArgumentList "/c", "set `"JAVA_HOME=$jdk17`" && set `"ROCKETMQ_HOME=$mqHome`" && cd /d $mqBin && .\mqnamesrv.cmd" -WindowStyle Hidden
     Wait-Port 9876 90 "NameServer" | Out-Null
 }
 if (Test-PortListening 10911) {
     Write-Host "  [Skip] Broker already running on 10911"
 } elseif (Test-PortListening 9876) {
     Start-Sleep -Seconds 3
-    Start-Process cmd -ArgumentList "/c", "set `"JAVA_HOME=$jdk17`" && set `"ROCKETMQ_HOME=$mqHome`" && cd /d $mqBin && mqbroker.cmd -n 127.0.0.1:9876 autoCreateTopicEnable=true" -WindowStyle Hidden
+    Start-Process cmd -ArgumentList "/c", "set `"JAVA_HOME=$jdk17`" && set `"ROCKETMQ_HOME=$mqHome`" && cd /d $mqBin && .\mqbroker.cmd -n 127.0.0.1:9876 autoCreateTopicEnable=true" -WindowStyle Hidden
     Wait-Port 10911 90 "Broker" | Out-Null
 } else {
     Write-Warning "  [WARN] NameServer not ready, Broker skipped"

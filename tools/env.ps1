@@ -17,3 +17,7 @@ $MAVEN_HOME = "D:\DevTools\maven\maven3.9.16"
 
 # Remote MySQL password (fills the ${DB_PASSWORD} placeholders in ai-cs-*.yml)
 $DB_PASSWORD = "Yxw172707"
+
+# LLM API keys：不要写在本文件（本文件会提交到仓库）。
+# 请复制 tools/env.local.ps1 模板填入真实密钥，该文件已被 .gitignore 排除，
+# 由 common.ps1 启动时自动加载；也可直接配置机器级环境变量 DEEPSEEK_API_KEY / SILICONFLOW_API_KEY。

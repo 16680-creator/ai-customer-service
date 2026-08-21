@@ -25,6 +25,9 @@ $DB_PASSWORD = "Yxw172707"
 
 $envFile = "$tools\env.ps1"
 if (Test-Path -LiteralPath $envFile) { . $envFile }
+# 本机私密配置（LLM 密钥等），不入库；后加载可覆盖 env.ps1 中的非敏感默认值
+$envLocalFile = "$tools\env.local.ps1"
+if (Test-Path -LiteralPath $envLocalFile) { . $envLocalFile }
 
 # ------------------------------------------------------------------ helpers
 function Test-PortListening([int]$port) {
@@ -163,6 +166,9 @@ Write-Host "           JDK17=$jdk17"
 Write-Host "           Maven=$maven"
 
 $env:DB_PASSWORD = $DB_PASSWORD
+# LLM API keys：非空才覆盖，避免清掉机器级环境变量
+if ($DEEPSEEK_API_KEY)   { $env:DEEPSEEK_API_KEY   = $DEEPSEEK_API_KEY }
+if ($SILICONFLOW_API_KEY) { $env:SILICONFLOW_API_KEY = $SILICONFLOW_API_KEY }
 $env:JAVA_HOME = $jdk17
 $env:Path = "$jdk17\bin;$maven\bin;$env:Path"
 

@@ -102,7 +102,8 @@ aics:
         fallbacks: [siliconflow-qwen3-32b]
       intent:
         primary: siliconflow-qwen3-8b
-        fallbacks: [siliconflow-qwen3-32b]
+        # deepseek 兜底：siliconflow 间歇性连接重置时保证意图识别可用
+        fallbacks: [siliconflow-qwen3-32b, deepseek-chat]
       rewrite:
         primary: siliconflow-qwen3-8b
         fallbacks: [siliconflow-qwen3-32b]
