@@ -57,6 +57,12 @@
             <el-button type="info" plain @click="$router.push('/message')" :icon="Message">消息管理</el-button>
             <el-button type="info" plain @click="$router.push('/notify')" :icon="Bell">通知中心</el-button>
             <el-button type="info" plain @click="$router.push('/user')" :icon="User">用户管理</el-button>
+            <el-button type="primary" plain @click="$router.push('/feedback')" :icon="Star">对话反馈</el-button>
+            <el-button type="warning" plain @click="$router.push('/trace')" :icon="Connection">链路追踪</el-button>
+            <el-button type="success" plain @click="$router.push('/prompts')" :icon="Document">Prompt 管理</el-button>
+            <el-button type="danger" plain @click="$router.push('/agent')" :icon="Cpu">售后 Agent</el-button>
+            <el-button type="info" plain @click="$router.push('/graph')" :icon="Share">知识图谱</el-button>
+            <el-button type="info" plain @click="$router.push('/rag-eval')" :icon="DataAnalysis">RAG 评估</el-button>
           </div>
 
           <el-divider />
@@ -65,6 +71,7 @@
             <div class="tip-item"><el-icon color="#409eff"><ChatDotRound /></el-icon> AI 对话支持「RAG 知识库模式」，知识库标识填 <b>knowledge</b> 可检索知识库文档</div>
             <div class="tip-item"><el-icon color="#e6a23c"><Tickets /></el-icon> 交易链路：购物车 → 结算 → 下单 → 订单管理 → 支付</div>
             <div class="tip-item"><el-icon color="#67c23a"><Goods /></el-icon> 商品支持图片上传、相似检索、编辑、删除、分类管理</div>
+            <div class="tip-item"><el-icon color="#9254de"><Cpu /></el-icon> 售后 Agent 编排：意图识别 → 待确认写操作 → 执行，支持转人工</div>
           </div>
         </el-card>
       </el-col>
@@ -87,7 +94,8 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import {
   ChatLineSquare, Collection, User, Search, ShoppingCart, Tickets, Goods,
-  Message, Bell, Files, Refresh, ChatDotRound, Monitor, Connection
+  Message, Bell, Files, Refresh, ChatDotRound, Monitor, Connection,
+  Star, Document, Cpu, Share, DataAnalysis
 } from '@element-plus/icons-vue'
 import axios from 'axios'
 import { notifyApi, messageApi } from '../api'

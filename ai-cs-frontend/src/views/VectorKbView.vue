@@ -70,16 +70,27 @@
                 </template>
               </el-input>
             </el-form-item>
+            <el-form-item label="检索模式">
+              <el-select v-model="searchMode" style="width: 100%">
+                <el-option label="VECTOR（纯向量）" value="VECTOR" />
+                <el-option label="HYBRID（混合）" value="HYBRID" />
+                <el-option label="RERANK（重排）" value="RERANK" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="TopK">
+              <el-input-number v-model="searchTopK" :min="1" :max="20" />
+            </el-form-item>
             <el-form-item label="检索问题">
-              <el-input v-model="searchQuery" placeholder="输入问题..." />
+              <el-input v-model="searchQuery" placeholder="输入问题..." @keyup.enter="doSearch" />
             </el-form-item>
             <el-form-item>
               <el-button type="primary" :loading="searching" @click="doSearch">检索</el-button>
+              <el-tag v-if="degraded" type="warning" size="small" style="margin-left: 8px">已降级（回退向量检索）</el-tag>
             </el-form-item>
           </el-form>
           <el-divider v-if="searchResults.length" />
           <div v-for="(r, i) in searchResults" :key="i" class="search-result">
-            <div class="score">相似度：{{ Number(r.score).toFixed(4) }}</div>
+            <div class="score">相似度：{{ Number(r.score).toFixed(4) }}<span v-if="r.source" class="src"> · {{ r.source }}</span></div>
             <div class="text">{{ r.text }}</div>
           </div>
           <el-empty v-if="searched && !searchResults.length" description="未命中相关文档" :image-size="60" />
@@ -145,18 +156,29 @@ async function uploadFile() {
 // 检索
 const searchKbName = ref('')
 const searchQuery = ref('')
+const searchMode = ref('VECTOR')
+const searchTopK = ref(5)
 const searchResults = ref([])
 const searched = ref(false)
 const searching = ref(false)
+const degraded = ref(false)
 async function doSearch() {
   if (!searchKbName.value.trim() || !searchQuery.value.trim()) return ElMessage.warning('请填写知识库标识和检索问题')
   searching.value = true
+  degraded.value = false
   try {
-    const { data } = await ragApi.get('/knowledge-base/search', {
-      params: { knowledgeBase: searchKbName.value.trim(), query: searchQuery.value.trim() }
+    const { data } = await ragApi.get('/retrieve/test', {
+      params: {
+        knowledgeBase: searchKbName.value.trim(),
+        query: searchQuery.value.trim(),
+        mode: searchMode.value,
+        topK: searchTopK.value,
+      }
     })
     if (data.code === 200) {
-      searchResults.value = data.data || []
+      const payload = data.data || {}
+      searchResults.value = payload.documents || []
+      degraded.value = !!payload.degraded
     } else ElMessage.error(data.message)
     searched.value = true
   } catch (e) {

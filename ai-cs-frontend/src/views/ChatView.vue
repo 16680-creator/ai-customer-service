@@ -73,6 +73,36 @@
                     </el-card>
                   </div>
                 </div>
+                <!-- 回答反馈工具条：点赞/点踩 + 评分 + 补充文本 -->
+                <div v-if="!msg.feedbackSubmitted" class="feedback-bar">
+                  <el-button-group size="small">
+                    <el-button
+                      :type="msg.feedback === 'LIKE' ? 'success' : 'default'"
+                      :icon="msg.feedback === 'LIKE' ? CaretTop : CaretTop"
+                      @click="rateMessage(msg, 'LIKE')"
+                    >有用</el-button>
+                    <el-button
+                      :type="msg.feedback === 'DISLIKE' ? 'danger' : 'default'"
+                      :icon="CaretBottom"
+                      @click="rateMessage(msg, 'DISLIKE')"
+                    >没用</el-button>
+                  </el-button-group>
+                  <el-rate
+                    v-if="msg.feedback"
+                    v-model="msg.score"
+                    :max="5"
+                    size="small"
+                    @change="submitFeedback(msg)"
+                  />
+                  <el-button
+                    v-if="msg.feedback"
+                    size="small"
+                    text
+                    type="primary"
+                    @click="openFeedbackComment(msg)"
+                  >补充</el-button>
+                </div>
+                <el-tag v-else size="small" type="success" effect="plain">已反馈 {{ msg.feedback === 'LIKE' ? '👍' : '👎' }}</el-tag>
               </div>
             </div>
             <el-empty v-if="currentMessages.length === 0" description="开始和 AI 对话吧" :image-size="120" />
@@ -129,9 +159,9 @@
 <script setup>
 import { ref, watch, nextTick } from 'vue'
 import { getToken, getUser } from '../utils/auth'
-import { chatApi, messageApi, visionApi } from '../api'
+import { chatApi, messageApi, visionApi, feedbackApi } from '../api'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Promotion, Document, Delete, Picture } from '@element-plus/icons-vue'
+import { Plus, Promotion, Document, Delete, Picture, CaretTop, CaretBottom } from '@element-plus/icons-vue'
 
 const GATEWAY = import.meta.env.VITE_GATEWAY || 'http://localhost:8080'
 
@@ -400,6 +430,46 @@ async function scrollToBottom() {
     messagesRef.value.scrollTop = messagesRef.value.scrollHeight
   }
 }
+
+// ===== 回答反馈（P1-4: 点赞/点踩/评分/补充）=====
+function rateMessage(msg, type) {
+  // 切换反馈类型；再次点击已选类型则取消
+  msg.feedback = msg.feedback === type ? null : type
+  if (!msg.feedback) return
+  msg.score = msg.score || 5
+  submitFeedback(msg)
+}
+
+async function submitFeedback(msg) {
+  if (!msg.feedback) return
+  try {
+    await feedbackApi.submit({
+      sessionId: Number(currentSession.value) || null,
+      feedbackType: msg.feedback,
+      score: msg.score || null,
+      comment: msg.feedbackComment || null,
+      requestId: msg.requestId || null,
+    })
+    msg.feedbackSubmitted = true
+    ElMessage.success('感谢反馈，已记录')
+  } catch (e) {
+    ElMessage.error('反馈提交失败: ' + (e.message || '未知错误'))
+  }
+}
+
+async function openFeedbackComment(msg) {
+  try {
+    const { value } = await ElMessageBox.prompt('补充您的反馈意见', '反馈补充', {
+      inputType: 'textarea',
+      confirmButtonText: '提交',
+      cancelButtonText: '取消',
+    })
+    msg.feedbackComment = value
+    await submitFeedback(msg)
+  } catch {
+    // 用户取消
+  }
+}
 </script>
 
 <style scoped>
@@ -467,4 +537,10 @@ async function scrollToBottom() {
   background: #fafafa; border-radius: 4px; padding: 6px 8px;
   font-size: 12px; line-height: 1.5;
 }
+/* 回答反馈工具条 */
+.feedback-bar {
+  margin-top: 12px; padding-top: 10px; border-top: 1px dashed #ebeef5;
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+}
+.feedback-bar :deep(.el-rate) { position: relative; top: 1px; }
 </style>
