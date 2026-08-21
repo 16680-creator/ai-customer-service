@@ -7,8 +7,10 @@ import com.aics.chat.agent.model.HandoffInfo;
 import com.aics.chat.agent.model.IntentResult;
 import com.aics.chat.agent.model.PolicyCheckResult;
 import com.aics.chat.agent.state.AfterSaleState;
+import com.aics.chat.agent.workflow.AgentTurnListener;
 import com.aics.chat.dto.OrderVO;
 import com.aics.chat.dto.ProductRecommendVO;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -98,6 +100,22 @@ public class AfterSaleContext {
 
     /** 是否需要用户输入（等待用户响应） */
     private boolean needsUserInput;
+
+    /**
+     * 流式事件监听器（仅本轮执行期间有效）。
+     * 必须 @JsonIgnore：ctx 会以 JSON 存入 Redis（AgentRunStore），回调对象不可序列化。
+     */
+    @JsonIgnore
+    private transient AgentTurnListener streamListener;
+
+    /**
+     * 发射步骤事件给流式监听器（未挂监听器时为空操作）
+     */
+    public void emitStep(String phase, String detail) {
+        if (streamListener != null) {
+            streamListener.onStep(phase, detail);
+        }
+    }
 
     public boolean isTerminal() {
         return state != null && state.isTerminal();

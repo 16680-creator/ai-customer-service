@@ -61,6 +61,19 @@ public interface ChatService {
     SseEmitter chatStreamSse(String sessionId, String message, String knowledgeBase);
 
     /**
+     * 回调式流式对话：同步阻塞执行，逐 token 回调 onToken，返回完整回复文本。
+     * 供 Agent 编排等需要"消费 token 流但自行决定推送通道"的调用方使用
+     * （与 {@link #chatStreamSse} 复用同一套历史组装与弹性流式调用）。
+     *
+     * @param sessionId 会话ID
+     * @param message   用户消息
+     * @param onToken   每个 token chunk 的回调
+     * @return 清洗与输出审核后的完整回复
+     * @throws IllegalStateException 模型降级（"[ERROR]" 软错误标记）时抛出，消息为降级原因
+     */
+    String streamReply(String sessionId, String message, java.util.function.Consumer<String> onToken);
+
+    /**
      * SSE 流式对话（支持 Hybrid / 查询改写增强）
      */
     SseEmitter chatStreamSse(String sessionId, String message, String knowledgeBase,

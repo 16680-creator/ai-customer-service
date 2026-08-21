@@ -740,6 +740,63 @@ public class ChatServiceImpl implements ChatService {
     }
 
     /**
+     * 回调式流式对话：与 {@link #chatStreamSse} 复用同一套历史组装与弹性流式调用，
+     * 区别仅在消费端——不绑定 SseEmitter，而是逐 token 回调给调用方，由调用方自行决定
+     * 推送通道（Agent 编排的 SSE 桥接即此用法）。同步阻塞至流结束，返回完整回复。
+     */
+    @Override
+    public String streamReply(String sessionId, String message, java.util.function.Consumer<String> onToken) {
+        // 输入 Guardrail：违规输入短路返回兜底文案，不调模型、不进历史
+        String blockMessage = guardInput(message);
+        if (blockMessage != null) {
+            log.warn("流式对话输入被内容审核拦截: sessionId={}", sessionId);
+            return blockMessage;
+        }
+
+        try {
+            // 1. 组装会话历史（与 chatStreamSse 保持一致）
+            List<Message> history = toSpringMessages(chatHistoryService.load(sessionId));
+            injectUserContext(history);
+            history.add(new UserMessage(message));
+            chatHistoryService.append(sessionId, "user", message);
+            if (history.size() > MAX_HISTORY_SIZE) {
+                history = compressHistory(history);
+            }
+
+            // 2. 弹性获取流式 Flux 并等待就绪（受 TimeLimiter 保护）
+            Flux<String> flux = resilientAiService.callSseStream(ModelScenario.CHAT, history).get();
+
+            // 3. 同步消费 token 流：逐 chunk 回调 + 累积。
+            //    "[ERROR]" 软错误标记（熔断/超时降级）转为异常抛给调用方，
+            //    由其决定如何呈现（对齐 chatStreamSse 中 error 事件的语义）
+            StringBuilder full = new StringBuilder();
+            flux.doOnNext(chunk -> {
+                if (chunk == null || chunk.isEmpty()) {
+                    return;
+                }
+                if (chunk.startsWith("[ERROR]")) {
+                    throw new IllegalStateException(chunk.substring(7));
+                }
+                full.append(chunk);
+                onToken.accept(chunk);
+            }).blockLast();
+
+            // 4. 清洗思考标签 + 输出 Guardrail，落库后返回全文
+            String response = cleanResponse(full.toString());
+            response = guardOutput(response);
+            chatHistoryService.append(sessionId, "assistant", response);
+            return response;
+        } catch (java.util.concurrent.ExecutionException e) {
+            Throwable cause = e.getCause();
+            log.error("流式对话初始化异常: sessionId={}, cause={}", sessionId, cause.getMessage());
+            throw new IllegalStateException(getFriendlyMessage(cause), e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("流式对话被中断", e);
+        }
+    }
+
+    /**
      * 查询会话历史（历史回看），直接委托 {@link ChatHistoryService#load}。
      */
     @Override

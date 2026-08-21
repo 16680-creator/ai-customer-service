@@ -126,7 +126,7 @@ public class AfterSaleAgentService {
     // ==================== 对外入口 ====================
 
     /**
-     * 处理一轮对话（新 run 或续跑）
+     * 处理一轮对话（新 run 或续跑，无流式监听）
      *
      * @param userId    用户 ID
      * @param sessionId 会话 ID
@@ -134,19 +134,30 @@ public class AfterSaleAgentService {
      * @param input     用户输入
      */
     public AgentTurnResult handleTurn(Long userId, Long sessionId, String runId, String input) {
+        return handleTurn(userId, sessionId, runId, input, null);
+    }
+
+    /**
+     * 处理一轮对话（新 run 或续跑，支持流式事件监听）
+     *
+     * @param listener 流式事件监听器（可为 null，null 等价于无监听）
+     */
+    public AgentTurnResult handleTurn(Long userId, Long sessionId, String runId, String input,
+                                      AgentTurnListener listener) {
         // 携带 runId 视为续跑既有 run
         if (StringUtils.hasText(runId)) {
             AfterSaleContext ctx = runStore.load(runId.trim())
                     .orElseThrow(() -> new BusinessException(ResultCode.AGENT_RUN_NOT_FOUND));
+            ctx.setStreamListener(listener);
             return resumeTurn(ctx, input);
         }
         // 无 runId：开启新 run
-        return startTurn(userId, sessionId, input);
+        return startTurn(userId, sessionId, input, listener);
     }
 
     // ==================== 新 run ====================
 
-    private AgentTurnResult startTurn(Long userId, Long sessionId, String input) {
+    private AgentTurnResult startTurn(Long userId, Long sessionId, String input, AgentTurnListener listener) {
         // 生成新 run 的唯一 ID
         String newRunId = UUID.randomUUID().toString();
         AfterSaleContext ctx = new AfterSaleContext();
@@ -154,6 +165,8 @@ public class AfterSaleAgentService {
         ctx.setSessionId(sessionId);
         ctx.setUserId(userId);
         ctx.setInput(input);
+        // 挂载流式监听器（可为 null）
+        ctx.setStreamListener(listener);
         // 初始状态：进入意图识别
         ctx.transit(AfterSaleState.CLASSIFY_INTENT);
         // 落库执行记录（审计）
@@ -167,6 +180,7 @@ public class AfterSaleAgentService {
                 System.currentTimeMillis() - t0,
                 safety.passed() ? "SUCCESS" : "FAILED", safety.reason());
         ctx.getStepSummaries().add("安全检查: " + (safety.passed() ? "通过" : "拦截-" + safety.reason()));
+        ctx.emitStep("SAFETY", "安全检查: " + (safety.passed() ? "通过" : "拦截-" + safety.reason()));
         // 拦截：直接失败终止，本轮不触发任何工具调用
         if (!safety.passed()) {
             // 审计留痕（3.2 F7）：注入拦截事件全量记录（输入仅存摘要）
@@ -186,6 +200,7 @@ public class AfterSaleAgentService {
         // 前者防“攻击系统”（注入/越权指令），后者防“违规内容”（辱骂/违法等），
         // 任一命中都短路终止，且本轮不触发任何工具调用（零副作用）。
         ContentReviewResult content = contentSafetyService.reviewInput(input);
+        ctx.emitStep("CONTENT_REVIEW", "内容审核: " + (content.passed() ? "通过" : "拦截-" + content.reason()));
         if (!content.passed()) {
             ctx.setState(AfterSaleState.FAILED);
             ctx.setErrorSummary(content.reason());
@@ -204,6 +219,7 @@ public class AfterSaleAgentService {
         traceRecorder.step(ctx, "INTENT", null, traceRecorder.digest(input),
                 summarizeIntent(intent), System.currentTimeMillis() - t0, "SUCCESS", null);
         ctx.getStepSummaries().add("意图识别: " + summarizeIntent(intent));
+        ctx.emitStep("INTENT", "意图识别: " + summarizeIntent(intent));
 
         // 2.1 情绪触发转人工（愤怒/强烈负面）
         if (intent.needsHandoff()) {
@@ -224,10 +240,10 @@ public class AfterSaleAgentService {
                 recommendByBudget(ctx);
                 return buildResult(ctx);
             }
+            ctx.emitStep("ROUTE", "路由: 普通对话");
             return AgentTurnResult.of(newRunId, "NORMAL_CHAT", ctx.getIntents(), null,
                     false, true, null, null, List.of(), null, null, null);
         }
-
         // 3. 进入售后状态机
         ctx.setState(AfterSaleState.LOCATE_ORDER);
         runStore.save(ctx);
@@ -343,6 +359,7 @@ public class AfterSaleAgentService {
                 traceRecorder.digest(ctx.getPendingOrderNo()), result.message(),
                 System.currentTimeMillis() - t0, result.isFail() ? "FAILED" : "SUCCESS", null);
         ctx.getStepSummaries().add("订单定位: " + result.message());
+        ctx.emitStep("LOCATE_ORDER", "订单定位: " + result.message());
         // 成功：绑定唯一订单并进入规则校验
         if (result.isSuccess()) {
             ctx.setOrder((OrderVO) result.data());
@@ -382,6 +399,7 @@ public class AfterSaleAgentService {
                 traceRecorder.digest(actionType.getCode()), summarizePolicy(policy),
                 System.currentTimeMillis() - t0, "SUCCESS", null);
         ctx.getStepSummaries().add("规则校验: " + summarizePolicy(policy));
+        ctx.emitStep("CHECK_POLICY", "规则校验: " + summarizePolicy(policy));
         ctx.setPolicyResult(policy);
         // 资格满足：进入证据收集
         if (policy.eligible()) {
@@ -420,6 +438,7 @@ public class AfterSaleAgentService {
                 item == null ? null : item.getProductPrice());
         ctx.setActionPlan(plan);
         ctx.getStepSummaries().add("参数收集: 动作=" + ctx.getActionType().getDesc() + ", 原因=" + reason);
+        ctx.emitStep("COLLECT_EVIDENCE", "参数收集: 动作=" + ctx.getActionType().getDesc() + ", 原因=" + reason);
         // 参数齐备：进入确认态（写操作前必须确认）
         ctx.transit(AfterSaleState.CONFIRM_ACTION);
     }
@@ -431,6 +450,8 @@ public class AfterSaleAgentService {
         confirmationService.issue(ctx, plan);
         traceRecorder.confirmation(ctx, "PENDING", null);
         ctx.getStepSummaries().add("确认请求: " + plan.actionType().getDesc() + " " + plan.orderNo()
+                + " " + plan.productName());
+        ctx.emitStep("CONFIRM_REQUEST", "确认请求: " + plan.actionType().getDesc() + " " + plan.orderNo()
                 + " " + plan.productName());
         // 等待用户在「确认/拒绝」间选择
         ctx.markWaitingUser();
@@ -466,6 +487,7 @@ public class AfterSaleAgentService {
             AfterSaleApplyVO vo = (AfterSaleApplyVO) result.data();
             ctx.setApplicationNo(vo.getApplicationNo());
             ctx.getStepSummaries().add("执行成功: 申请单号=" + vo.getApplicationNo());
+            ctx.emitStep("EXECUTE", "执行成功: 申请单号=" + vo.getApplicationNo());
             ctx.transit(AfterSaleState.COMPLETED);
             traceRecorder.updateRunStatus(ctx, "COMPLETED", null);
         } else {
@@ -529,6 +551,7 @@ public class AfterSaleAgentService {
         String ticketNo = result.isSuccess() ? String.valueOf(result.data()) : null;
         ctx.setHandoff(new HandoffInfo(ticketNo, reason, priority, summary));
         ctx.getStepSummaries().add("转人工: " + reason + (ticketNo == null ? "" : ", 工单=" + ticketNo));
+        ctx.emitStep("HANDOFF", "转人工: " + reason + (ticketNo == null ? "" : ", 工单=" + ticketNo));
         // 无论迁移表是否允许，最终置为 HANDOFF 终态
         if (stateMachine.canTransit(ctx.getState(), AfterSaleState.HANDOFF)) {
             ctx.transit(AfterSaleState.HANDOFF);
@@ -581,6 +604,7 @@ public class AfterSaleAgentService {
                 result.message(), System.currentTimeMillis() - t0,
                 result.isSuccess() ? "SUCCESS" : "FAILED", null);
         ctx.getStepSummaries().add("商品推荐: " + result.message());
+        ctx.emitStep("RECOMMEND", "商品推荐: " + result.message());
         // 成功：记录推荐列表供回复展示
         if (result.isSuccess()) {
             ctx.setRecommendations((List<ProductRecommendVO>) result.data());
