@@ -21,6 +21,12 @@ const routes = [
   { path: '/rag-kb', name: 'VectorKb', component: () => import('../views/VectorKbView.vue') },
   { path: '/chat-dashboard', name: 'ChatDashboard', component: () => import('../views/ChatDashboardView.vue') },
   { path: '/knowledge-ops', name: 'KnowledgeOps', component: () => import('../views/KnowledgeOpsView.vue') },
+  { path: '/feedback', name: 'Feedback', component: () => import('../views/ChatView.vue') },
+  { path: '/trace', name: 'Trace', component: () => import('../views/TraceView.vue') },
+  { path: '/prompts', name: 'Prompts', component: () => import('../views/PromptView.vue') },
+  { path: '/agent', name: 'Agent', component: () => import('../views/AgentView.vue') },
+  { path: '/graph', name: 'Graph', component: () => import('../views/GraphView.vue') },
+  { path: '/rag-eval', name: 'RagEval', component: () => import('../views/RagEvalView.vue') },
 ]
 
 const router = createRouter({

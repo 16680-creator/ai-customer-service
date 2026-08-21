@@ -21,6 +21,9 @@ const SERVICES = {
   pay: `${BASE_URL}/pay`,
   mq: `${BASE_URL}/mq`,
   rag: `${BASE_URL}/rag`,
+  observability: `${BASE_URL}/observability`,
+  prompts: `${BASE_URL}/prompts`,
+  agent: `${BASE_URL}/agent`,
 }
 
 function redirectToLogin() {
@@ -70,11 +73,49 @@ export const productApi = createClient(SERVICES.product)
 export const payApi = createClient(SERVICES.pay)
 export const mqApi = createClient(SERVICES.mq)
 export const ragApi = createClient(SERVICES.rag)
+export const observabilityApi = createClient(SERVICES.observability)
+export const promptApi = createClient(SERVICES.prompts)
+export const agentApi = createClient(SERVICES.agent)
 
 // ===== RAG 进阶（003-rag-advanced-features）=====
 export const chartApi = {
   /** 问数图表：查询结果 -> 自然语言结论 + ECharts 配置 */
   generate: (question, rows) => chatApi.post('/chart', { question, rows }),
+}
+
+// ===== 用户反馈（ChatFeedbackController）=====
+export const feedbackApi = {
+  /** 提交反馈（点赞/点踩/评分），payload: { sessionId, feedbackType: 'LIKE'|'DISLIKE', score?, comment?, requestId? } */
+  submit: (payload) => chatApi.post('/feedback', payload),
+  /** 查询反馈（按 requestId，可选） */
+  list: (requestId) => chatApi.get('/feedback', { params: requestId ? { requestId } : {} }),
+}
+
+// ===== 可观测性（ObservabilityController）=====
+export const observabilityApiWrappers = {
+  /** 按 requestId 查询一次请求的完整调用链（spansJson 含节点/耗时/费用） */
+  getTrace: (requestId) => observabilityApi.get('/traces/{requestId}'.replace('{requestId}', requestId)),
+}
+
+// ===== Prompt 管理（PromptController，配置化版本管理）=====
+export const promptApiWrappers = {
+  /** 列出全部 scenario 的生效版本 */
+  list: () => promptApi.get('/'),
+  /** 列出某场景的所有版本及内容长度摘要 */
+  listVersions: (scenario) => promptApi.get('/{scenario}'.replace('{scenario}', scenario)),
+  /** 热切换某场景的生效版本（回滚/灰度收敛） */
+  setActive: (scenario, version) =>
+    promptApi.post('/{scenario}/active'.replace('{scenario}', scenario), null, { params: { version } }),
+}
+
+// ===== Agent 编排（AgentController）=====
+export const agentApiWrappers = {
+  /** 同步对话 */
+  chat: (payload) => agentApi.post('/chat', payload),
+  /** 健康检查 */
+  health: () => agentApi.get('/health'),
+  /** 图调试（返回节点/边，供前端可视化） */
+  graphDebug: () => agentApi.get('/graph/debug'),
 }
 
 export const opsApi = {
