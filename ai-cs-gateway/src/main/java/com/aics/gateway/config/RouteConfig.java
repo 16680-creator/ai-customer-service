@@ -39,19 +39,25 @@ public class RouteConfig {
                         .filters(f -> f.stripPrefix(1))
                         .uri("lb://ai-cs-chat"))
                 // 可观测性服务（LLM 调用链 / trace / 指标，chat 服务内部）
+                // 注意：ObservabilityController 映射为 /api/observability，直接透传不去前缀
                 .route("ai-cs-observability", r -> r
                         .path("/api/observability/**")
-                        .filters(f -> f.stripPrefix(1))
                         .uri("lb://ai-cs-chat"))
                 // Prompt 管理服务（chat 服务内部）
+                // 注意：PromptController 映射为 /api/prompts，直接透传不去前缀
                 .route("ai-cs-prompt", r -> r
                         .path("/api/prompts/**")
-                        .filters(f -> f.stripPrefix(1))
                         .uri("lb://ai-cs-chat"))
-                // Agent 编排服务（chat 服务内部的 AgentController，/agent/**）
+                // Agent 编排服务（chat 服务内部的 AgentController，映射为 /chat/agent/**）
+                // 注意：对话入口是 POST /chat/agent（无 /chat 后缀），需单独重写；
+                // 其余接口（confirm/runs/health）按 /api/agent/** → /chat/agent/** 重写
+                .route("ai-cs-agent-chat", r -> r
+                        .path("/api/agent/chat")
+                        .filters(f -> f.rewritePath("/api/agent/chat", "/chat/agent"))
+                        .uri("lb://ai-cs-chat"))
                 .route("ai-cs-agent", r -> r
                         .path("/api/agent/**")
-                        .filters(f -> f.stripPrefix(1))
+                        .filters(f -> f.rewritePath("/api/agent/(?<segment>.*)", "/chat/agent/${segment}"))
                         .uri("lb://ai-cs-chat"))
                 // 搜索服务
                 .route("ai-cs-search", r -> r
