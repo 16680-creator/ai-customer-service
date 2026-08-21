@@ -99,8 +99,8 @@ export const observabilityApiWrappers = {
 
 // ===== Prompt 管理（PromptController，配置化版本管理）=====
 export const promptApiWrappers = {
-  /** 列出全部 scenario 的生效版本 */
-  list: () => promptApi.get('/'),
+  /** 列出全部 scenario 的生效版本（注意：不能带尾斜杠，Spring Boot 3 不再匹配 /api/prompts/） */
+  list: () => promptApi.get(''),
   /** 列出某场景的所有版本及内容长度摘要 */
   listVersions: (scenario) => promptApi.get('/{scenario}'.replace('{scenario}', scenario)),
   /** 热切换某场景的生效版本（回滚/灰度收敛） */

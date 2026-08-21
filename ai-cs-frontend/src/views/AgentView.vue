@@ -17,6 +17,12 @@
               {{ m.role === 'user' ? '我' : 'A' }}
             </el-avatar>
             <div class="bubble">
+              <!-- 流式编排步骤进度（逐个点亮） -->
+              <div v-if="m.steps && m.steps.length" class="steps">
+                <el-tag v-for="(s, si) in m.steps" :key="si" size="small" type="success" effect="plain">
+                  {{ s }}
+                </el-tag>
+              </div>
               <div class="reply">{{ m.content }}</div>
               <div v-if="m.meta" class="meta">
                 <el-tag v-if="m.meta.state" size="small" type="info" effect="plain">{{ m.meta.state }}</el-tag>
@@ -62,10 +68,14 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, reactive, onMounted, nextTick } from 'vue'
 import { agentApi } from '../api'
+import { getToken } from '../utils/auth'
 import { ElMessage } from 'element-plus'
 import { Promotion } from '@element-plus/icons-vue'
+
+// 流式端点直连网关（fetch + ReadableStream，axios 不支持流式响应）
+const GATEWAY = import.meta.env.VITE_GATEWAY || 'http://localhost:8080'
 
 const messages = ref([])
 const input = ref('')
@@ -74,7 +84,8 @@ const confirming = ref(false)
 const healthOk = ref(true)
 const handoff = ref(null)
 const msgRef = ref(null)
-const sessionId = ref('agent-' + Date.now())
+// 后端 AgentRequestDTO.sessionId 为 Long，必须传数字（不能加 'agent-' 前缀）
+const sessionId = ref(Date.now())
 
 onMounted(checkHealth)
 
@@ -92,6 +103,7 @@ async function scroll() {
   if (msgRef.value) msgRef.value.scrollTop = msgRef.value.scrollHeight
 }
 
+// 流式对话（SSE）：fetch + ReadableStream 解析，步骤进度逐个点亮 + 回复打字机追加
 async function send() {
   const text = input.value.trim()
   if (!text || sending.value) return
@@ -99,27 +111,71 @@ async function send() {
   input.value = ''
   sending.value = true
   await scroll()
+
+  // 预置空回复气泡：需持响应式引用，流式追加才会触发视图更新
+  const assistant = reactive({ role: 'assistant', content: '', steps: [], meta: null })
+  messages.value.push(assistant)
+  await scroll()
+
   try {
-    const { data } = await agentApi.post('/chat', {
-      sessionId: sessionId.value,
-      input: text,
-    })
-    const res = data?.data ?? data
-    handoff.value = res.handoff || null
-    messages.value.push({
-      role: 'assistant',
-      content: res.reply || '(无回复)',
-      meta: {
-        state: res.state,
-        intents: res.intents || [],
-        applicationNo: res.applicationNo,
-        confirmationToken: res.confirmationToken || null,
-        actionPlan: res.actionPlan || null,
-        candidates: res.candidates || [],
-        runId: res.runId,
+    const resp = await fetch(`${GATEWAY}/api/agent/stream/sse`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer ' + (getToken() || ''),
       },
+      body: JSON.stringify({ sessionId: sessionId.value, input: text }),
     })
+    if (!resp.ok || !resp.body) throw new Error('HTTP ' + resp.status)
+
+    const reader = resp.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let streamError = null
+    let result = null
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+
+      // 按 SSE 事件分隔（空行）逐条解析
+      let sep
+      while ((sep = buffer.indexOf('\n\n')) >= 0) {
+        const rawEvent = buffer.slice(0, sep)
+        buffer = buffer.slice(sep + 2)
+        for (const line of rawEvent.split('\n')) {
+          if (!line.startsWith('data:')) continue
+          const data = line.slice(5).trim()
+          if (!data) continue
+          let obj
+          try { obj = JSON.parse(data) } catch { continue }
+          if (obj.step !== undefined) assistant.steps.push(obj.detail || obj.step)
+          if (obj.content) assistant.content += obj.content
+          if (obj.error) streamError = obj.error
+          if (obj.done) result = obj.result
+        }
+      }
+    }
+
+    if (streamError) throw new Error(streamError)
+
+    // done 事件携带完整结果：售后模板类回复无 content 流，用 result.reply 兜底；
+    // 已有打字机累积文本时保留，避免重复追加
+    const res = result || {}
+    if (!assistant.content) assistant.content = res.reply || '(无回复)'
+    handoff.value = res.handoff || null
+    assistant.meta = {
+      state: res.state,
+      intents: res.intents || [],
+      applicationNo: res.applicationNo,
+      confirmationToken: res.confirmationToken || null,
+      actionPlan: res.actionPlan || null,
+      candidates: res.candidates || [],
+      runId: res.runId,
+    }
   } catch (e) {
+    if (!assistant.content) assistant.content = '❌ Agent 调用失败'
     ElMessage.error('Agent 调用失败: ' + (e.message || ''))
   } finally {
     sending.value = false
@@ -172,6 +228,7 @@ function cancelConfirm(m) {
 .turn.user .bubble { background: #ecf5ff; }
 .reply { font-size: 14px; line-height: 1.6; white-space: pre-wrap; }
 .meta { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.steps { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
 .app-no { font-size: 12px; color: #67c23a; }
 .confirm-box { margin-top: 8px; border: 1px dashed #e6a23c; border-radius: 6px; padding: 8px; }
 .plan-title { font-size: 12px; color: #e6a23c; margin-bottom: 4px; }
