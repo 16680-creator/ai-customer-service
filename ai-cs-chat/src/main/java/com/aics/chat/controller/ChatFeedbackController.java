@@ -33,7 +33,7 @@ import java.util.List;
  */
 @Tag(name = "用户反馈")
 @RestController
-@RequestMapping("/api/chat")
+@RequestMapping("/chat")
 @RequiredArgsConstructor
 @Validated
 public class ChatFeedbackController {

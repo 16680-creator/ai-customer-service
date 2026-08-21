@@ -38,6 +38,21 @@ public class RouteConfig {
                         .path("/api/chat/**")
                         .filters(f -> f.stripPrefix(1))
                         .uri("lb://ai-cs-chat"))
+                // 可观测性服务（LLM 调用链 / trace / 指标，chat 服务内部）
+                .route("ai-cs-observability", r -> r
+                        .path("/api/observability/**")
+                        .filters(f -> f.stripPrefix(1))
+                        .uri("lb://ai-cs-chat"))
+                // Prompt 管理服务（chat 服务内部）
+                .route("ai-cs-prompt", r -> r
+                        .path("/api/prompts/**")
+                        .filters(f -> f.stripPrefix(1))
+                        .uri("lb://ai-cs-chat"))
+                // Agent 编排服务（chat 服务内部的 AgentController，/agent/**）
+                .route("ai-cs-agent", r -> r
+                        .path("/api/agent/**")
+                        .filters(f -> f.stripPrefix(1))
+                        .uri("lb://ai-cs-chat"))
                 // 搜索服务
                 .route("ai-cs-search", r -> r
                         .path("/api/search/**")
