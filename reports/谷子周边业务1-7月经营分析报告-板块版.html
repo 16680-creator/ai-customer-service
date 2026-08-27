@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>谷子周边业务 1-7 月经营分析报告（板块版）</title>
+<style>
+:root {
+  --primary: #2E75B6;
+  --primary-light: #5B9BD5;
+  --primary-dark: #1F3A5F;
+  --bg: #F4F7FB;
+  --card: #FFFFFF;
+  --text-main: #21314D;
+  --text-sub: #5A7CA6;
+  --text-faint: #8FA9C8;
+  --border: #D7E5F4;
+  --bg-light: #EDF4FB;
+  --ok: #3E8E5A;
+  --warn: #C65D5D;
+  --shadow: 0 6px 18px rgba(31, 58, 95, 0.08);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: var(--bg); color: var(--text-main); font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif; }
+.container { max-width: 1160px; margin: 0 auto; padding: 0 24px; }
+
+/* 顶部导航 */
+.topbar { position: sticky; top: 0; z-index: 100; background: rgba(255,255,255,0.92); backdrop-filter: blur(8px); border-bottom: 1px solid var(--border); }
+.topbar .inner { display: flex; align-items: center; justify-content: space-between; height: 56px; }
+.brand { font-weight: 800; color: var(--primary-dark); font-size: 15px; }
+.topbar nav { display: flex; gap: 18px; }
+.topbar nav a { font-size: 12.5px; color: var(--text-sub); text-decoration: none; transition: color .2s; }
+.topbar nav a:hover { color: var(--primary); }
+
+/* 封面 */
+.cover { padding: 44px 0 16px; }
+.cover .tag { display: inline-block; background: var(--bg-light); color: var(--primary); border: 1px solid var(--border); padding: 4px 14px; border-radius: 20px; font-size: 12px; margin-bottom: 14px; }
+.cover h1 { font-size: 30px; color: var(--primary-dark); letter-spacing: 1px; }
+.cover .sub { color: var(--text-sub); font-size: 14px; margin-top: 10px; }
+.cover .meta { color: var(--text-faint); font-size: 12px; margin-top: 8px; }
+
+/* KPI */
+.kpi-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; margin: 22px 0; }
+@media (max-width: 1000px) { .kpi-grid { grid-template-columns: repeat(3, 1fr); } }
+.kpi-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 16px; box-shadow: var(--shadow); }
+.kpi-card .label { font-size: 12px; color: var(--text-sub); }
+.kpi-card .value { font-size: 23px; font-weight: 800; color: var(--primary-dark); margin: 6px 0 2px; }
+.kpi-card .value .unit { font-size: 12px; color: var(--text-sub); font-weight: 400; margin-left: 3px; }
+.kpi-card .note { font-size: 11px; color: var(--text-faint); }
+.kpi-card .delta { display: inline-block; margin-top: 8px; font-size: 11px; padding: 2px 8px; border-radius: 10px; }
+.kpi-card .delta.up { background: #E3F2E9; color: var(--ok); }
+.kpi-card .delta.down { background: #FBE9E7; color: var(--warn); }
+
+/* 板块结构 */
+.block { margin: 34px 0 6px; }
+.block-head { display: flex; align-items: center; gap: 14px; padding-bottom: 14px; border-bottom: 2px solid var(--primary-light); }
+.block-head .b-no { width: 46px; height: 46px; flex: none; border-radius: 12px; background: linear-gradient(135deg, var(--primary), var(--primary-light)); color: #fff; font-size: 17px; font-weight: 800; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow); }
+.block-head h2 { font-size: 21px; color: var(--primary-dark); }
+.block-head .b-en { font-size: 11px; color: var(--text-faint); letter-spacing: 2px; }
+.block-desc { font-size: 12.5px; color: var(--text-sub); padding: 10px 0 0 60px; }
+
+.part { margin: 22px 0; }
+.part-title { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.part-title .p-badge { padding: 3px 14px; border-radius: 16px; color: #fff; font-size: 12.5px; font-weight: 700; letter-spacing: 1px; }
+.pb-chart { background: var(--primary-light); }
+.pb-cause { background: #C77A3B; }
+.pb-advice { background: var(--ok); }
+.part-title .p-sub { font-size: 13px; color: var(--text-sub); }
+
+/* 图表区 */
+.chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.chart-grid .full { grid-column: 1 / -1; }
+.chart-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+.c-title { font-size: 14.5px; font-weight: 700; color: var(--primary-dark); display: flex; align-items: center; gap: 8px; }
+.c-title .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary-light); }
+.c-sub { font-size: 11.5px; color: var(--text-faint); margin: 5px 0 10px 16px; }
+.c-body { width: 100%; height: 340px; }
+.c-body.tall { height: 420px; }
+
+/* 正文块 */
+.text-block { background: var(--card); border: 1px solid var(--border); border-left: 4px solid var(--primary-light); border-radius: 12px; padding: 20px 24px; margin: 14px 0; box-shadow: var(--shadow); }
+.text-block h3 { font-size: 15.5px; color: var(--primary-dark); margin-bottom: 10px; }
+.text-block p { font-size: 13.5px; line-height: 1.85; color: var(--text-main); margin: 8px 0; }
+.text-block ul { padding-left: 22px; }
+.text-block li { font-size: 13.5px; line-height: 1.8; color: var(--text-main); margin: 6px 0; }
+.text-block b { color: var(--primary-dark); }
+.highlight { border-radius: 10px; padding: 12px 16px; font-size: 13px; line-height: 1.7; background: var(--bg-light); border: 1px solid var(--border); margin: 10px 0; }
+.highlight.ok { background: #E8F5EC; border-color: #BCE0CB; }
+.highlight.warn { background: #FDF0EC; border-color: #F0CDBD; }
+
+/* 表格 */
+.text-block table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 12.8px; }
+.text-block th { background: var(--bg-light); color: var(--primary-dark); padding: 8px 10px; border: 1px solid var(--border); text-align: left; }
+.text-block td { padding: 7px 10px; border: 1px solid var(--border); color: var(--text-main); }
+.text-block .bad { color: var(--warn); font-weight: 700; }
+.text-block .ok-c { color: var(--ok); font-weight: 700; }
+
+/* 建议卡片 */
+.advice-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 14px 0; }
+@media (max-width: 1000px) { .advice-grid { grid-template-columns: repeat(2, 1fr); } }
+.advice-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+.advice-card .a-icon { width: 38px; height: 38px; border-radius: 10px; background: var(--bg-light); display: flex; align-items: center; justify-content: center; font-size: 19px; margin-bottom: 10px; }
+.advice-card h4 { font-size: 14px; color: var(--primary-dark); margin-bottom: 6px; }
+.advice-card p { font-size: 12.3px; color: var(--text-sub); line-height: 1.7; }
+
+/* 附录核对 */
+.verify-item { display: flex; gap: 12px; margin: 8px 0; font-size: 13px; align-items: flex-start; }
+.verify-item .v-icon { width: 22px; height: 22px; border-radius: 50%; flex: none; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #fff; margin-top: 2px; }
+.v-icon.ok { background: var(--ok); }
+.v-icon.bad { background: var(--warn); }
+.verify-item .v-text b { color: var(--text-main); }
+
+/* 页脚 */
+.footer { margin-top: 60px; padding: 30px 0 40px; border-top: 1px solid var(--border); text-align: center; font-size: 12px; color: var(--text-faint); }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="container inner">
+    <div class="brand">谷子周边 · 经营分析</div>
+    <nav>
+      <a href="#b1">一·整体经营</a>
+      <a href="#b2">二·品类经营</a>
+      <a href="#b3">三·平台渠道</a>
+      <a href="#b4">四·退款售后</a>
+      <a href="#b5">五·IP组合</a>
+      <a href="#appendix">附录·核对</a>
+    </nav>
+  </div>
+</div>
+
+<div class="cover">
+  <div class="container">
+    <span class="tag">1-7 月经营分析 · 品类 × 平台交叉维度</span>
+    <h1>谷子周边业务 1-7 月经营分析报告</h1>
+    <div class="sub">基于《周边业务-经营利润表-1-7月(2).xlsx》全量数据重算核验 · 板块式结构：数据图表 → 归因分析 → 运营建议</div>
+    <div class="meta">数据来源：周边业务-经营利润表-1-7月(2).xlsx（各平台数据分表 6,976 行 SKU×平台×月份明细）&nbsp;|&nbsp;分析周期：2026 年 1-7 月</div>
+  </div>
+</div>
+
+<div class="container">
+  <!-- 核心指标总览 -->
+  <div class="kpi-grid" id="kpiGrid"></div>
+
+  <!-- ============ 板块一 整体经营表现 ============ -->
+  <section class="block" id="b1">
+    <div class="block-head">
+      <div class="b-no">01</div>
+      <div><h2>整体经营表现</h2><div class="b-en">OVERALL PERFORMANCE</div></div>
+    </div>
+    <div class="block-desc">1-7 月累计 GMV 951.3 万元、税后净利 424.0 万元、综合净利率 50.1%。整体盈利质量健康，但 7 月环比回落 29.0%、Q2 净利率连续走弱，结构性问题凸显。</div>
+
+    <div class="part">
+      <div class="part-title"><span class="p-badge pb-chart">数据图表</span><span class="p-sub">月度 GMV/净利率走势 · 月度品类结构变化</span></div>
+      <div class="chart-grid">
+        <div class="chart-card full">
+          <div class="c-title"><span class="dot"></span>月度 GMV 与税后净利率趋势（1-7 月）</div>
+          <div class="c-sub">柱形：GMV（万元）｜折线：净利率（%）｜标注 2 月爆品驱动与 7 月回落</div>
+          <div class="c-body" id="chartMonthly"></div>
+        </div>
+        <div class="chart-card full">
+          <div class="c-title"><span class="dot"></span>月度品类结构变化：图书 / 金属书签 / 盲盒福袋（净销售额占比 %）</div>
+          <div class="c-sub">金属书签 Q1 占 25.5% → Q2 骤降至 0.3%；图书占比基本持平；盲盒福袋 Q2 爆发</div>
+          <div class="c-body" id="chartStruct"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="part">
+      <div class="part-title"><span class="p-badge pb-cause">归因分析</span><span class="p-sub">总览 · 月度趋势 · 7 月回落 · 净利率走弱</span></div>
+      <div class="text-block">
+        <h3>1.1 经营总览：高毛利、高净利，盈利质量健康</h3>
+        <p>1-7 月累计 <b>GMV 951.3 万元</b>，退款 104.8 万元（退款率 11.0%），净销售额 <b>846.5 万元</b>；扣除商品成本与包装成本后实现商品毛利 <b>573.4 万元</b>（毛利率 67.7%，不含物流），再扣减仓储物流与全部税费后，税后净利 <b>424.0 万元</b>，综合净利率 <b>50.1%</b>。累计销售 27.7 万件，动销 SKU 553 个。</p>
+        <div class="highlight ok">
+          商品毛利率 67.7% + 净利率 50.1%，处于周边/谷子品类中的优秀水平。税费（增值税及附加 + 企业所得税 + 印花税）合计约 78 万元，占净销售额约 9.2%。
+        </div>
+      </div>
+      <div class="text-block">
+        <h3>1.2 月度趋势：爆发-回落-再攀升-7 月回调</h3>
+        <ul>
+          <li><b>1 月</b>（43.2 万）：启动期，基数低。</li>
+          <li><b>2 月</b>（164.6 万，环比 <b>+280.7%</b>）：春节 + 新年限定集中爆发，核心驱动为「跃马鸣霄」新年限定金属书签系列（单月 GMV 69.8 万，占当月 42.3%）；当月净利率 53.5%，为全年峰值。</li>
+          <li><b>3 月</b>（110.4 万）：爆品红利衰减，金属书签从 69.8 万回落至 13.6 万。</li>
+          <li><b>4-6 月</b>（161.2 / 164.7 / 179.6 万）：新品 + 盲盒福袋放量支撑连续走高，6 月为年内高点。</li>
+          <li><b>7 月</b>（127.5 万，环比 <b>-29.0%</b>）：明显回调，净利率 49.6%（较 6 月微升），呈"量降利稳"特征。</li>
+        </ul>
+        <div class="highlight warn">
+          2 月的爆发高度依赖单一新品系列；金属书签品类在 2 月后单月近乎归零。7 月回调是"爆品红利消退 + 高退款品类占比上升 + 文具本册利润恶化"共振的结果。
+        </div>
+      </div>
+      <div class="text-block">
+        <h3>1.3 7 月 GMV 环比 -29.0% 的三重归因</h3>
+        <p><b>归因一 · 金属书签爆品红利消退（主因）：</b>2 月「跃马鸣霄」书签单月 GMV 69.8 万、占当月 42.3%；此后 4-7 月金属书签单月 GMV 跌至 0.1 万元附近，品类几近归零。爆品高基数直接拖累同比口径，7 月缺少可替代的新品爆点。</p>
+        <p><b>归因二 · 高退款品类放量稀释转化质量：</b>盲盒福袋 Q2 净销售额占比由 0.1% 升至 12.4%，但其退款率 16.1% 全品类最高。放量带来的净销售被高退款部分抵消，7 月盲盒福袋增速也明显放缓。</p>
+        <p><b>归因三 · 平台普降、无结构对冲：</b>小红书（7 月 44.9 万 vs 6 月 54.0 万）、微信小店（29.5 vs 42.8 万）、淘宝（25.5 vs 38.7 万）三大主力平台 7 月同步回落，天猫、抖音亦小幅下滑，缺乏逆势增长平台兜底。</p>
+        <div class="highlight">
+          定量估算：7 月较 6 月 GMV 减少约 52 万元，其中金属书签约 0 元（两月均在低位）、盲盒福袋减少约 9 万元、图书约 8 万元、立牌约 8 万元、挂件约 6 万元——回落是普跌而非单一品类崩塌。
+        </div>
+      </div>
+      <div class="text-block">
+        <h3>1.4 净利率走弱：Q2 较 Q1 明显下台阶</h3>
+        <p>月度净利率：1 月 50.0% → 2 月 53.5%（峰值）→ 3 月 51.0% → 4 月 49.2% → 5 月 49.3% → 6 月 48.4%（谷底）→ 7 月 49.6%（微回升）。Q1 平均约 51.5%，Q2（4-7 月）平均约 49.1%，整体净利率较年初明显下台阶。主要归因：</p>
+        <ul>
+          <li><b>品类结构切换：</b>高净利率的金属书签（54.8%）占比从 Q1 25.5% 降至 Q2 0.3%；中净利率的盲盒福袋（52.2%）放量但退款率高；图书占比虽稳定但净利率低（39.7%）。</li>
+          <li><b>文具本册净利率下滑：</b>品类级 Q1 48.2% → Q2 42.8%（-5.4pp），分平台看摆件-微信小店 -21.9pp、挂件-天使 -11.2pp、吧唧-快手 -8.6pp 等组合级恶化同样明显。</li>
+          <li><b>天使渠道放量：</b>天使渠道（净利率 50.1%）Q2 GMV 环比上升，但内部品类效率分化（金属书签、色纸等品类净利率明显低于平台整体），结构上略有拖累。</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="part">
+      <div class="part-title"><span class="p-badge pb-advice">运营建议</span><span class="p-sub">优先级路线图（按净利增量潜力排序）</span></div>
+      <div class="text-block">
+        <table>
+          <tr><th>优先级</th><th>动作</th><th>目标</th><th>估算净利增量</th></tr>
+          <tr><td class="bad">P0</td><td>文具本册 Q2 利润恶化专项复盘，恢复定价与成本</td><td>净利率回 45%+</td><td>约 5-8 万元/季</td></tr>
+          <tr><td class="bad">P0</td><td>图书成本结构优化（版权 + 印刷）</td><td>净利率 39.7% → 45%</td><td>约 8-9 万元/年</td></tr>
+          <tr><td class="ok-c">P1</td><td>盲盒福袋退款率管控</td><td>16.1% → 12%</td><td>约 2-3 万元/年</td></tr>
+          <tr><td class="ok-c">P1</td><td>金属书签节日限定双线产品节奏</td><td>Q4 再创爆点</td><td>（结构性）</td></tr>
+          <tr><td class="ok-c">P1</td><td>毛绒团子挂件扩 SKU + 小红书加码</td><td>GMV 年化翻倍</td><td>（结构性）</td></tr>
+          <tr><td>P2</td><td>天使渠道品类结构优化</td><td>聚焦高净利率品类</td><td>约 2-3 万元/年</td></tr>
+        </table>
+        <div class="highlight ok">
+          <b>总体判断：</b>业务基本盘（净利率 50.1%、前三平台 GMV 占比 78.0%）稳固，7 月回调与 Q2 净利率走弱属"结构性、可干预"问题。短期止血（文具本册、图书）优先于开新（新品、新渠道），预计 3-6 个月内可将净利率修复至 50% 以上平台。
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 板块二 品类经营分析 ============ -->
+  <section class="block" id="b2">
+    <div class="block-head">
+      <div class="b-no">02</div>
+      <div><h2>品类经营分析</h2><div class="b-en">CATEGORY ANALYSIS</div></div>
+    </div>
+    <div class="block-desc">图书大而不强（168.5 万 / 净利率 39.7%），金属书签高开低走（2 月 69.8 万 → 4-7 月归零），盲盒福袋量升退款高（16.1%），毛绒团子挂件是结构性亮点。</div>
+
+    <div class="part">
+      <div class="part-title"><span class="p-badge pb-chart">数据图表</span><span class="p-sub">品类结构 · 金属书签爆品周期 · 毛绒团子 · TOP/BOTTOM 组合</span></div>
+      <div class="chart-grid">
+        <div class="chart-card">
+          <div class="c-title"><span class="dot"></span>品类净销售额结构（Top 13）</div>
+          <div class="c-sub">横条长度 = 净销售额（万元）｜右侧数值 = 净利率（%）</div>
+          <div class="c-body tall" id="chartCats"></div>
+        </div>
+        <div class="chart-card">
+          <div class="c-title"><span class="dot"></span>金属书签月度 GMV：2 月爆发后断崖（万元）</div>
+          <div class="c-sub">2 月「跃马鸣霄」新年限定书签系列贡献 69.8 万，占当月 GMV 42.3%</div>
+          <div class="c-body" id="chartJs"></div>
+        </div>
+        <div class="chart-card">
+          <div class="c-title"><span class="dot"></span>毛绒团子挂件 · 分平台 GMV（万元）</div>
+          <div class="c-sub">全平台 GMV 56.8 万元，占挂件品类 62.5%｜净利率 50.3%</div>
+          <div class="c-body" id="chartTu"></div>
+        </div>
+        <div class="chart-card full">
+          <div class="c-title"><span class="dot"></span>税后净利 TOP/BOTTOM 品类-平台组合（万元）</div>
+          <div class="c-sub">蓝色为盈利 TOP10，红色为垫底组合（负向为亏损/近零规模）</div>
+          <div class="c-body" id="chartTopBottom"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="part">
+      <div class="part-title"><span class="p-badge pb-cause">归因分析</span><span class="p-sub">品类解读 · 文具本册 · 成本结构</span></div>
+      <div class="text-block">
+        <h3>2.1 品类解读：图书大而不强，金属书签高开低走，盲盒福袋量升退款高</h3>
+        <table>
+          <tr><th>品类</th><th>净销售(万)</th><th>净利率</th><th>退款率</th><th>毛利率*</th><th>物流费率</th><th>关键信号</th></tr>
+          <tr><td>图书</td><td>168.5</td><td>39.7%</td><td>8.0%</td><td>49.5%</td><td>7.6%</td><td>第一大品类但净利率全品类最低，商品成本率高企</td></tr>
+          <tr><td>立牌</td><td>122.7</td><td>53.9%</td><td>10.8%</td><td>72.4%</td><td>7.2%</td><td>规模第二、盈利稳健，小红书贡献 19.7 万净利居首</td></tr>
+          <tr><td>吧唧</td><td>100.9</td><td>56.2%</td><td>11.4%</td><td>79.2%</td><td>11.3%</td><td>高净利率大品类，小红书组合净利率 56.7%</td></tr>
+          <tr><td>文具本册</td><td>85.3</td><td>43.8%</td><td>9.1%</td><td>65.1%</td><td>12.2%</td><td>Q2 净利率 48.2%→42.8%（-5.4pp），最需警惕</td></tr>
+          <tr><td>挂件</td><td>80.8</td><td>51.5%</td><td>11.0%</td><td>70.6%</td><td>8.3%</td><td>毛绒团子挂件占其 GMV 62.5%，是结构性亮点</td></tr>
+          <tr><td>金属书签</td><td>73.1</td><td>54.8%</td><td>14.6%</td><td>70.9%</td><td>4.6%</td><td>2 月爆发 69.8 万后 4-7 月近归零</td></tr>
+          <tr><td>盲盒福袋</td><td>70.3</td><td>52.2%</td><td>16.1%</td><td>67.4%</td><td>4.2%</td><td>Q2 净销售占比 0.1%→12.4%，但退款率全品类最高</td></tr>
+          <tr><td>色纸</td><td>53.2</td><td>57.7%</td><td>10.6%</td><td>79.4%</td><td>9.6%</td><td>净利率全品类最高之一</td></tr>
+          <tr><td>纸品周边</td><td>32.2</td><td>50.7%</td><td>10.8%</td><td>74.5%</td><td>13.2%</td><td>物流费率全品类最高</td></tr>
+          <tr><td>毛绒类</td><td>21.4</td><td>48.9%</td><td>12.3%</td><td>63.6%</td><td>4.5%</td><td>退款率偏高</td></tr>
+          <tr><td>镭射票</td><td>20.7</td><td>59.2%</td><td>9.0%</td><td>83.9%</td><td>12.3%</td><td>净利率全品类最高，商品成本率仅 16.1%</td></tr>
+          <tr><td>亚克力类</td><td>16.0</td><td>50.5%</td><td>12.6%</td><td>72.7%</td><td>11.7%</td><td>物流费率高、退款率偏高</td></tr>
+          <tr><td>摆件</td><td>1.4</td><td>45.3%</td><td>9.6%</td><td>59.3%</td><td>4.6%</td><td>规模极小，Q2 净利率下滑明显</td></tr>
+        </table>
+        <p style="font-size:11.5px;color:var(--text-faint);">* 毛利率 =（净销售额 - 商品成本 - 包装成本）/ 净销售额，不含物流费用。</p>
+        <div class="highlight">
+          <b>结构性信号：</b>高净利率品类（镭射票 59.2%、色纸 57.7%、吧唧 56.2%）规模普遍偏小；大品类中图书（39.7%）净利率显著拉低整体水平，若图书净利率提升至整体 50% 水平，可新增净利约 17 万元。
+        </div>
+      </div>
+      <div class="text-block">
+        <h3>2.2 文具本册净利率骤降的可能成因</h3>
+        <p>文具本册净利率下降是全平台、系统性的（品类级 Q1 48.2% → Q2 42.8%），指向<b>品类级共性因素而非单一渠道问题</b>：</p>
+        <ul>
+          <li><b>成本端：</b>笔记本/线缝本纸张与印工成本抬升，Q2 商品成本率明显上升。</li>
+          <li><b>价格端：</b>618 大促期折扣力度加大、赠品/满减活动侵蚀毛利，Q2 正值大促季。</li>
+          <li><b>结构端：</b>低毛利款式（如笔记本 vs 便利贴）Q2 放量占比提升。</li>
+        </ul>
+        <div class="highlight warn">
+          文具本册是继图书之后第二大"规模-利润"失衡品类：规模第 4（85.3 万）但净利率仅 43.8% 且仍在快速下滑，若维持 Q1 的 48.2% 净利率水平，Q2 文具本册可多贡献净利约 3-4 万元。
+        </div>
+      </div>
+      <div class="text-block">
+        <h3>2.3 成本结构：图书商品成本高企、纸品周边物流偏重</h3>
+        <ul>
+          <li><b>商品成本率（含包装）：</b>图书约 50.5% 最高（IP 版权金 + 纸张印刷双重成本）；镭射票 16.1%、色纸 20.6% 最低。图书毛利率 49.5% 全品类最低，与净利率 39.7% 互为印证。</li>
+          <li><b>物流费用率：</b>纸品周边 13.2% 全品类最高，文具本册 12.2%、镭射票 12.3%、亚克力类 11.7% 次之；盲盒福袋 4.2%、金属书签 4.6%、毛绒类 4.5% 最低（客单价高、件数少）。</li>
+          <li><b>整体水平：</b>全业务物流费用率约 8.4%，高于典型电商基准，主要受纸品/文具类多件拆单影响。</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="part">
+      <div class="part-title"><span class="p-badge pb-advice">运营建议</span><span class="p-sub">品类级行动清单</span></div>
+      <div class="advice-grid">
+        <div class="advice-card">
+          <div class="a-icon">📚</div>
+          <h4>图书：抓大做强，提利 10pp</h4>
+          <p>目标净利率 39.7% → 45%：优化 IP 分成谈判、纸张集采、按需印刷，砍尾部低毛利书品。若提升 5pp 即新增净利约 8.4 万元。</p>
+        </div>
+        <div class="advice-card">
+          <div class="a-icon">🔖</div>
+          <h4>金属书签：再造爆品节奏</h4>
+          <p>2 月"跃马鸣霄"验证了节日限定爆品模型。建议建立"节日限定 + 常规款"双线，提前 2 个月上新排期，避免品类 4-7 月归零。</p>
+        </div>
+        <div class="advice-card">
+          <div class="a-icon">✏️</div>
+          <h4>文具本册：立即止血</h4>
+          <p>Q2 净利率 -5.4pp 是最大风险。建议复盘 618 定价与折扣、重谈纸张印工供应商、砍亏损款式，Q3 目标净利率回 45%。</p>
+        </div>
+        <div class="advice-card">
+          <div class="a-icon">🐻</div>
+          <h4>毛绒团子挂件：重点孵化</h4>
+          <p>净利率 50.3%、GMV 56.8 万、SKU 仅 9 个，是"高利润+高增长"双优品类。建议扩 SKU、加 IP 联名、小红书种草加码。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 板块三 平台渠道分析 ============ -->
+  <section class="block" id="b3">
+    <div class="block-head">
+      <div class="b-no">03</div>
+      <div><h2>平台渠道分析</h2><div class="b-en">CHANNEL ANALYSIS</div></div>
+    </div>
+    <div class="block-desc">小红书 / 微信小店 / 淘宝三足鼎立（GMV 占比 78.0%），京东、新世纪净利率领先但规模有限，快手退款率 14.4% 为全平台最高。</div>
+
+    <div class="part">
+      <div class="part-title"><span class="p-badge pb-chart">数据图表</span><span class="p-sub">平台占比 · 品类×平台净利率矩阵 · Q1→Q2 变化</span></div>
+      <div class="chart-grid">
+        <div class="chart-card">
+          <div class="c-title"><span class="dot"></span>平台 GMV 占比与净利率</div>
+          <div class="c-sub">环形：GMV 占比｜右侧列表：净利率（%）</div>
+          <div class="c-body tall" id="chartPlats"></div>
+        </div>
+        <div class="chart-card">
+          <div class="c-title"><span class="dot"></span>Q1 → Q2 净利率变化：恶化 Top 与改善 Top（百分点）</div>
+          <div class="c-sub">组合级变化，蓝色为改善、浅色为恶化</div>
+          <div class="c-body tall" id="chartQ1Q2"></div>
+        </div>
+        <div class="chart-card full">
+          <div class="c-title"><span class="dot"></span>品类 × 平台 净利率热力图（%）</div>
+          <div class="c-sub">颜色越深 = 净利率越高；灰白 = 无销售；行按品类净销售额降序、列按平台 GMV 降序</div>
+          <div class="c-body tall" id="chartMatrix"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="part">
+      <div class="part-title"><span class="p-badge pb-cause">归因分析</span><span class="p-sub">平台解读 · 交叉维度</span></div>
+      <div class="text-block">
+        <h3>3.1 平台解读：小红书/微信/淘宝三足鼎立，京东/天猫净利率领先</h3>
+        <table>
+          <tr><th>平台</th><th>GMV(万)</th><th>占比</th><th>净利(万)</th><th>净利率</th><th>退款率</th><th>动销SKU</th></tr>
+          <tr><td>小红书</td><td>299.4</td><td>31.5%</td><td>128.9</td><td>49.8%</td><td>13.6%</td><td>520</td></tr>
+          <tr><td>微信小店</td><td>240.8</td><td>25.3%</td><td>106.5</td><td>49.6%</td><td>10.9%</td><td>476</td></tr>
+          <tr><td>淘宝</td><td>202.1</td><td>21.2%</td><td>93.2</td><td>50.9%</td><td>9.4%</td><td>388</td></tr>
+          <tr><td>抖音</td><td>102.1</td><td>10.7%</td><td>44.5</td><td>49.1%</td><td>11.3%</td><td>399</td></tr>
+          <tr><td>天猫</td><td>42.5</td><td>4.5%</td><td>20.0</td><td>52.2%</td><td>9.9%</td><td>230</td></tr>
+          <tr><td>天使</td><td>34.5</td><td>3.6%</td><td>17.3</td><td>50.1%</td><td>0.0%</td><td>154</td></tr>
+          <tr><td>快手</td><td>14.7</td><td>1.5%</td><td>6.1</td><td>48.3%</td><td>14.4%</td><td>212</td></tr>
+          <tr><td>京东</td><td>11.6</td><td>1.2%</td><td>5.7</td><td>53.8%</td><td>9.0%</td><td>230</td></tr>
+          <tr><td>新世纪</td><td>3.0</td><td>0.3%</td><td>1.6</td><td>54.6%</td><td>0.0%</td><td>32</td></tr>
+          <tr><td>喜马拉雅</td><td>0.6</td><td>0.1%</td><td>0.2</td><td>37.6%</td><td>0.0%</td><td>58</td></tr>
+        </table>
+        <div class="highlight">
+          <b>平台效率观察：</b>京东（53.8%）、新世纪（54.6%）净利率领先但规模有限；小红书 13.6%、快手 14.4% 退款率偏高，是平台退货风险的主要来源；喜马拉雅规模极小（GMV 0.6 万）且净利率仅 37.6%，建议评估其渠道价值。
+        </div>
+      </div>
+      <div class="text-block">
+        <h3>3.2 交叉维度：图书强在小红书/微信，平台品类效率分化明显</h3>
+        <p>从品类×平台净利率矩阵看（见热力图）：</p>
+        <ul>
+          <li><b>图书</b>净利率在 35%-41% 区间，微信小店（39.6%）、小红书（38.5%）、淘宝（41.3%）为主要贡献平台；喜马拉雅仅 9.9%，为全场最低组合（但该组合规模极小）。</li>
+          <li><b>盲盒福袋</b>在小红书（净利率 50.8%、净利 13.8 万）与微信小店放量，但退款率分别明显高于整体。</li>
+          <li><b>金属书签</b>在小红书与微信小店贡献最大，但均伴随 14%+ 的高退款。</li>
+          <li><b>天使渠道</b>整体净利率 50.1% 属正常水平，但内部品类分化明显（金属书签、色纸等品类净利率明显偏低），品类结构可优化。</li>
+        </ul>
+        <div class="highlight">
+          <b>四象限定位（规模 × 净利率）：</b>「高规模高利润」= 立牌×小红书/微信/淘宝、吧唧×小红书/微信；「高规模低利润」= 图书×各主力平台（净利率 39% 上下）；「低规模高利润」= 镭射票×多平台（59% 上下）、京东/新世纪整体；「低规模低利润」= 喜马拉雅各组合、摆件×各平台。
+        </div>
+      </div>
+    </div>
+
+    <div class="part">
+      <div class="part-title"><span class="p-badge pb-advice">运营建议</span><span class="p-sub">平台级行动清单</span></div>
+      <div class="advice-grid">
+        <div class="advice-card">
+          <div class="a-icon">📱</div>
+          <h4>小红书：规模质量双优，加大投放</h4>
+          <p>GMV 299.4 万（31.5%）且净利率 49.8%，规模与效率兼优。加大笔记投放与直播场次；同时管控 13.6% 的退款率，重点盯盲盒福袋/金属书签组合。</p>
+        </div>
+        <div class="advice-card">
+          <div class="a-icon">💬</div>
+          <h4>微信小店：私域复购放大器</h4>
+          <p>净利率 49.6%、退款率 10.9%，规模居第二、效率中上，是私域粘性最高的主力平台。建议扩大会员/社群运营，用私域承接新品首发，降低公域引流成本。</p>
+        </div>
+        <div class="advice-card">
+          <div class="a-icon">🛍️</div>
+          <h4>淘宝：效率标杆，精细化运营</h4>
+          <p>净利率 50.9%、退款率 9.4%（全平台最优之一），是规模与效率平衡最好的平台。建议将图书-淘宝（41.3%）等组合作为品类提利试点。</p>
+        </div>
+        <div class="advice-card">
+          <div class="a-icon">📉</div>
+          <h4>天使渠道：优化品类结构</h4>
+          <p>整体净利率 50.1% 属正常，但金属书签、色纸等品类效率明显偏低。建议评估该渠道品类投放结构，聚焦高净利率品类。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 板块四 退款与售后管理 ============ -->
+  <section class="block" id="b4">
+    <div class="block-head">
+      <div class="b-no">04</div>
+      <div><h2>退款与售后管理</h2><div class="b-en">REFUND & AFTER-SALES</div></div>
+    </div>
+    <div class="block-desc">整体退款率 11.0%。盲盒福袋（16.1%）与金属书签（14.6%）是品类重灾区，快手（14.4%）、小红书（13.6%）是平台重灾区。</div>
+
+    <div class="part">
+      <div class="part-title"><span class="p-badge pb-chart">数据图表</span><span class="p-sub">平台退款率 · 品类退款率（%）</span></div>
+      <div class="chart-grid">
+        <div class="chart-card full">
+          <div class="c-title"><span class="dot"></span>退款率全景：平台 × 品类</div>
+          <div class="c-sub">上图：平台退款率（%）｜下图：品类退款率（%）｜深红 = 超过 12% 警戒线</div>
+          <div class="c-body tall" id="chartRefund"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="part">
+      <div class="part-title"><span class="p-badge pb-cause">归因分析</span><span class="p-sub">退款率结构 · 净利侵蚀估算</span></div>
+      <div class="text-block">
+        <h3>4.1 退款率：盲盒福袋与金属书签是重灾区</h3>
+        <ul>
+          <li><b>盲盒福袋 16.1%（全品类最高）：</b>盲盒/福袋类天然存在"不确定性退款"，盒内商品与买家预期落差是退款主因；小红书等种草平台组合退款率更高。</li>
+          <li><b>金属书签 14.6%：</b>2 月大促冲动消费 + 新年限定退换集中，小红书组合退款率曾达 19.1%。</li>
+          <li><b>亚克力类 12.6%、毛绒类 12.3%：</b>高于整体水平，物流运输破损或色差争议占比较高。</li>
+          <li><b>平台维度：</b>快手整体退款率 14.4%、小红书 13.6% 明显高于微信小店（10.9%）与淘宝（9.4%），与种草/直播冲动消费属性相关。</li>
+        </ul>
+        <div class="highlight warn">
+          退款率对净利的侵蚀示例：盲盒福袋 GMV 约 83.8 万、退款率 16.1%，若降至 12%（参考微信小店组合水平），可回收净销售约 3.4 万元，按 52% 净利率折算新增净利约 1.8 万元。
+        </div>
+      </div>
+    </div>
+
+    <div class="part">
+      <div class="part-title"><span class="p-badge pb-advice">运营建议</span><span class="p-sub">售后专项行动清单</span></div>
+      <div class="advice-grid">
+        <div class="advice-card">
+          <div class="a-icon">🎁</div>
+          <h4>盲盒福袋：控退款、明预期</h4>
+          <p>退款率 16.1% → 12% 可回收约 3.4 万净销售。详情页增加"盒内款式清单概率公示"、加强材质/尺寸说明、优化发货质检。</p>
+        </div>
+        <div class="advice-card">
+          <div class="a-icon">🛒</div>
+          <h4>平台分层管控</h4>
+          <p>快手（14.4%）、小红书（13.6%）退款率高于均值，建议对两平台设置售后预警、拉高详情页信息完整度、控制冲动型 SKU 投放占比。</p>
+        </div>
+        <div class="advice-card">
+          <div class="a-icon">📦</div>
+          <h4>物流破损专项</h4>
+          <p>亚克力类（12.6%）、毛绒类（12.3%）退款中运输破损/色差占比高。建议升级包装缓冲、增加发货前质检照片，减少破损类退款。</p>
+        </div>
+        <div class="advice-card">
+          <div class="a-icon">🔖</div>
+          <h4>金属书签：二次营销挽回</h4>
+          <p>节日限定冲动退款集中。建议售后流程中增加"换款不退"选项，将退款转化为等价换购，降低净退款对净销售的侵蚀。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 板块五 IP 与产品组合 ============ -->
+  <section class="block" id="b5">
+    <div class="block-head">
+      <div class="b-no">05</div>
+      <div><h2>IP 与产品组合</h2><div class="b-en">IP & PRODUCT MIX</div></div>
+    </div>
+    <div class="block-desc">IP 集中度中等：TOP5 IP 占 GMV 30.4%、TOP10 占 51.6%；「猫系 IP + 图书」是核心基本盘，单一 IP 爆品生命周期短、波动大。</div>
+
+    <div class="part">
+      <div class="part-title"><span class="p-badge pb-chart">数据图表</span><span class="p-sub">IP / 角色 GMV Top10</span></div>
+      <div class="chart-grid">
+        <div class="chart-card full">
+          <div class="c-title"><span class="dot"></span>IP / 角色 GMV Top10（万元）</div>
+          <div class="c-sub">TOP5 IP 占 GMV 30.4%，TOP10 占 51.6%（含"合集/礼盒/未填写角色"等非纯 IP 项）</div>
+          <div class="c-body tall" id="chartIp"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="part">
+      <div class="part-title"><span class="p-badge pb-cause">归因分析</span><span class="p-sub">IP 集中度 · 品类-IP 绑定关系</span></div>
+      <div class="text-block">
+        <h3>5.1 IP 集中度：头部稳定但分散，爆品依赖显著</h3>
+        <ul>
+          <li><b>角色维度：</b>猫四月（65.8 万 / 6.9%）、合集（61.4 万 / 6.5%）、猫七夜-图书（57.0 万 / 6.0%）、猫小九-图书（56.1 万 / 5.9%）、鼠克（48.7 万 / 5.1%）位居前五，TOP5 合计 30.4%；TOP10 合计 51.6%。</li>
+          <li><b>IP 与品类强绑定：</b>TOP10 中多个"角色-图书"条目（猫七夜-图书、猫小九-图书、猫八两-图书）表明<b>图书品类高度依赖头部 IP 版权内容</b>，是图书低毛利的深层原因（IP 分成 + 印刷双成本）。</li>
+          <li><b>爆品生命周期：</b>金属书签 2 月爆发（69.8 万）依赖"跃马鸣霄"新年限定单一系列，IP 时效性强、爆发后快速消退，对业绩波动影响大。</li>
+        </ul>
+        <div class="highlight">
+          <b>风险提示：</b>若剔除"合集/礼盒/未填写角色"等非纯 IP 项，真实头部 IP 集中度更高，单一 IP 表现波动对整体业绩的影响被放大。
+        </div>
+      </div>
+    </div>
+
+    <div class="part">
+      <div class="part-title"><span class="p-badge pb-advice">运营建议</span><span class="p-sub">IP 组合行动清单</span></div>
+      <div class="advice-grid">
+        <div class="advice-card">
+          <div class="a-icon">🧸</div>
+          <h4>IP 矩阵运营</h4>
+          <p>头部 IP（猫四月、猫系家族）深耕品类矩阵，腰部 IP（鼠克等）差异化打法，长尾 IP 按季度评估汰换，降低单一 IP 依赖。</p>
+        </div>
+        <div class="advice-card">
+          <div class="a-icon">🔁</div>
+          <h4>IP × 品类交叉扩展</h4>
+          <p>将已验证的高利润 IP 复制到毛绒团子、吧唧、立牌等品类（参考毛绒团子 9 SKU 的高利润模型），摊薄版权采购成本。</p>
+        </div>
+        <div class="advice-card">
+          <div class="a-icon">📋</div>
+          <h4>版权采购优化</h4>
+          <p>图书品类 IP 分成谈判争取"保底 + 阶梯分成"，纸张集采、按需印刷控成本，缓解图书净利率 39.7% 的压力。</p>
+        </div>
+        <div class="advice-card">
+          <div class="a-icon">🎯</div>
+          <h4>新 IP 试水机制</h4>
+          <p>建立小批量试水 + 数据回收机制：预售制测款，验证 IP 转化率与退款率后再放量，避免 2 月式孤注一掷的爆品押注。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 附录A 数据核对 ============ -->
+  <section class="block" id="appendix">
+    <div class="block-head">
+      <div class="b-no">附</div>
+      <div><h2>数据核对结果</h2><div class="b-en">DATA VERIFICATION</div></div>
+    </div>
+
+    <div class="text-block">
+      <h3>A.1 核对方法与口径</h3>
+      <p>以《周边业务-经营利润表-1-7月(2).xlsx》为唯一数据源，以「各平台数据分表」（6,976 行 SKU×平台×月份明细）为明细基础，关联「各SKU数据汇总」的产品类型字段进行品类归集，重新汇总计算全部指标，与报告逐项比对。</p>
+      <p>指标口径：净销售额 = 销售额 - 退款金额；毛利率 =（净销售额 - 商品成本 - 包装成本）/ 净销售额（不含物流）；物流费用率 = 仓储物流成本 / 净销售额；税后净利 = 毛利 - 增值税及附加 - 企业所得税 - 印花税；净利率 = 税后净利 / 净销售额；退款率 = 退款金额 / 销售额。</p>
+    </div>
+
+    <div class="text-block">
+      <h3>A.2 验证通过项（与 Excel 重算完全一致或基本一致）</h3>
+      <div class="verify-item"><div class="v-icon ok">✓</div><div class="v-text"><b>总体指标：</b>GMV 951.3 万、退款 104.8 万（退款率 11.0%）、净销售额 846.5 万、商品毛利 573.4 万（毛利率 67.7%）、税后净利 424.0 万（净利率 50.1%）、销量 27.7 万件、动销 SKU 553 个 —— 全部一致。</div></div>
+      <div class="verify-item"><div class="v-icon ok">✓</div><div class="v-text"><b>月度趋势：</b>2 月 GMV 164.6 万（+280.7%）、6 月 179.6 万为峰值、7 月 127.5 万（环比 -29.0%），各月净利率基本一致。</div></div>
+      <div class="verify-item"><div class="v-icon ok">✓</div><div class="v-text"><b>品类结构：</b>13 个品类的净销售额、净利率、退款率、毛利率、物流费率与 Excel 重算一致（图书 168.5 万/39.7%、镭射票 20.7 万/59.2%、色纸 53.2 万/57.7% 等）。</div></div>
+      <div class="verify-item"><div class="v-icon ok">✓</div><div class="v-text"><b>平台结构：</b>10 个平台的 GMV、占比、净利率、退款率、动销 SKU 数全部一致（小红书 299.4 万/31.5%、微信小店 240.8 万/25.3%、淘宝 202.1 万/21.2% 等）。</div></div>
+      <div class="verify-item"><div class="v-icon ok">✓</div><div class="v-text"><b>品类×平台净利率矩阵：</b>热力图全部单元格与重算一致（含图书-喜马拉雅 9.9% 等极端值）。</div></div>
+      <div class="verify-item"><div class="v-icon ok">✓</div><div class="v-text"><b>毛绒团子挂件：</b>GMV 56.8 万（占挂件 62.5%）、净利率 50.3%、退款率 11.4%、销量 10,067 件、9 个 SKU，分平台数据一致。</div></div>
+      <div class="verify-item"><div class="v-icon ok">✓</div><div class="v-text"><b>TOP/BOTTOM 组合：</b>立牌-小红书 19.7 万、图书-微信小店 19.6 万、图书-小红书 17.9 万等净利数据一致。</div></div>
+    </div>
+
+    <div class="text-block">
+      <h3>A.3 发现的问题与修正（重点）</h3>
+      <div class="verify-item"><div class="v-icon bad">✕</div><div class="v-text"><b>【重要】品类结构变化张冠李戴：</b>此前口径曾称"图书占比 Q1 约 25% 降至 Q2 约 17%"。按 Excel 重算，<b>图书 Q1 占 19.9% → Q2 19.9%，占比持平</b>；Q1 占比约 25.5% 的实为<b>金属书签</b>（Q2 骤降至 0.3%）。本报告已按正确口径修正。</div></div>
+      <div class="verify-item"><div class="v-icon bad">✕</div><div class="v-text"><b>【重要】遗漏关键事实：</b>金属书签 2 月 GMV 69.8 万，其中「跃马鸣霄」新年限定书签系列贡献 69.7 万、占当月 GMV 42.3%，是 2 月冲高的核心驱动；此后 4-7 月该品类单月仅约 0.1 万。此前口径未提及这一爆品兴衰周期。</div></div>
+      <div class="verify-item"><div class="v-icon bad">✕</div><div class="v-text"><b>成本率/物流率拆分有误：</b>此前部分品类的"商品成本率/物流费用率"与源表不符（毛利率与合计均正确，但拆分偏移）：镭射票报告 18.6%/9.8%、重算 16.1%/12.3%；金属书签报告 24.5%/9.2%、重算 29.1%/4.6%；亚克力类物流费率重算为 11.7%；文具本册物流费率重算为 12.2%。</div></div>
+      <div class="verify-item"><div class="v-icon bad">✕</div><div class="v-text"><b>IP 集中度口径差异：</b>按角色字段重算，TOP5 IP 占 GMV 30.4%、TOP10 占 51.6%（含"合集/礼盒/未填写角色"等非纯 IP 项），结论方向一致。</div></div>
+      <div class="verify-item"><div class="v-icon ok">✓</div><div class="v-text"><b>说明：</b>部分估算类结论（如退款率下降带来的净利增量、图书净利率提升的净利增量）属估算口径差异，不影响结论方向。</div></div>
+    </div>
+
+    <div class="text-block">
+      <h3>A.4 核对结论</h3>
+      <div class="highlight ok">
+        全部关键数据与 Excel 完全一致（总体、月度、品类、平台、矩阵、专项、趋势等），结论方向成立；此前存在 1 处<b>品类结构张冠李戴</b>、1 处<b>关键事实遗漏</b>（金属书签 2 月爆品）、以及成本率拆分、IP 集中度等<b>口径级误差</b>。本报告已全部按源表修正，并按"板块式结构（数据图表 → 归因分析 → 运营建议）"重新组织。
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="footer">
+  谷子周边业务 1-7 月经营分析报告 · 品类 × 平台交叉维度（板块版）<br>
+  数据来源：《周边业务-经营利润表-1-7月(2).xlsx》｜本报告所有图表与指标均可由源表复核
+</div>
+
+<script src="echarts.min.js"></script>
+<script src="data.js"></script>
+<script src="charts.js"></script>
+<script>
+renderKpi();
+renderMonthly();
+renderStruct();
+renderCats();
+renderJs();
+renderTu();
+renderTopBottom();
+renderPlats();
+renderQ1Q2();
+renderMatrix();
+renderRefund();
+renderIp();
+</script>
+</body>
+</html>
