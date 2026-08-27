@@ -73,6 +73,7 @@ import { agentApi } from '../api'
 import { getToken } from '../utils/auth'
 import { ElMessage } from 'element-plus'
 import { Promotion } from '@element-plus/icons-vue'
+import { buildAgentConfirmRequest, buildAgentRequest, nextAgentRunId } from './agentRequest.js'
 
 // 流式端点直连网关（fetch + ReadableStream，axios 不支持流式响应）
 const GATEWAY = import.meta.env.VITE_GATEWAY || 'http://localhost:8080'
@@ -86,6 +87,7 @@ const handoff = ref(null)
 const msgRef = ref(null)
 // 后端 AgentRequestDTO.sessionId 为 Long，必须传数字（不能加 'agent-' 前缀）
 const sessionId = ref(Date.now())
+const activeRunId = ref(null)
 
 onMounted(checkHealth)
 
@@ -124,7 +126,7 @@ async function send() {
         'Content-Type': 'application/json',
         Authorization: 'Bearer ' + (getToken() || ''),
       },
-      body: JSON.stringify({ sessionId: sessionId.value, input: text }),
+      body: JSON.stringify(buildAgentRequest(sessionId.value, text, activeRunId.value)),
     })
     if (!resp.ok || !resp.body) throw new Error('HTTP ' + resp.status)
 
@@ -164,6 +166,7 @@ async function send() {
     // 已有打字机累积文本时保留，避免重复追加
     const res = result || {}
     if (!assistant.content) assistant.content = res.reply || '(无回复)'
+    activeRunId.value = nextAgentRunId(res)
     handoff.value = res.handoff || null
     assistant.meta = {
       state: res.state,
@@ -189,11 +192,8 @@ async function confirm(m) {
   if (!token) return
   confirming.value = true
   try {
-    const { data } = await agentApi.post('/confirm', {
-      sessionId: sessionId.value,
-      runId,
-      confirmationToken: token,
-    })
+    const { data } = await agentApi.post('/confirm',
+      buildAgentConfirmRequest(sessionId.value, runId, token))
     const res = data?.data ?? data
     m.meta.confirmationToken = null
     messages.value.push({
