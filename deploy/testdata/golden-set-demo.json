@@ -1,0 +1,8 @@
+[
+  { "id": "demo-001", "question": "型号 ABC-123 的保修期是多久？", "knowledgeBase": "knowledge", "expectedDocumentIds": ["2001"], "referenceAnswer": "型号 ABC-123 保修期为 1 年，自签收之日起计算。", "expectedKeywords": ["保修", "1 年"] },
+  { "id": "demo-002", "question": "订单怎么申请退款？", "knowledgeBase": "knowledge", "expectedDocumentIds": ["2002"], "referenceAnswer": "进入订单详情页点击申请退款，填写退款原因提交即可。", "expectedKeywords": ["退款", "订单"] },
+  { "id": "demo-003", "question": "退货运费由谁承担？", "knowledgeBase": "knowledge", "expectedDocumentIds": ["2003"], "referenceAnswer": "非质量问题退货运费由买家承担。", "expectedKeywords": ["运费", "买家"] },
+  { "id": "demo-004", "question": "平台支持哪些支付方式？", "knowledgeBase": "knowledge", "expectedDocumentIds": ["2004"], "referenceAnswer": "支持微信、支付宝、银行卡支付。", "expectedKeywords": ["支付"] },
+  { "id": "demo-005", "question": "发货后多久能收到？", "knowledgeBase": "knowledge", "expectedDocumentIds": ["2005"], "referenceAnswer": "现货商品支付后 24 小时内发货，一般 3-5 个工作日送达。", "expectedKeywords": ["发货", "3-5"] },
+  { "id": "demo-006", "question": "如何修改收货地址？", "knowledgeBase": "knowledge", "expectedDocumentIds": ["2006"], "referenceAnswer": "在订单详情页修改收货地址，发货前可改。", "expectedKeywords": ["地址"] }
+]

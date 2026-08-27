@@ -134,9 +134,10 @@ CREATE TABLE IF NOT EXISTS kb_document_tag (
 -- 售后规则种子文档（005 售后 Agent，供规则 RAG 检索，标题 ASR-xxx）
 INSERT INTO kb_document (id, title, content, doc_type, summary, tags, category_id, status, create_by, deleted)
 SELECT * FROM (
-    SELECT 9001, 'ASR-001 耳机换货规则',
-           '条款编号：ASR-001；适用动作：换货（EXCHANGE）；适用商品：耳机类商品；条件：商品存在非人为质量问题（如无法开机、声音异常、外观损坏非人为）；期限：自签收之日起 15 天内可申请换货；流程：用户提交换货申请，附质量问题描述；超出期限或人为损坏不予换货。',
-           'txt', '耳机 15 天内质量问题可换货', 'after-sale-rules,换货', NULL, 1, 1, 0
+    SELECT 9001 AS id, 'ASR-001 耳机换货规则' AS title,
+           '条款编号：ASR-001；适用动作：换货（EXCHANGE）；适用商品：耳机类商品；条件：商品存在非人为质量问题（如无法开机、声音异常、外观损坏非人为）；期限：自签收之日起 15 天内可申请换货；流程：用户提交换货申请，附质量问题描述；超出期限或人为损坏不予换货。' AS content,
+           'txt' AS doc_type, '耳机 15 天内质量问题可换货' AS summary, 'after-sale-rules,换货' AS tags,
+           NULL AS category_id, 1 AS status, 1 AS create_by, 0 AS deleted
     UNION ALL SELECT 9002, 'ASR-002 耳机退货规则',
            '条款编号：ASR-002；适用动作：退货（RETURN）；适用商品：耳机类商品；条件：商品完好、配件齐全、不影响二次销售；期限：自签收之日起 7 天内无理由退货；流程：用户提交退货申请，退货完成后退款。',
            'txt', '耳机 7 天无理由退货', 'after-sale-rules,退货', NULL, 1, 1, 0
