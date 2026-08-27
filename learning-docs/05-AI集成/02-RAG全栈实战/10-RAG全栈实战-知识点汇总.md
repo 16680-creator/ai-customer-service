@@ -22,6 +22,7 @@
 12. [常见问题定位与调优速查](#十二常见问题定位与调优速查)
 13. [生产化检查清单](#十三生产化检查清单)
 14. [推荐学习顺序](#十四推荐学习顺序)
+15. [Chroma 与 Elasticsearch：分工、对比与真实生效状态](#十五chroma-与-elasticsearch分工对比与真实生效状态)
 
 ---
 
@@ -376,7 +377,7 @@ RRFScore(d) = Σ 1/(k + r)    k 为平滑常数（标准值 60）
 scores.merge(item.getId(), 1.0 / (k + rank), Double::sum);
 ```
 
-**关键前提：两路 ID 体系一致**——ES 路用 `_id`，向量路用 `metadata.documentId`，靠入库双写保证一致。响应中保留 `esRank`、`vectorRank` 便于解释和排障。
+**关键前提：两路 ID 体系一致**——ES 路用 `_id`，向量路用 `metadata.documentId`，由 `indexToEs()` 把 ES `_id` 写成 `documentId` 来保证（`SearchServiceImpl.java:164-167`）。注意这条双写只覆盖 `ai-cs-search` 自有的 `POST /search/document/{index}` 入口，知识后台的上传链路根本不写 ES，详见 §15.4。响应中保留 `esRank`、`vectorRank` 便于解释和排障。
 
 ### 6.4 双路编排与降级
 
@@ -402,7 +403,7 @@ ES 关键词路查询（filter 不参与打分，must 参与 BM25）：
 
 工程策略清单：
 
-- 并行执行 ES 与向量召回，降低总延迟。
+- 并行执行 ES 与向量召回以降低总延迟——⚠️ 这是目标而非现状，当前 `HybridSearchServiceImpl.java:52-53` 仍是顺序调用（见 §15.4 第 8 条）。
 - ES 索引 `_id` 与向量 metadata 的 `documentId` 统一。
 - 融合后仍可接 Rerank，形成"多路宽召回 -> RRF -> 精排"。
 - 分别用精确查询和语义查询验证两路能力，不能只测普通关键词。
@@ -784,6 +785,81 @@ ES 索引首次写入时由 `createEsIndexIfNeeded(...)` 幂等自动创建，�
 
 ---
 
+## 十五、Chroma 与 Elasticsearch：分工、对比与真实生效状态
+
+一句话定位：**Chroma 是 RAG 的主存储，Elasticsearch 是可插拔的关键词副本**。两者互不依赖、互不缓存，只在混合检索里作为并联的两路出现。
+
+### 15.1 概念与职责对比
+
+| 维度 | Elasticsearch | Chroma |
+|------|---------------|--------|
+| 检索原理 | BM25 倒排索引，关键词字面匹配 | 向量余弦相似度（HNSW 近邻图），语义匹配 |
+| 容器 | index | collection |
+| 容器粒度 | 一库一索引，索引名 = 知识库标识小写（`SearchServiceImpl.java:231`） | 全局单集合 `aics-knowledge`，知识库靠 metadata `knowledgeBase` 区分 |
+| 建容器 | 手写 `createEsIndexIfNeeded()`（`:196`，实际 create 在 `:203`）+ 启动预建 `knowledge`（`@PostConstruct:45`） | starter 代做：`initialize-schema: true` → Bean 初始化时 `getOrCreateCollection`，项目内 0 行手写代码 |
+| 字段 schema | 必须预定义：8 个字段显式 mapping（`:205-213`）——documentId/tags/knowledgeBase/docType 为 keyword，title/content/summary 为 text，page 为 integer | 无 schema 概念，metadata 弱类型、随写随有 |
+| 是否存向量 | 不存（本项目只用它做关键词路，未启用 dense_vector） | 存（text + embedding + metadata） |
+| 打分量纲 | BM25 分，可上千 | 余弦相似度 0~1 |
+| 度量可否变更 | 打分函数可换 | **距离度量在建集合时固化，之后改不了**；集合已存在时 `initialize-schema` 只复用不重建 |
+
+因为 Chroma 侧"创建索引"这个动作根本没有对应物（新知识库写进去带个 `knowledgeBase` 值就自动成库），所以 `POST /search/index/{index}` 才会是个空实现——见 §15.4 第 4 条。
+
+### 15.2 三个服务分别连谁
+
+| 服务 | Chroma | ES | 说明 |
+|------|--------|----|------|
+| `ai-cs-knowledge` | 写 | — | 上传 → `kb_document` → MQ → `KnowledgeVectorService.vectorize()` 只写 Chroma |
+| `ai-cs-chat` | 读 | — | 宽召回走 Chroma；需要 ES 能力时经 Feign 调 `GET /search/hybrid`。源码里出现的 "Elasticsearch" 全在注释中，无客户端 |
+| `ai-cs-search` | 读 + 写 | 读 + 写 | `HybridSearchServiceImpl.java:46-47` 同时注入 `ElasticsearchClient` 与 `VectorStore`，双路在同进程内并联 |
+
+### 15.3 RAG 链路中的读写用法
+
+**写入——全仓唯一的双写点** `SearchServiceImpl.java:92 indexDocument()`：
+
+```text
+:112  vectorStore.add(...)   → 先写 Chroma
+:114  indexToEs(...)         → 再写 ES：幂等建索引 → 按 documentId 删旧(:155) → esClient.index(_id=documentId)(:164)
+```
+
+ES 写失败只 warn、不回滚 Chroma（`:169-171`）——**ES 落后于 Chroma 是设计允许的常态**，不是 bug。
+
+**读取** `HybridSearchServiceImpl.java:50`：
+
+```text
+:52  esSearch()      → bool{ filter: term(knowledgeBase) + must: multiMatch(title^2, content) }，size=20
+:53  vectorSearch()  → similaritySearch topK=20 + filterExpression knowledgeBase=='x'，id 取 metadata.documentId
+:56/:61/:65  双空→空；ES 空→仅向量；向量空→仅 ES
+:71  RrfMerger.merge(esItems, vectorItems, topK, k=60)
+```
+
+两路结果的**唯一对齐键**是 ES `_id` == Chroma `metadata.documentId`（ES 写入时 `_id` 即 docId，`:166`；向量路读取 `:136-137`）。融合后由 `toResults()` 回填 `esRank`/`vectorRank`（`:167-168`），这两个字段是判断"某条到底是被哪一路召回的"的唯一线索。
+
+### 15.4 当前落差点（只读代码容易误判）
+
+| # | 现象 | 根因 | 证据 |
+|---|------|------|------|
+| 1 | 对话传 `hybrid=true` 仍不走 ES | 全局开关默认关 | `RagRetrieveProperties.java:14` `hybridEnabled=false`；`HybridRetriever.java:123` 直接回退；`tools/nacos-config/ai-cs-chat.yml` 无 `aics.rag.hybrid-enabled` |
+| 2 | 开关打开后 ES 路依然命中 0 | 知识后台入库不写 ES | `ai-cs-knowledge` 全服务 0 处 ES 引用 |
+| 3 | ES 里只有几条演示数据 | ES 唯一入口是 `POST /search/document/{index}` | 仅 `deploy/testdata/seed-redbox-data.ps1:115-124` 写入（`knowledge` 3 条 + `faq-test` 2 条）；前端无任何写入调用 |
+| 4 | 调"创建索引"接口后 ES 仍无索引 | 该实现对 ES 是空操作 | `SearchServiceImpl.java:85-89` 只打日志返回 |
+| 5 | 某些文档只能被单路召回 | 入库未传 `documentId` 时 ES `_id` 用随机 UUID 兜底，RRF 对不齐 | `:166` vs `:136` |
+| 6 | "ES 挂了"与"ES 没命中"结果不可区分 | 两者都返回空列表，仅 warn | `:113-116` |
+| 7 | 换 Embedding 模型后检索质量异常 | 集合存在即复用，维度与距离度量固化 | 三处 `initialize-schema: true`（knowledge:26 / chat:39 / search:39） |
+| 8 | 讲稿称"双路并行降低总延迟"，实际是顺序执行 | 未做并行编排 | `HybridSearchServiceImpl.java:52-53` 顺序调用 |
+
+因此，**在 RAG 对话链路上 ES 路目前不产生效果**（第 1、2 条叠加，两次降级都指向纯向量）；`/search/hybrid` 只对 seed 进去的那几条文档有意义，且前端未调用。
+
+### 15.5 让 ES 路真正生效与验证清单
+
+1. Nacos `ai-cs-chat.yml` 打开 `aics.rag.hybrid-enabled: true`。
+2. 补双写：在 `KnowledgeVectorService.vectorize()`（`ai-cs-knowledge/.../service/KnowledgeVectorService.java:69`）内同步写 ES，或给 `ai-cs-search` 加一个 `knowledge-doc-sync-topic` 消费者（与 `KnowledgeSyncConsumer.java:66` 同一 topic）。**推荐后者**——与 §九 的异步口径一致，且不把 ES 抖动引入入库主链路。
+3. 保证 `_id` 与 `documentId` 同源，即 §3.3 的三条硬约束。
+4. 验证 ES 路：`GET /search/hybrid?index=knowledge&query=ABC-123`，看结果里 `esRank` 是否有值。
+5. 验证全链路：`GET /chat/rag`（带 `hybrid=true`），看日志 `RAG增强检索: mode=HYBRID, degraded=false`；若 `degraded=true` 按 `degradeReason` 回查第 1、2 条。
+6. 查 Chroma 现状：`curl http://<host>:8000/api/v2/collections` 看集合 `configuration` 中的距离度量与向量维度。
+
+---
+
 ## 附：原文档与知识点对照
 
 | 原文档 | 主要知识点 |
@@ -798,4 +874,4 @@ ES 索引首次写入时由 `createEsIndexIfNeeded(...)` 幂等自动创建，�
 | 08-RocketMQ增量同步 | 异步链路、消息设计、幂等、死信补偿 |
 | 09-接口测试报告 | 23 用例验证结论、6 个修复记录 |
 
-本汇总在上述专题原文之外，另合并了 Word 讲稿独有的四块内容：服务边界与职责表（§2.1）、按现象定位的排障表（§12.1）、生产化检查清单（§十三）与推荐学习顺序（§十四）。需要逐行代码时，回看对应专题原文。
+本汇总在上述专题原文之外，另合并了 Word 讲稿独有的四块内容：服务边界与职责表（§2.1）、按现象定位的排障表（§12.1）、生产化检查清单（§十三）与推荐学习顺序（§十四）。第十五章（Chroma 与 ES 对比及真实生效状态）不来自上述任何一份材料，而是代码走查结论，并据此修正了 §6.3「靠入库双写保证一致」与 §6.4「双路并行」两处与代码现状不符的表述。需要逐行代码时，回看对应专题原文。
