@@ -147,9 +147,10 @@ function Start-BackendService($svc) {
     $jar = Get-ChildItem -Path "$root\$name\target" -Filter '*.jar' -ErrorAction SilentlyContinue |
            Where-Object { $_.Name -notmatch 'sources|javadoc|original' } | Select-Object -First 1
     if ($jar -and (Test-FatJar $jar.FullName)) {
-        Start-Proc "$jdk17\bin\java.exe" @("-jar", $jar.FullName) $name $root
+        Start-Proc "$jdk17\bin\java.exe" @("-Dfile.encoding=UTF-8", "-jar", $jar.FullName) $name $root
     } else {
-        Start-Proc "$maven\bin\mvn.cmd" @("-pl", $name, "spring-boot:run", "-DskipTests") $name $root
+        Start-Proc "$maven\bin\mvn.cmd" @("-pl", $name, "spring-boot:run",
+            "-Dspring-boot.run.jvmArguments=-Dfile.encoding=UTF-8", "-DskipTests") $name $root
     }
 }
 
