@@ -808,10 +808,28 @@ public class ChatServiceImpl implements ChatService {
     /**
      * RAG 检索入口：纯向量 / Hybrid / 改写；增强失败自动降级纯向量。
      * 检索环节计入 LLM 调用链观测（retrieval span：query、召回数、文档 ID、耗时）。
+     *
+     * <p>学习点：这里刻意不用 {@link TraceSpans#observeReturn} 一行式观测，而是手写
+     * Observation 生命周期——因为检索明细（docIds）要等检索完成、stop() 之前才能补进 span，
+     * 装饰器封装拿不到"中途填充明细"的能力；结论：观测需要中途补充数据时，就手动管理
+     * start/stop，封装只适用于"数据在动作开始时已就绪"的场景。</p>
+     *
+     * @param hybrid  是否启用混合检索（ES 关键词 + 向量语义 + RRF 融合，经 Feign 调
+     *                ai-cs-search 的 /search/hybrid）；false 保持纯向量语义检索。
+     *                受全局开关 aics.rag.hybrid-enabled 控制，未开启时 HybridRetriever
+     *                内部直接降级纯向量
+     * @param rewrite 是否启用查询改写 + HyDE 增强（LLM 把模糊问题拆成多个子查询，
+     *                并生成"假设性标准答案文档"用其向量检索，提升模糊问题召回率）；
+     *                true 时走 HYBRID_QUERY_REWRITE 模式。受全局开关 aics.rag.rewrite-enabled
+     *                控制，改写失败时降级为原始问题检索
      */
     private List<Document> retrieveRagDocs(String knowledgeBase, String message, int topK, double threshold,
                                            boolean hybrid, boolean rewrite) {
         // retrieval 环节观测：query、召回数、文档 ID、耗时（handler 在 onStop 时组装 span）
+        // 学习点：lowCardinalityKeyValue（低基数键）与 highCardinalityKeyValue（高基数键）的选择——
+        //   低基数键取值有限（span.type/knowledgeBase），适合作为指标聚合维度（如按知识库统计召回率）；
+        //   高基数键取值近乎无限（query/topK），只进 span 明细、不进指标，避免监控存储被无限维度撑爆。
+        //   这是 Micrometer Observation 的通用规则：先想清楚"哪些维度需要聚合统计"，再决定键的类别。
         io.micrometer.observation.Observation observation = io.micrometer.observation.Observation
                 .createNotStarted("rag.retrieval", observationRegistry)
                 .lowCardinalityKeyValue("span.type", "RETRIEVAL")
@@ -823,6 +841,9 @@ public class ChatServiceImpl implements ChatService {
                 .start();
         try {
             List<Document> docs;
+            // 参数组合：hybrid=false 且 rewrite=false → 纯向量（存量默认路径）；
+            // 仅 hybrid=true → HYBRID（ES+向量 RRF 融合）；rewrite=true → HYBRID_QUERY_REWRITE
+            // （改写+HyDE 链路本身已包含混合检索，故 rewrite 为"增强超集"，此时 hybrid 取值不影响结果）
             if (!hybrid && !rewrite) {
                 docs = knowledgeBaseService.search(knowledgeBase, message, topK, threshold);
             } else {
@@ -833,6 +854,9 @@ public class ChatServiceImpl implements ChatService {
                             result.getMode(), result.isDegraded(), result.getDocuments().size());
                     docs = result.getDocuments();
                 } catch (Exception e) {
+                    // 学习点：增强检索降级模式——Hybrid/改写依赖 ES、改写 LLM 等外围链路，
+                    // 故障面比纯向量大；捕获异常后回退纯向量，保证"召回能力"始终可用
+                    // （核心能力不被外围增强故障拖垮），warn 日志保留故障线索，降级对调用方透明。
                     log.warn("RAG增强检索失败，降级纯向量: mode={}, err={}", mode, e.getMessage());
                     docs = knowledgeBaseService.search(knowledgeBase, message, topK, threshold);
                 }
@@ -840,6 +864,10 @@ public class ChatServiceImpl implements ChatService {
             // 明细：召回数 + 命中文档 ID（截断，防敏感信息进 trace）
             // 学习点：detail 只放文档 ID 而非文档全文——trace 数据可能被导出到第三方
             // 追踪平台（Langfuse/Phoenix），文档全文属业务敏感内容，ID 足够还原检索路径
+            // 学习点：getOrDefault("documentId", d.getId()) 兜底写法——documentId 是入库时写入
+            // metadata 的文档 ID（KnowledgeBaseService.addChunks），d.getId() 是 Document 自带主键；
+            // 混合检索源（HybridRetriever）会补写 documentId，纯向量源则依赖入库时写入，
+            // 兜底保证不同检索源在观测口径上一致，避免出现"空 ID"污染 trace
             String docIds = docs.stream()
                     .map(d -> String.valueOf(d.getMetadata().getOrDefault("documentId", d.getId())))
                     .limit(20).collect(Collectors.joining(","));
@@ -848,9 +876,14 @@ public class ChatServiceImpl implements ChatService {
             return docs;
         } catch (Exception e) {
             // 检索异常也要标记观测失败：看板上能区分"检索没命中"与"检索报错"
+            // 学习点：observation.error(e) + rethrow 是"观测不吞异常"的标准写法——
+            // 观测层记录失败信号（错误栈/状态码），业务异常原样向上传播给调用方处理；
+            // 若在这里吞掉异常，降级/失败的真实原因会被观测掩盖，排查时只见结果不见过程
             observation.error(e);
             throw e;
         } finally {
+            // 学习点：stop() 放 finally 保证 span 必然闭合——成功返回、异常抛出、提前 return
+            // 三条路径都经过这里；若漏掉 finally，异常路径会产生"悬空 span"，破坏链路完整性
             observation.stop();
         }
     }
@@ -908,6 +941,9 @@ public class ChatServiceImpl implements ChatService {
      * score 为检索相似度；content 为命中片段原文。</p>
      */
     private List<CitationItemDTO> buildCitations(List<Document> docs) {
+        // 学习点：检索结果"自包含"设计——溯源所需的 documentId/title/page/score 全部随
+        // Document 的 metadata 一起返回，前端展示引用时无需二次查库；代价是入库时要
+        // 把展示字段写全（KnowledgeBaseService.addChunks），缺字段的检索源会降级为无溯源
         List<CitationItemDTO> citations = new ArrayList<>(docs.size());
         for (Document doc : docs) {
             Map<String, Object> meta = doc.getMetadata();
@@ -945,6 +981,10 @@ public class ChatServiceImpl implements ChatService {
 
     /**
      * 将异常转换为友好的用户提示。
+     *
+     * <p>学习点：异常"脱敏映射"——熔断/超时属于预期的服务降级，直接把原始异常抛给用户
+     * 会泄露内部状态（如熔断器名称、超时配置）；这里按异常类型映射为固定文案，
+     * 既隐藏实现细节，又给用户可执行的下一步动作（稍后重试），兜底再返回原始 message。</p>
      */
     private String getFriendlyMessage(Throwable e) {
         if (e == null) return "未知错误";

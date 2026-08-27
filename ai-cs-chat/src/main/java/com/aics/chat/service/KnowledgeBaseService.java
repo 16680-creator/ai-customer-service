@@ -99,7 +99,11 @@ public class KnowledgeBaseService {
     private double recallThreshold = 0.3;
 
     /**
-     * 将文本内容写入知识库（入库）。
+     * 将原始文本切分为多个文档片段，并写入指定知识库。
+     *
+     * <p>方法先使用 {@link TokenTextSplitter} 按 Token 数量对长文本进行分块，
+     * 再由 {@link #addChunks(String, List)} 统一补充元数据并写入向量库。
+     * 分块后每个片段可以独立进行 Embedding 和相似度检索，避免整篇长文本影响召回精度。</p>
      *
      * @param knowledgeBase 知识库标识（存入 metadata 的 {@code knowledgeBase} 字段，便于按库过滤检索）
      * @param text          原始文本内容
@@ -136,11 +140,21 @@ public class KnowledgeBaseService {
     }
 
     /**
-     * 分块并写入向量库（入库的通用实现）。
+     * 将原始文档列表切分为多个片段，补充知识库元数据后写入向量库。
      *
-     * @param knowledgeBase 知识库标识
-     * @param documents     读取到的原始文档列表
-     * @return 写入的分块数量
+     * <p>这是文本、PDF、Office 和 HTML 等不同来源文档的统一入库入口，
+     * 具体流程如下：</p>
+     * <ol>
+     *     <li>使用 {@link TokenTextSplitter} 将每个原始文档按 Token 数量切分。</li>
+     *     <li>为每个片段补充知识库标识、文档 ID 和标题等元数据。</li>
+     *     <li>调用 {@link VectorStore#add(List)} 触发 Embedding 并保存到向量库。</li>
+     * </ol>
+     *
+     * <p>元数据会随向量片段一起保存，后续检索时可用于知识库过滤、文档溯源和前端引用展示。</p>
+     *
+     * @param knowledgeBase 知识库标识，用于隔离不同知识库的检索数据
+     * @param documents     读取到的原始文档列表，可能来自文本、PDF、Office 或 HTML 文件
+     * @return 实际写入向量库的分块数量
      */
     private int addChunks(String knowledgeBase, List<Document> documents) {
         // 1. 分块：每个 Document 再切分为更小的片段，便于精准检索
