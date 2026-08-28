@@ -19,3 +19,23 @@ spring:
     import:
       - optional:nacos:aics-shared.yml
       - optional:nacos:ai-cs-gateway.yml
+
+# ===== 网关能力配置（限流 / 鉴权 / 负载均衡） =====
+aics:
+  gateway:
+    rate-limit:
+      enabled: true
+      # 限流算法：sliding-window（滑动窗口，requests/window-seconds 生效）
+      #          | token-bucket（令牌桶，qps 生效，允许短时突发、限制长期平均速率）
+      algorithm: sliding-window
+      requests: 60
+      window-seconds: 60
+      qps: 5
+    auth:
+      # API Key 白名单：格式 keyId:secret，逗号分隔（如 svc-app:sk-xxxx,svc-job:sk-yyyy）
+      # 空 = 关闭 API Key 认证（仅 JWT）；keyId 校验通过后作为 X-User-Id 透传下游
+      api-keys: ""
+    loadbalancer:
+      # 负载均衡算法：round-robin（轮询，Spring Cloud LoadBalancer 默认）
+      #             | least-connections（最少连接，按实例在途请求数分流）
+      algorithm: round-robin

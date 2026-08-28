@@ -95,4 +95,21 @@ class RateLimitFilterTest {
         }
         assertEquals(3, forwarded.get());
     }
+
+    @Test
+    void 令牌桶模式_突发耗尽后429() {
+        ReflectionTestUtils.setField(filter, "algorithm", "token-bucket");
+        ReflectionTestUtils.setField(filter, "qps", 2);
+        ReflectionTestUtils.setField(filter, "enabled", true);
+
+        // qps=2 即桶容量 2：突发 2 次放行，第 3 次（未等补充）429
+        filter.filter(newExchange("u9"), countingChain()).block();
+        filter.filter(newExchange("u9"), countingChain()).block();
+        assertEquals(2, forwarded.get());
+
+        MockServerWebExchange third = newExchange("u9");
+        filter.filter(third, countingChain()).block();
+        assertEquals(HttpStatus.TOO_MANY_REQUESTS, third.getResponse().getStatusCode());
+        assertEquals(2, forwarded.get(), "令牌耗尽的请求不得转发下游");
+    }
 }

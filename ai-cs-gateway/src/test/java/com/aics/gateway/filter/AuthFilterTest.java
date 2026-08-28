@@ -111,4 +111,64 @@ class AuthFilterTest {
 
         newFilter().filter(exchange, chain).block();
     }
+
+    // ===== API Key 认证（机器调用场景）：keyId:secret 校验 + 身份透传 =====
+
+    private AuthFilter newFilterWithApiKeys(String apiKeysConfig) {
+        AuthFilter filter = newFilter();
+        ReflectionTestUtils.setField(filter, "apiKeysConfig", apiKeysConfig);
+        filter.initApiKeys();
+        return filter;
+    }
+
+    @Test
+    void 有效APIKey_注入机器身份并移除密钥头() {
+        MockServerHttpRequest request = MockServerHttpRequest
+                .method(HttpMethod.POST, "/chat/agent")
+                .header("X-API-Key", "svc-app:sk-secret-123")
+                .build();
+        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        GatewayFilterChain chain = mock(GatewayFilterChain.class);
+        when(chain.filter(any())).thenAnswer(invocation -> {
+            ServerWebExchange mutated = invocation.getArgument(0, ServerWebExchange.class);
+            HttpHeaders headers = mutated.getRequest().getHeaders();
+            assertEquals(List.of("svc-app"), headers.get("X-User-Id"), "keyId 应作为身份透传下游");
+            assertEquals("api-key:svc-app", headers.getFirst("X-User-Name"));
+            assertNull(headers.getFirst("X-API-Key"), "密钥不得继续向下游传播");
+            return Mono.empty();
+        });
+
+        newFilterWithApiKeys("svc-app:sk-secret-123,svc-job:sk-other").filter(exchange, chain).block();
+        verify(chain).filter(any());
+    }
+
+    @Test
+    void 错误secret_返回401() {
+        MockServerHttpRequest request = MockServerHttpRequest
+                .method(HttpMethod.POST, "/chat/agent")
+                .header("X-API-Key", "svc-app:sk-wrong")
+                .build();
+        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+        GatewayFilterChain chain = mock(GatewayFilterChain.class);
+        when(chain.filter(any())).thenReturn(Mono.empty());
+
+        newFilterWithApiKeys("svc-app:sk-secret-123").filter(exchange, chain).block();
+        assertEquals(HttpStatus.UNAUTHORIZED, exchange.getResponse().getStatusCode());
+    }
+
+    @Test
+    void 未配置APIKey时_携带密钥头仍401() {
+        MockServerHttpRequest request = MockServerHttpRequest
+                .method(HttpMethod.POST, "/chat/agent")
+                .header("X-API-Key", "svc-app:sk-secret-123")
+                .build();
+        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+        GatewayFilterChain chain = mock(GatewayFilterChain.class);
+        when(chain.filter(any())).thenReturn(Mono.empty());
+
+        // api-keys 为空 = 关闭 API Key 认证，仅 JWT
+        newFilterWithApiKeys("").filter(exchange, chain).block();
+        assertEquals(HttpStatus.UNAUTHORIZED, exchange.getResponse().getStatusCode());
+    }
 }

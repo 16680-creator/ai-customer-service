@@ -17,11 +17,20 @@ import reactor.core.publisher.Mono;
 /**
  * 网关限流过滤器（3.2 推荐顺序 1：限流）。
  *
- * <p>滑动窗口内存限流，维度 = 可信用户ID（认证后由 {@link AuthFilter} 注入；
+ * <p>内存限流，维度 = 可信用户ID（认证后由 {@link AuthFilter} 注入；
  * 未认证/白名单路径退化为客户端 IP）。超限返回 429，不转发下游。</p>
  *
+ * <p>支持两种算法（{@code aics.gateway.rate-limit.algorithm}）：
+ * <ul>
+ *   <li><b>sliding-window</b>（默认）：滑动窗口，严格限制"窗口内总次数"，
+ *       配置 requests + window-seconds；</li>
+ *   <li><b>token-bucket</b>：令牌桶，限制"长期平均速率 + 允许短时突发"，
+ *       配置 qps（补充速率，桶容量默认等于 qps）。</li>
+ * </ul></p>
+ *
  * <p>配置项（{@code aics.gateway.rate-limit.*}）：enabled（默认 true）、
- * requests（默认 60）、window-seconds（默认 60）。</p>
+ * algorithm（默认 sliding-window）、requests（默认 60）、window-seconds（默认 60）、
+ * qps（默认 5，token-bucket 生效）。</p>
  */
 @Component
 public class RateLimitFilter implements GlobalFilter, Ordered {
@@ -34,13 +43,22 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
     @Value("${aics.gateway.rate-limit.enabled:true}")
     private boolean enabled;
 
+    /** 限流算法：sliding-window（默认）/ token-bucket */
+    @Value("${aics.gateway.rate-limit.algorithm:sliding-window}")
+    private String algorithm;
+
     @Value("${aics.gateway.rate-limit.requests:60}")
     private int requests;
 
     @Value("${aics.gateway.rate-limit.window-seconds:60}")
     private int windowSeconds;
 
-    private final SlidingWindowRateLimiter limiter = new SlidingWindowRateLimiter();
+    /** token-bucket 算法的每秒补充令牌数（= 每用户长期 QPS 上限） */
+    @Value("${aics.gateway.rate-limit.qps:5}")
+    private int qps;
+
+    private final SlidingWindowRateLimiter slidingWindowLimiter = new SlidingWindowRateLimiter();
+    private final TokenBucketRateLimiter tokenBucketLimiter = new TokenBucketRateLimiter();
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
@@ -51,11 +69,22 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
             return chain.filter(exchange);
         }
         String key = resolveKey(exchange);
-        if (!limiter.tryAcquire(key, Math.max(1, requests), Math.max(1, windowSeconds))) {
+        if (!tryAcquire(key)) {
             log.warn("请求触发限流: key={}, path={}", key, exchange.getRequest().getPath());
             return tooManyRequests(exchange.getResponse());
         }
         return chain.filter(exchange);
+    }
+
+    /**
+     * 按配置的算法尝试获取配额：token-bucket 用 QPS 速率限流，其余值走滑动窗口（默认）。
+     * 常量写在前的 equalsIgnoreCase，algorithm 未配置（null）时安全回退滑动窗口。
+     */
+    private boolean tryAcquire(String key) {
+        if ("token-bucket".equalsIgnoreCase(algorithm)) {
+            return tokenBucketLimiter.tryAcquire(key, Math.max(1, qps), Math.max(1, qps));
+        }
+        return slidingWindowLimiter.tryAcquire(key, Math.max(1, requests), Math.max(1, windowSeconds));
     }
 
     /**
