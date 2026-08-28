@@ -52,6 +52,7 @@
 ```
 
 **宪法对此需求的约束**：
+
 - 必须使用 Resilience4j（Spring Boot 3 原生支持，无外部依赖）
 - 必须遵循 TDD 循环（Red → Green → Refactor）
 - 所有配置必须外移到 YAML，不允许硬编码
@@ -91,12 +92,12 @@ AI 针对 spec 中不明确的地方提出澄清问题，人确认后写入 spec
 
 **关键澄清点**：
 
-| 问题 | 决策 |
-|------|------|
-| 流式调用是否也要重试？ | **不重试**，流式 Flux 是一次性的，重试会导致重复消费 |
-| 熔断器参数如何确定？ | 使用默认推荐值：10 次滑动窗口，50% 阈值，30 秒熔断时长 |
-| 超时超了是抛异常还是降级返回？ | **降级返回友好提示**，不抛异常，保持接口可用 |
-| 是否需要单独的 Bulkhead？ | 第一期不需要，后续并发量高时再加 |
+| 问题                | 决策                               |
+| ----------------- | -------------------------------- |
+| 流式调用是否也要重试？       | **不重试**，流式 Flux 是一次性的，重试会导致重复消费  |
+| 熔断器参数如何确定？        | 使用默认推荐值：10 次滑动窗口，50% 阈值，30 秒熔断时长 |
+| 超时超了是抛异常还是降级返回？   | **降级返回友好提示**，不抛异常，保持接口可用         |
+| 是否需要单独的 Bulkhead？ | 第一期不需要，后续并发量高时再加                 |
 
 ### 阶段 3：实现计划（Plan）
 
@@ -252,6 +253,7 @@ resilience4j:
 ```
 
 **配置设计要点**：
+
 - **两个独立熔断器实例**：非流式和流式互不影响，一个熔断另一个还能用
 - **重试只针对网络/超时类异常**：`retry-exceptions` 列出 SocketTimeout/Connect/ResourceAccess/Timeout，
   业务异常（`BusinessException` / `IllegalArgumentException`）通过 `ignore-exceptions` 显式不重试，避免无效调用
@@ -299,6 +301,7 @@ public class ResilientAiService {
 ```
 
 > **与最终实现（v2）的差异说明**：上方为 SDD 规划时「注解式容错（@TimeLimiter + @Retry + @CircuitBreaker + 固定 fallbackChat/fallbackSseStream）」的初始设计稿。**项目真实实现已演进为「模型路由 + 多模型降级链 + 模型粒度熔断/超时 + 观测」**：
+>
 > - 所有方法首参为 `ModelScenario scenario`（`callChat` / `callRagChat` / `callSummary` / `callSseStream` / `callSseRagStream`），方法与规划名一致但多了场景参数；
 > - 熔断改为**模型粒度**（`ModelHealthRegistry.breaker(modelId)`），超时按**模型 `timeoutMs`** 用 `CompletableFuture.get(timeoutMs)` + `cancel(true)` 实现；
 > - 失败按 `fallbackChain` 逐模型降级，最终 `fallbackText(scenario)` 返回 "AI 助手暂时繁忙，请稍后重试。"（SUMMARY 返回空），**不是**规划里的 `fallbackChat` / `fallbackSseStream` / `fallbackSummary`；
@@ -307,6 +310,7 @@ public class ResilientAiService {
 > - 注意：`application.yml` 中 `resilience4j.chatService` / `sseChatService` 实例已成残留配置；仅视觉模型 `visionService` 仍由 `VisionModelClient` 的注解使用。
 
 **关键设计决策**：
+
 - **为什么返回 CompletableFuture？** `@TimeLimiter` 通过 `Future.get(timeout)` 实现超时，要求方法返回 `Future` 类型
 - **为什么用包装层而非直接改 ChatServiceImpl？** 分离关注点，弹性逻辑与业务逻辑解耦
 - **ResilientAiService 还提供 RAG / 摘要 / 流式 RAG 的重载**：`callRagChat`、`callSummary`、`callSseRagStream`
@@ -404,27 +408,27 @@ onTimeout 回调 → 自动清理，释放资源
 
 ### 3.2 各阶段产出物
 
-| 阶段 | 产出物 | 本需求的具体内容 |
-|------|--------|----------------|
+| 阶段               | 产出物                               | 本需求的具体内容         |
+| ---------------- | --------------------------------- | ---------------- |
 | **Constitution** | `.specify/memory/constitution.md` | 强制 SDD 流程、TDD 循环 |
-| **Specify** | `specs/.../spec.md` | 6 条 SHALL 行为契约 |
-| **Clarify** | 澄清记录（写入 spec） | 4 个决策点 |
-| **Plan** | `specs/.../plan.md` | 技术选型、架构、接口契约 |
-| **Tasks** | `specs/.../tasks.md` | 6 个依赖有序的任务 |
-| **Implement** | 代码变更 | 4 个文件改动，1 个新建文件 |
+| **Specify**      | `specs/.../spec.md`               | 6 条 SHALL 行为契约   |
+| **Clarify**      | 澄清记录（写入 spec）                     | 4 个决策点           |
+| **Plan**         | `specs/.../plan.md`               | 技术选型、架构、接口契约     |
+| **Tasks**        | `specs/.../tasks.md`              | 6 个依赖有序的任务       |
+| **Implement**    | 代码变更                              | 4 个文件改动，1 个新建文件  |
 
 ### 3.3 方法论 vs 工具：SDD 与 Superpowers 的关系
 
 > 很多同学容易混淆这两个概念，这里做一次清晰的区分。
 
-| 维度 | SDD（方法论） | Superpowers / SpecKit（工具） |
-|------|-------------|-----------------------------|
-| **本质** | 规约驱动开发的通用理念 | 实现 SDD 方法论的具体工具链 |
-| **类比** | 敏捷开发、TDD（理念） | Jira + GitLab CI + 代码生成器（具体实现） |
-| **流程** | 任何 "spec → design → implement" 都算 SDD | 强制 `constitution → specify → clarify → plan → tasks → implement` |
-| **产物** | 任何形式的规格文档 | 特定的 spec.md / plan.md / tasks.md 模板 |
-| **灵活性** | 可裁剪、可自定义 | 工具强制流程，但可跳过某些阶段（如 Clarify） |
-| **约束力** | 靠团队自觉 | 通过宪法（constitution）和 slash commands 强制约束 |
+| 维度      | SDD（方法论）                              | Superpowers / SpecKit（工具）                                        |
+| ------- | ------------------------------------- | ---------------------------------------------------------------- |
+| **本质**  | 规约驱动开发的通用理念                           | 实现 SDD 方法论的具体工具链                                                 |
+| **类比**  | 敏捷开发、TDD（理念）                          | Jira + GitLab CI + 代码生成器（具体实现）                                   |
+| **流程**  | 任何 "spec → design → implement" 都算 SDD | 强制 `constitution → specify → clarify → plan → tasks → implement` |
+| **产物**  | 任何形式的规格文档                             | 特定的 spec.md / plan.md / tasks.md 模板                              |
+| **灵活性** | 可裁剪、可自定义                              | 工具强制流程，但可跳过某些阶段（如 Clarify）                                       |
+| **约束力** | 靠团队自觉                                 | 通过宪法（constitution）和 slash commands 强制约束                          |
 
 **一句话总结**：SDD 是"做什么"（理念），Superpowers 是"用什么做"（工具）。就像用 Jira 走敏捷开发——Jira 是工具，敏捷是方法论。
 
@@ -443,6 +447,7 @@ Superpowers（AI 自动执行）：
 ```
 
 **比喻**：
+
 - **SDD 人工模式** = 开车走国道，每个路口都要停下来看路标、确认方向
 - **Superpowers 工具模式** = 开导航，设好目的地，导航自动规划路线带着你走，你只需要在关键岔路扫一眼
 
@@ -450,13 +455,13 @@ Superpowers 的价值在于：**把 SDD 流程从"人工逐级确认"变成了"A
 
 ### 3.4 流程收益
 
-| 维度 | 没有 SDD | 有 SDD |
-|------|----------|--------|
-| **需求理解** | 口头传递，容易遗漏 | 明文 SHALL 契约，可追溯 |
-| **设计决策** | 埋在代码里，无人知晓 | 写进 plan.md，可审阅 |
-| **任务边界** | 全凭直觉分组 | 依赖有序，精确到文件 |
-| **执行过程** | 自由发挥，质量不可控 | 逐任务执行，TDD 循环 |
-| **知识沉淀** | 代码即文档，阅读成本高 | 文档链完整，新人友好 |
+| 维度       | 没有 SDD      | 有 SDD           |
+| -------- | ----------- | --------------- |
+| **需求理解** | 口头传递，容易遗漏   | 明文 SHALL 契约，可追溯 |
+| **设计决策** | 埋在代码里，无人知晓  | 写进 plan.md，可审阅  |
+| **任务边界** | 全凭直觉分组      | 依赖有序，精确到文件      |
+| **执行过程** | 自由发挥，质量不可控  | 逐任务执行，TDD 循环    |
+| **知识沉淀** | 代码即文档，阅读成本高 | 文档链完整，新人友好      |
 
 ---
 
@@ -491,14 +496,14 @@ Superpowers 的价值在于：**把 SDD 流程从"人工逐级确认"变成了"A
 
 ### 4.2 文件变更清单
 
-| 文件 | 变更类型 | 说明 |
-|------|---------|------|
-| `pom.xml`（父） | 修改 | 添加 Resilience4j BOM 版本管理 |
-| `ai-cs-chat/pom.xml` | 修改 | 添加 resilience4j-spring-boot3、aop、timelimiter |
-| `application.yml` | 修改 | 添加 resilience4j 完整配置 |
-| `ResilientAiService.java` | **新建** | 弹性包装类，核心注解组合 |
-| `ChatServiceImpl.java` | 修改 | 替换 ChatClient 为 ResilientAiService |
-| `Resilience4jConfig.java` | 修改 | 改为配置说明文档类 |
+| 文件                        | 变更类型   | 说明                                           |
+| ------------------------- | ------ | -------------------------------------------- |
+| `pom.xml`（父）              | 修改     | 添加 Resilience4j BOM 版本管理                     |
+| `ai-cs-chat/pom.xml`      | 修改     | 添加 resilience4j-spring-boot3、aop、timelimiter |
+| `application.yml`         | 修改     | 添加 resilience4j 完整配置                         |
+| `ResilientAiService.java` | **新建** | 弹性包装类，核心注解组合                                 |
+| `ChatServiceImpl.java`    | 修改     | 替换 ChatClient 为 ResilientAiService           |
+| `Resilience4jConfig.java` | 修改     | 改为配置说明文档类                                    |
 
 ### 4.3 熔断器状态流转
 
@@ -577,12 +582,12 @@ Tasks（任务拆分）：
 
 ### 6.2 常见问题
 
-| 问题 | 解决方式 |
-|------|---------|
-| 流程感觉繁琐 | 小需求可以跳过 Clarify 直接到 Plan，保持灵活性 |
-| 文档维护成本 | 文档就是设计决策的记录，对后续维护的价值远大于写文档的成本 |
-| 任务依赖关系 | 工具自动生成，不用手动排序 |
-| 和现有代码冲突 | Plan 阶段会分析影响范围，提前发现冲突 |
+| 问题      | 解决方式                           |
+| ------- | ------------------------------ |
+| 流程感觉繁琐  | 小需求可以跳过 Clarify 直接到 Plan，保持灵活性 |
+| 文档维护成本  | 文档就是设计决策的记录，对后续维护的价值远大于写文档的成本  |
+| 任务依赖关系  | 工具自动生成，不用手动排序                  |
+| 和现有代码冲突 | Plan 阶段会分析影响范围，提前发现冲突          |
 
 ### 6.3 经验总结
 
@@ -597,21 +602,21 @@ Tasks（任务拆分）：
 
 ### 7.1 相关命令速查
 
-| 命令 | 作用 | 本需求的使用 |
-|------|------|-------------|
-| `/speckit-constitution` | 查看/更新项目宪法 | 确定 SDD 流程约束 |
-| `/speckit-specify` | 定义功能规格 | 生成 6 条 SHALL 契约 |
-| `/speckit-clarify` | 澄清规格问题 | 确认 4 个设计决策 |
-| `/speckit-plan` | 生成实现计划 | 技术选型 + 架构设计 |
-| `/speckit-tasks` | 拆分可执行任务 | 6 个依赖有序任务 |
-| `/speckit-implement` | 逐个执行任务 | 5 个文件变更 |
+| 命令                      | 作用        | 本需求的使用          |
+| ----------------------- | --------- | --------------- |
+| `/speckit-constitution` | 查看/更新项目宪法 | 确定 SDD 流程约束     |
+| `/speckit-specify`      | 定义功能规格    | 生成 6 条 SHALL 契约 |
+| `/speckit-clarify`      | 澄清规格问题    | 确认 4 个设计决策      |
+| `/speckit-plan`         | 生成实现计划    | 技术选型 + 架构设计     |
+| `/speckit-tasks`        | 拆分可执行任务   | 6 个依赖有序任务       |
+| `/speckit-implement`    | 逐个执行任务    | 5 个文件变更         |
 
 ### 7.2 相关文件路径
 
-| 文件 | 路径 |
-|------|------|
-| 项目宪法 | `.specify/memory/constitution.md` |
-| 弹性包装类 | `ai-cs-chat/src/main/java/com/aics/chat/service/impl/ResilientAiService.java` |
-| 配置说明 | `ai-cs-chat/src/main/java/com/aics/chat/config/Resilience4jConfig.java` |
-| 配置 YAML | `ai-cs-chat/src/main/resources/application.yml` |
-| 业务服务 | `ai-cs-chat/src/main/java/com/aics/chat/service/impl/ChatServiceImpl.java` |
+| 文件      | 路径                                                                            |
+| ------- | ----------------------------------------------------------------------------- |
+| 项目宪法    | `.specify/memory/constitution.md`                                             |
+| 弹性包装类   | `ai-cs-chat/src/main/java/com/aics/chat/service/impl/ResilientAiService.java` |
+| 配置说明    | `ai-cs-chat/src/main/java/com/aics/chat/config/Resilience4jConfig.java`       |
+| 配置 YAML | `ai-cs-chat/src/main/resources/application.yml`                               |
+| 业务服务    | `ai-cs-chat/src/main/java/com/aics/chat/service/impl/ChatServiceImpl.java`    |
