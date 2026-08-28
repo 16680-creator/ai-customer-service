@@ -10,14 +10,14 @@
 项目 `ai-customer-service` 已具备基础 RAG（向量 + Rerank + 引用溯源 + 搜索侧混合检索 + NL2SQL），
 本次用 Spec Kit 流程再落地六项 RAG 进阶能力：
 
-| # | 能力 | 对应用户故事 |
-|---|------|-------------|
-| 1 | RAG 评估体系（golden 集 + 指标 + LLM-as-Judge + CI 门禁） | US1 |
-| 2 | Hybrid RAG 接入对话（ES+向量+RRF 混合检索） | US2 |
-| 3 | 查询改写 / HyDE（多查询 + 假设性文档） | US3 |
-| 4 | GraphRAG / 多跳检索（图谱 + BFS，无图降级） | US4 |
-| 5 | 智能问数自然语言化 + ECharts 图表 | US5 |
-| 6 | 知识库运营闭环（提问聚类 + 缺口识别 + FAQ 反哺） | US6 |
+| #   | 能力                                             | 对应用户故事 |
+| --- | ---------------------------------------------- | ------ |
+| 1   | RAG 评估体系（golden 集 + 指标 + LLM-as-Judge + CI 门禁） | US1    |
+| 2   | Hybrid RAG 接入对话（ES+向量+RRF 混合检索）                | US2    |
+| 3   | 查询改写 / HyDE（多查询 + 假设性文档）                       | US3    |
+| 4   | GraphRAG / 多跳检索（图谱 + BFS，无图降级）                 | US4    |
+| 5   | 智能问数自然语言化 + ECharts 图表                         | US5    |
+| 6   | 知识库运营闭环（提问聚类 + 缺口识别 + FAQ 反哺）                  | US6    |
 
 ---
 
@@ -45,13 +45,13 @@
 
 **产物**：
 
-| 文件 | 内容 |
-|------|------|
-| `research.md` | 15 项技术决策（D1-D15）：评估形态、golden 集存放、指标自实现、LLM-Judge 复用、Feign 接入 Hybrid、默认开关、RRF 融合、图存储抽象、图表判定规则、聚类算法等 |
-| `data-model.md` | 评估/检索/图表/运营四类实体 + 新增表 `kb_faq` / `kb_graph_triple` |
-| `contracts/rest-api.md` | 新增/变更 REST 契约（检索测试、RAG 扩展、图表、图谱、评估、运营） |
-| `quickstart.md` | 前置条件 + 验证命令 + 新增配置项清单 |
-| `plan.md` | 技术上下文 + 宪法检查（全部通过）+ 项目结构 |
+| 文件                      | 内容                                                                                                 |
+| ----------------------- | -------------------------------------------------------------------------------------------------- |
+| `research.md`           | 15 项技术决策（D1-D15）：评估形态、golden 集存放、指标自实现、LLM-Judge 复用、Feign 接入 Hybrid、默认开关、RRF 融合、图存储抽象、图表判定规则、聚类算法等 |
+| `data-model.md`         | 评估/检索/图表/运营四类实体 + 新增表 `kb_faq` / `kb_graph_triple`                                                 |
+| `contracts/rest-api.md` | 新增/变更 REST 契约（检索测试、RAG 扩展、图表、图谱、评估、运营）                                                             |
+| `quickstart.md`         | 前置条件 + 验证命令 + 新增配置项清单                                                                              |
+| `plan.md`               | 技术上下文 + 宪法检查（全部通过）+ 项目结构                                                                           |
 
 **关键决策示例**：
 
@@ -71,16 +71,16 @@
 
 **实施范围**（本记录交付时已完成并验证）：
 
-| 模块 | 新增代码 | 测试 |
-|------|---------|------|
-| ai-cs-chat/rag/eval | GoldenCaseLoader、RetrievalMetrics、RagEvalServiceImpl、LlmJudgeService、RagEvalController、golden-set.json（20 条） | RetrievalMetricsTest、RagEvalServiceImplTest、RagEvaluationTest（CI 门禁） |
-| ai-cs-chat/rag/retrieve | HybridRetriever、RetrievalMode、RetrieveResult、MultiQueryMerger、RagRetrieveProperties、RetrieveController | MultiQueryMergerTest、HybridRetrieverTest、RetrieveControllerTest |
-| ai-cs-chat/rag/rewrite | QueryRewriteService、RewriteResult、QueryRewriteProperties | QueryRewriteServiceTest |
-| ai-cs-chat/rag/graph | GraphStore、InMemoryGraphStore、GraphRagService、GraphProperties、GraphController | InMemoryGraphStoreTest |
-| ai-cs-chat/nl2sql/chart | ChartType、ChartTypeDetector、EChartsOptionBuilder、ChartAnswerGenerator、ChartController | ChartTypeDetectorTest、ChartAnswerGeneratorTest、ChartControllerTest |
-| ai-cs-chat | SearchFeignClient、ChatHybridPageVO/ChatHybridSearchResult、ChatServiceImpl/ChatController 接入 hybrid/rewrite | — |
-| ai-cs-knowledge/ops | EmbeddingClusterService、KnowledgeGapDetector、QuestionClusterService、FaqService、KnowledgeFaq、KnowledgeOpsController | EmbeddingClusterServiceTest、QuestionClusterServiceTest、KnowledgeOpsControllerTest |
-| ai-cs-frontend | ChatDashboardView（ECharts 图表）、KnowledgeOpsView（聚类看板）、路由/API 封装、echarts 依赖 | 构建通过 |
+| 模块                      | 新增代码                                                                                                               | 测试                                                                                |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
+| ai-cs-chat/rag/eval     | GoldenCaseLoader、RetrievalMetrics、RagEvalServiceImpl、LlmJudgeService、RagEvalController、golden-set.json（20 条）       | RetrievalMetricsTest、RagEvalServiceImplTest、RagEvaluationTest（CI 门禁）              |
+| ai-cs-chat/rag/retrieve | HybridRetriever、RetrievalMode、RetrieveResult、MultiQueryMerger、RagRetrieveProperties、RetrieveController             | MultiQueryMergerTest、HybridRetrieverTest、RetrieveControllerTest                   |
+| ai-cs-chat/rag/rewrite  | QueryRewriteService、RewriteResult、QueryRewriteProperties                                                           | QueryRewriteServiceTest                                                           |
+| ai-cs-chat/rag/graph    | GraphStore、InMemoryGraphStore、GraphRagService、GraphProperties、GraphController                                      | InMemoryGraphStoreTest                                                            |
+| ai-cs-chat/nl2sql/chart | ChartType、ChartTypeDetector、EChartsOptionBuilder、ChartAnswerGenerator、ChartController                              | ChartTypeDetectorTest、ChartAnswerGeneratorTest、ChartControllerTest                |
+| ai-cs-chat              | SearchFeignClient、ChatHybridPageVO/ChatHybridSearchResult、ChatServiceImpl/ChatController 接入 hybrid/rewrite         | —                                                                                 |
+| ai-cs-knowledge/ops     | EmbeddingClusterService、KnowledgeGapDetector、QuestionClusterService、FaqService、KnowledgeFaq、KnowledgeOpsController | EmbeddingClusterServiceTest、QuestionClusterServiceTest、KnowledgeOpsControllerTest |
+| ai-cs-frontend          | ChatDashboardView（ECharts 图表）、KnowledgeOpsView（聚类看板）、路由/API 封装、echarts 依赖                                          | 构建通过                                                                              |
 
 **验证结果**：
 
@@ -140,19 +140,17 @@
 
 ## 五、一致性自查（/speckit-analyze 视角）
 
-| 检查项 | 结论 |
-|--------|------|
-| spec ↔ plan 用户故事一致（US1-US6） | ✅ |
-| plan ↔ tasks 阶段/任务一致 | ✅ |
-| tasks 每个故事有测试前置任务（TDD） | ✅ |
-| contracts ↔ 控制器路径/参数一致（/chat/retrieve/test、/chat/chart、/rag/eval/run、/rag/graph/*、/knowledge/ops/*） | ✅ |
-| data-model ↔ 实体/表一致（kb_faq、kb_graph_triple） | ✅ |
-| 宪法门禁（不新增模块、Feign 跨服务、配置走 Nacos、复用 Result） | ✅ |
-| 测试全绿 + 前端构建通过 | ✅ |
+| 检查项                                                                                                 | 结论  |
+| --------------------------------------------------------------------------------------------------- | --- |
+| spec ↔ plan 用户故事一致（US1-US6）                                                                         | ✅   |
+| plan ↔ tasks 阶段/任务一致                                                                                | ✅   |
+| tasks 每个故事有测试前置任务（TDD）                                                                              | ✅   |
+| contracts ↔ 控制器路径/参数一致（/chat/retrieve/test、/chat/chart、/rag/eval/run、/rag/graph/*、/knowledge/ops/*） | ✅   |
+| data-model ↔ 实体/表一致（kb_faq、kb_graph_triple）                                                         | ✅   |
+| 宪法门禁（不新增模块、Feign 跨服务、配置走 Nacos、复用 Result）                                                           | ✅   |
+| 测试全绿 + 前端构建通过                                                                                       | ✅   |
 
 ---
-
-
 
 ---
 
@@ -161,15 +159,15 @@
 在真实基础设施（远程 MySQL/Redis/Chroma 123.60.31.79 + 本地 Nacos/RocketMQ）上重启
 chat(8083)/knowledge(8082) 新 jar，逐项实测：
 
-| 能力 | 接口 | 实测结果 |
-|------|------|---------|
-| US1 评估 | POST /rag/eval/run | ✅ 加载 golden 集（20 条）→ 检索 → 指标(recall/mrr/hitRate) → LLM-Judge 均分 → 门禁判定；product-manual 库无数据时 hitRate=0、passed=false（行为正确） |
-| US2 Hybrid | GET /chat/retrieve/test?mode=HYBRID | ✅ 全链路实测：启动 ai-cs-search(8084) + 临时开启 hybrid 开关 → chat Feign → search 混合检索 → 返回 5 条命中（mode=HYBRID, degraded=false，top1 为刚收录的 FAQ）；ES 未部署时 search 侧自动走向量路；开关关闭时自动降级纯向量 |
-| US3 改写/HyDE | GET /chat/retrieve/test?mode=HYBRID_QUERY_REWRITE | ✅ 临时开启开关后实测成功路径：LLM 改写→多查询+HyDE→向量检索→RRF 融合返回 5 条命中、未降级；关闭后自动降级 |
-| US4 GraphRAG | POST /rag/graph/triple + GET /rag/graph/query | ✅ 三元组入库（id 1/2）→ 多跳查询 depth=2 命中「退款政策→申请入口→审核时效」2 条 |
-| US5 图表 | POST /chat/chart | ✅ LLM 生成结论 + chartType=PIE 自动判定 + ECharts option 返回 |
-| US6 聚类 | POST /knowledge/ops/cluster | ✅ 24 条提问聚成 1 主题、占比正确、缺口检测（命中率 1.0、无缺口） |
-| US6 FAQ | POST /knowledge/ops/faq | ✅ 收录成功（faqId=1）→ 创建知识文档 → 触发向量化 |
+| 能力           | 接口                                                | 实测结果                                                                                                                                                                 |
+| ------------ | ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| US1 评估       | POST /rag/eval/run                                | ✅ 加载 golden 集（20 条）→ 检索 → 指标(recall/mrr/hitRate) → LLM-Judge 均分 → 门禁判定；product-manual 库无数据时 hitRate=0、passed=false（行为正确）                                             |
+| US2 Hybrid   | GET /chat/retrieve/test?mode=HYBRID               | ✅ 全链路实测：启动 ai-cs-search(8084) + 临时开启 hybrid 开关 → chat Feign → search 混合检索 → 返回 5 条命中（mode=HYBRID, degraded=false，top1 为刚收录的 FAQ）；ES 未部署时 search 侧自动走向量路；开关关闭时自动降级纯向量 |
+| US3 改写/HyDE  | GET /chat/retrieve/test?mode=HYBRID_QUERY_REWRITE | ✅ 临时开启开关后实测成功路径：LLM 改写→多查询+HyDE→向量检索→RRF 融合返回 5 条命中、未降级；关闭后自动降级                                                                                                      |
+| US4 GraphRAG | POST /rag/graph/triple + GET /rag/graph/query     | ✅ 三元组入库（id 1/2）→ 多跳查询 depth=2 命中「退款政策→申请入口→审核时效」2 条                                                                                                                  |
+| US5 图表       | POST /chat/chart                                  | ✅ LLM 生成结论 + chartType=PIE 自动判定 + ECharts option 返回                                                                                                                  |
+| US6 聚类       | POST /knowledge/ops/cluster                       | ✅ 24 条提问聚成 1 主题、占比正确、缺口检测（命中率 1.0、无缺口）                                                                                                                               |
+| US6 FAQ      | POST /knowledge/ops/faq                           | ✅ 收录成功（faqId=1）→ 创建知识文档 → 触发向量化                                                                                                                                      |
 
 ### E2E 过程中发现并修复的问题
 

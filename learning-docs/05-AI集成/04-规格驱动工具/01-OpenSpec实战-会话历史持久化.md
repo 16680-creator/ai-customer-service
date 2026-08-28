@@ -17,10 +17,10 @@ ai-cs-chat 服务原本用内存 `ConcurrentHashMap<String,List<Message>>` 缓�
 
 ### 方案选型
 
-| 方案 | 说明 | 结论 |
-|------|------|------|
-| 全量存 Redis | 快，但 Redis 也非绝对可靠 | 不行 |
-| 内存 Map → 直接接 message 表 | 每次对话都查库，慢 | 不行 |
+| 方案                             | 说明                                            | 结论     |
+| ------------------------------ | --------------------------------------------- | ------ |
+| 全量存 Redis                      | 快，但 Redis 也非绝对可靠                              | 不行     |
+| 内存 Map → 直接接 message 表         | 每次对话都查库，慢                                     | 不行     |
 | **Redis 热缓存 + message 表最终持久化** | 热数据走 Redis（快），冷数据落 message 表（稳），Redis 未命中回源重建 | **选它** |
 
 这个方案能满足：重启不丢、多实例共享、支持历史回看。
@@ -42,6 +42,7 @@ openspec/changes/chat-history-persistence/
 ```
 
 **关键设计决策（design.md）：**
+
 - Redis 用 **List** 类型存会话历史，key 形如 `chat:history:{sessionKey}`。
 - 消息用 **JSON** 序列化为 `ChatHistoryMessage`（`role` + `content`）存入 Redis。
 - chat 侧通过 **Feign** 调 ai-cs-message（服务名 `ai-cs-message`）按 sessionKey 拉历史。
@@ -51,14 +52,14 @@ openspec/changes/chat-history-persistence/
 
 按 tasks.md 逐条勾选完成：
 
-| 任务组 | 内容 | 结果 |
-|--------|------|------|
-| 1 | ai-cs-message 提供按 sessionKey 查询能力 | 完成 |
-| 2 | ai-cs-chat 引入 Redis 依赖与配置 | 完成 |
-| 3 | chat 侧新增历史 DTO 与存取组件 | 完成 |
-| 4 | 改造 ChatServiceImpl 使用持久化历史 | 完成 |
-| 5 | chat 侧新增历史回看接口 | 完成 |
-| 6 | 验证与联调 | 编译通过（运行时验证留待环境） |
+| 任务组 | 内容                                | 结果              |
+| --- | --------------------------------- | --------------- |
+| 1   | ai-cs-message 提供按 sessionKey 查询能力 | 完成              |
+| 2   | ai-cs-chat 引入 Redis 依赖与配置         | 完成              |
+| 3   | chat 侧新增历史 DTO 与存取组件              | 完成              |
+| 4   | 改造 ChatServiceImpl 使用持久化历史        | 完成              |
+| 5   | chat 侧新增历史回看接口                    | 完成              |
+| 6   | 验证与联调                             | 编译通过（运行时验证留待环境） |
 
 实施中间踩的一个坑：操作中误点"拒绝"回退了一些文件，导致 mapper 和 service 接口被还原，编译报错 `找不到符号 selectBySessionKey`。排查后用 `git status` 对照发现不一致，重新补齐 mapper 的 `@Select` 方法和 service 接口申明后编译通过。
 
@@ -96,12 +97,12 @@ spring:
 
 ### 3. 新增的 Java 类
 
-| 文件 | 作用 |
-|------|------|
-| `dto/ChatHistoryMessage.java` | 历史消息 DTO（`role` + `content`），Redis 序列化载体 |
-| `feign/MessageFeignClient.java` | Feign 调用 ai-cs-message 按 sessionKey 查询 |
-| `service/ChatHistoryService.java` | 历史存取接口：`load` / `append` |
-| `service/impl/ChatHistoryServiceImpl.java` | Redis LRANGE → 回源 message 表 → 重建写回 |
+| 文件                                         | 作用                                       |
+| ------------------------------------------ | ---------------------------------------- |
+| `dto/ChatHistoryMessage.java`              | 历史消息 DTO（`role` + `content`），Redis 序列化载体 |
+| `feign/MessageFeignClient.java`            | Feign 调用 ai-cs-message 按 sessionKey 查询   |
+| `service/ChatHistoryService.java`          | 历史存取接口：`load` / `append`                 |
+| `service/impl/ChatHistoryServiceImpl.java` | Redis LRANGE → 回源 message 表 → 重建写回       |
 
 ### 4. ai-cs-message 新增能力
 
@@ -172,12 +173,12 @@ openspec status --change "chat-history-persistence" --json
 
 ## 五、遇到的问题与解决
 
-| 问题 | 解决 |
-|------|------|
+| 问题                                                         | 解决                                                |
+| ---------------------------------------------------------- | ------------------------------------------------- |
 | 误点拒绝导致 mapper/service 接口被回退，编译报 `找不到符号 selectBySessionKey` | `git status` 对照发现 mapper 和 service 接口被我误操作还原，重新补齐 |
-| 编译报"方法不会覆盖或实现超类型的方法" | 同样是接口被回退所致，补齐接口申明后解决 |
-| PowerShell 不支持 `&&` / heredoc | 改用 `;` 分隔、单行 `-m` 提交 |
-| Redis 不可用导致对话阻塞 | 通过 try-catch 降级为空历史，不阻塞主流程 |
+| 编译报"方法不会覆盖或实现超类型的方法"                                       | 同样是接口被回退所致，补齐接口申明后解决                              |
+| PowerShell 不支持 `&&` / heredoc                              | 改用 `;` 分隔、单行 `-m` 提交                              |
+| Redis 不可用导致对话阻塞                                            | 通过 try-catch 降级为空历史，不阻塞主流程                        |
 
 ---
 
