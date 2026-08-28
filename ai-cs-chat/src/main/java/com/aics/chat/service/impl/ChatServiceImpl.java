@@ -1,5 +1,7 @@
 package com.aics.chat.service.impl;
 
+import com.aics.chat.cache.HotQaCacheService;
+import com.aics.chat.cache.SemanticCacheService;
 import com.aics.chat.dto.ChatHistoryMessage;
 import com.aics.chat.dto.ChatRagResponseDTO;
 import com.aics.chat.dto.CitationItemDTO;
@@ -140,6 +142,9 @@ public class ChatServiceImpl implements ChatService {
     private final com.aics.chat.security.RagAclFilter ragAclFilter;
     private final com.aics.chat.security.SecurityAuditRecorder securityAuditRecorder;
     private final com.aics.chat.prompt.PromptRegistry promptRegistry;
+    // ===== 缓存层：热门问答缓存 / 语义缓存（向量缓存在 EmbeddingModel 装饰器层生效） =====
+    private final HotQaCacheService hotQaCacheService;
+    private final SemanticCacheService semanticCacheService;
 
     /** 最大历史消息数，超过时触发压缩 */
     private static final int MAX_HISTORY_SIZE = 20;
@@ -159,6 +164,43 @@ public class ChatServiceImpl implements ChatService {
     private String cleanResponse(String response) {
         if (response == null) return "";
         return THINK_PATTERN.matcher(response).replaceAll("").trim();
+    }
+
+    /**
+     * 缓存命名空间：knowledgeBase + 当前用户ID。
+     *
+     * <p>RAG 结果经过用户维度 ACL 过滤，缓存也必须按用户隔离；否则用户 A 有权看到的
+     * 文档回答可能被用户 B 从缓存直接取走，绕过 {@code RagAclFilter}。</p>
+     */
+    private String cacheNamespace(String knowledgeBase) {
+        Long userId = ChatUserContext.getUserId();
+        return knowledgeBase + ":user:" + (userId == null ? "anonymous" : userId);
+    }
+
+    /**
+     * 缓存层查询（按成本升序）：热门问答精确命中（O(1) HGET）→ 语义缓存相似命中（向量比对）。
+     * 任一命中即跳过"检索 + LLM 生成"整条链路，返回缓存的回答与引用。
+     */
+    private java.util.Optional<ChatRagResponseDTO> lookupCachedAnswer(String knowledgeBase, String message) {
+        String namespace = cacheNamespace(knowledgeBase);
+        java.util.Optional<ChatRagResponseDTO> hot = hotQaCacheService.lookup(namespace, message);
+        if (hot.isPresent()) {
+            return hot;
+        }
+        java.util.Optional<ChatRagResponseDTO> semantic = semanticCacheService.lookup(namespace, message);
+        // 语义缓存命中也代表问题出现一次：继续累计频次，最终可提升为成本更低的热门问答缓存
+        semantic.ifPresent(answer -> hotQaCacheService.record(namespace, message, answer));
+        return semantic;
+    }
+
+    /**
+     * 缓存层回填：热门问答频次 +1（达阈值自动提升为热门问答），并写入语义缓存。
+     * 仅在输出 Guardrail 通过、回答非空时调用——被安全拦截的回答绝不进入缓存。
+     */
+    private void cacheRagAnswer(String knowledgeBase, String message, ChatRagResponseDTO answer) {
+        String namespace = cacheNamespace(knowledgeBase);
+        hotQaCacheService.record(namespace, message, answer);
+        semanticCacheService.put(namespace, message, answer);
     }
 
     /**
@@ -375,7 +417,19 @@ public class ChatServiceImpl implements ChatService {
         String blockMessage = guardInput(message);
         if (blockMessage != null) {
             log.warn("RAG对话输入被内容审核拦截: sessionId={}, knowledgeBase={}", sessionId, knowledgeBase);
-            return Result.success(new ChatRagResponseDTO(blockMessage, List.of()));
+            return Result.success(new ChatRagResponseDTO().setContent(blockMessage).setCitations(List.of()));
+        }
+
+        // 缓存层（热门问答 → 语义缓存）：相似/相同问题直接返回缓存回答，不检索不调 LLM
+        java.util.Optional<ChatRagResponseDTO> cached = lookupCachedAnswer(knowledgeBase, message);
+        if (cached.isPresent()) {
+            ChatRagResponseDTO hit = cached.get();
+            log.info("RAG对话命中缓存: sessionId={}, kb={}, source={}", sessionId, knowledgeBase, hit.getCacheSource());
+            // 缓存回答同样计入 answer 观测（引用数口径一致），但不触发线上采样评估——
+            // 评估对象应是"模型新生成的回答"，缓存复制品打分会污染评估集
+            recordAnswerSpan(sessionId, message, hit.getContent(),
+                    hit.getCitations() == null ? 0 : hit.getCitations().size());
+            return Result.success(hit);
         }
 
         try {
@@ -400,7 +454,9 @@ public class ChatServiceImpl implements ChatService {
             response = cleanResponse(response);   // 去掉模型思考过程标签，只留正式回答
 
             // 输出 Guardrail（3.2 F4）：违规回答拦截为兜底文案
+            String cleanedResponse = response;
             response = guardOutput(response);
+            boolean outputBlocked = !cleanedResponse.equals(response);
 
             // 从检索结果构建引用溯源列表（documentId/title/page/score/content），随回答返回前端
             List<CitationItemDTO> citations = buildCitations(docs);
@@ -410,7 +466,15 @@ public class ChatServiceImpl implements ChatService {
             triggerOnlineEval(sessionId, message, response);
 
             log.info("RAG对话完成: sessionId={}, 检索命中{}条, 引用{}条", sessionId, docs.size(), citations.size());
-            return Result.success(new ChatRagResponseDTO(response, citations));
+            // 缓存层回填：频次 +1（达标提升热门问答）+ 写入语义缓存，供后续相似问题直接命中。
+            // 被安全审核拦截的回答（兜底文案）不入缓存——缓存的是"模型的真实回答"
+            ChatRagResponseDTO responseDto = new ChatRagResponseDTO()
+                    .setContent(response)
+                    .setCitations(citations);
+            if (!outputBlocked) {
+                cacheRagAnswer(knowledgeBase, message, responseDto);
+            }
+            return Result.success(responseDto);
         } catch (ExecutionException e) {
             Throwable cause = e.getCause();
             log.error("RAG对话异常: sessionId={}, cause={}", sessionId, cause != null ? cause.getMessage() : e.getMessage());
@@ -473,6 +537,33 @@ public class ChatServiceImpl implements ChatService {
             }
             emitter.complete();
             return emitter;
+        }
+
+        // 缓存层：RAG 流式路径同样先查缓存（热门问答 → 语义缓存），命中则整段推送缓存回答
+        if (hasKb) {
+            java.util.Optional<ChatRagResponseDTO> cached = lookupCachedAnswer(knowledgeBase, message);
+            if (cached.isPresent()) {
+                ChatRagResponseDTO hit = cached.get();
+                log.info("SSE流式命中缓存: sessionId={}, kb={}, source={}",
+                        sessionId, knowledgeBase, hit.getCacheSource());
+                // 会话历史仍要记录（用户问题 + 缓存回答），保持后续多轮上下文连贯
+                chatHistoryService.append(sessionId, "user", message);
+                chatHistoryService.append(sessionId, "assistant", hit.getContent());
+                try {
+                    // 缓存回答没有逐 token 过程，一次性推送完整内容（前端拼接逻辑与流式一致）
+                    emitter.send(SseEmitter.event().data(Map.of("content", hit.getContent())));
+                    Map<String, Object> cachedDone = new HashMap<>();
+                    cachedDone.put("done", true);
+                    cachedDone.put("citations", hit.getCitations() == null ? List.of() : hit.getCitations());
+                    cachedDone.put("cacheHit", true);
+                    cachedDone.put("cacheSource", hit.getCacheSource());
+                    emitter.send(SseEmitter.event().data(cachedDone));
+                } catch (Exception ignore) {
+                    // 客户端可能已断开，尽力推送
+                }
+                emitter.complete();
+                return emitter;
+            }
         }
 
         try {
@@ -677,12 +768,19 @@ public class ChatServiceImpl implements ChatService {
                         if (outputBlocked) {
                             log.warn("SSE回答未通过输出审核，已拦截: sessionId={}", sessionId);
                         }
-                        try {
-                            // ② 持久化会话历史
-                            // ChatHistoryService 内部采用 Redis 热缓存 + MySQL 异步落库双写策略：
-                            //   - Redis：保证下次对话能快速加载最近历史（毫秒级）
-                            //   - MySQL：保证历史数据不丢失（持久化）
-                            chatHistoryService.append(sessionId, "assistant", response);
+                            try {
+                                // ② 持久化会话历史
+                                // ChatHistoryService 内部采用 Redis 热缓存 + MySQL 异步落库双写策略：
+                                //   - Redis：保证下次对话能快速加载最近历史（毫秒级）
+                                //   - MySQL：保证历史数据不丢失（持久化）
+                                chatHistoryService.append(sessionId, "assistant", response);
+                                // 缓存层回填（仅 RAG 路径且输出未被安全拦截）：完整回答写入
+                                // 热门问答/语义缓存，供后续相同/相似问题直接命中
+                                if (hasKb && !outputBlocked) {
+                                    cacheRagAnswer(knowledgeBase, message, new ChatRagResponseDTO()
+                                            .setContent(response)
+                                            .setCitations(citations));
+                                }
                             // 同时追加到内存中的 streamHistory（本次请求的上下文副本），
                             // 供后续可能的同请求内多轮调用使用
                             streamHistory.add(new AssistantMessage(response));

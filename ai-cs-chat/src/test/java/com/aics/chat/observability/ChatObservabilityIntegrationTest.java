@@ -124,7 +124,9 @@ class ChatObservabilityIntegrationTest {
 
         ChatServiceImpl chatService = new ChatServiceImpl(llm, kb, history,
                 mock(HybridRetriever.class), r, onlineEval, contentSafety, ragAclFilter, auditRecorder,
-                promptRegistry);
+                promptRegistry,
+                mock(com.aics.chat.cache.HotQaCacheService.class),
+                mock(com.aics.chat.cache.SemanticCacheService.class));
 
         // 模拟请求入口：拦截器创建上下文
         TraceContext ctx = TraceContextHolder.begin(observability, 1L, "s1", "rag");

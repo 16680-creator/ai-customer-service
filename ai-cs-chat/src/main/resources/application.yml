@@ -154,3 +154,24 @@ resilience4j:
 #   aics.vision.model: Qwen/Qwen2.5-VL-72B-Instruct
 #   aics.vision.enabled: true
 #   aics.vision.allowed-image-host: <MinIO 内网地址白名单，逗号分隔>
+
+# ===== 缓存层配置（向量缓存 / 语义缓存 / 热门问答缓存） =====
+# 查询命中顺序：热门问答（精确 O(1)）→ 语义缓存（向量相似）→ 完整 RAG 链路
+aics:
+  cache:
+    # 向量缓存：相同文本的 Embedding 不再重复调用向量化 API（L1 进程内 LRU + L2 Redis）
+    vector:
+      enabled: true
+      l1-max-entries: 4096
+      ttl-hours: 168
+    # 语义缓存：问题向量与缓存条目余弦相似度 ≥ threshold 即视为"相似问题"，直接返回缓存回答
+    semantic:
+      enabled: true
+      threshold: 0.92
+      max-entries: 200
+      ttl-hours: 168
+    # 热门问答缓存：同一问题（归一化后）出现 promote-threshold 次即缓存回答，精确命中
+    hot-qa:
+      enabled: true
+      promote-threshold: 3
+      ttl-hours: 24

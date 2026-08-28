@@ -1,5 +1,8 @@
 package com.aics.chat.config;
 
+import com.aics.chat.cache.CacheProperties;
+import com.aics.chat.cache.CachingEmbeddingModel;
+import com.aics.chat.cache.VectorCacheStore;
 import com.aics.chat.modelrouter.ChatClientCustomizer;
 import com.aics.chat.rag.rerank.RerankProperties;
 import com.aics.chat.service.OrderQueryService;
@@ -16,6 +19,7 @@ import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.method.MethodToolCallbackProvider;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -165,7 +169,8 @@ public class SpringAiConfig {
      */
     @Bean
     @Primary   // 优先注入本 Bean（向量库/检索统一用 bge-m3，保证向量空间一致）
-    public EmbeddingModel siliconFlowEmbeddingModel() {
+    public EmbeddingModel siliconFlowEmbeddingModel(CacheProperties cacheProperties,
+                                                    ObjectProvider<VectorCacheStore> vectorCacheStoreProvider) {
         log.info("========================================");
         log.info("创建硅基流动 EmbeddingModel");
         log.info("  base-url : {}", embeddingBaseUrl);
@@ -177,8 +182,24 @@ public class SpringAiConfig {
                 .baseUrl(embeddingBaseUrl)
                 .apiKey(embeddingApiKey)
                 .build();
-        return new OpenAiEmbeddingModel(embeddingApi, MetadataMode.EMBED,
+        EmbeddingModel raw = new OpenAiEmbeddingModel(embeddingApi, MetadataMode.EMBED,
                 OpenAiEmbeddingOptions.builder().model(embeddingModel).build());
+
+        // ===== 缓存层：向量缓存（装饰器包装，相同文本的向量不再重复调用向量化 API） =====
+        // 学习点：在 EmbeddingModel 层做缓存而非改 VectorStore——ChromaVectorStore 的
+        // add/similaritySearch 内部都会经由 EmbeddingModel.call() 取向量，装饰器让
+        // 入库、检索、语义缓存取向量三个调用点零改动共享同一份缓存
+        if (!cacheProperties.getVector().isEnabled()) {
+            return raw;
+        }
+        VectorCacheStore cacheStore = vectorCacheStoreProvider.getIfAvailable();
+        if (cacheStore == null) {
+            return raw;
+        }
+        log.info("向量缓存已启用: L1容量={}, L2 TTL={}h", cacheProperties.getVector().getL1MaxEntries(),
+                cacheProperties.getVector().getTtlHours());
+        // 缓存键以模型名做命名空间：换模型后向量空间不同，旧缓存必须失效
+        return new CachingEmbeddingModel(raw, cacheStore, embeddingModel);
     }
 
     /**

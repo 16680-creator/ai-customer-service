@@ -57,6 +57,10 @@ class ChatServiceImplStreamReplyTest {
     private SecurityAuditRecorder securityAuditRecorder;
     @Mock
     private PromptRegistry promptRegistry;
+    @Mock
+    private com.aics.chat.cache.HotQaCacheService hotQaCacheService;
+    @Mock
+    private com.aics.chat.cache.SemanticCacheService semanticCacheService;
 
     private ChatServiceImpl service;
 
@@ -64,7 +68,8 @@ class ChatServiceImplStreamReplyTest {
     void setUp() {
         service = new ChatServiceImpl(resilientAiService, knowledgeBaseService, chatHistoryService,
                 hybridRetriever, ObservationRegistry.create(), onlineEvalService,
-                contentSafetyService, ragAclFilter, securityAuditRecorder, promptRegistry);
+                contentSafetyService, ragAclFilter, securityAuditRecorder, promptRegistry,
+                hotQaCacheService, semanticCacheService);
         // 默认放行输入/输出审核
         when(contentSafetyService.reviewInput(anyString())).thenReturn(ContentReviewResult.pass());
         when(contentSafetyService.reviewOutput(anyString())).thenReturn(ContentReviewResult.pass());
