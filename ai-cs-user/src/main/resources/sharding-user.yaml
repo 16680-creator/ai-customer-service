@@ -1,0 +1,91 @@
+# ============================================================
+# 用户服务分库分表规则（ShardingSphere-JDBC 5.4.1）
+#
+# 分片方案：2 库 × 4 表
+#   - user_db_0 / user_db_1 ：用户库分片，各含 sys_user_0..3
+#   - user_db               ：非分片库，存放 sys_role、sys_user_role 等单表
+#
+# 路由算法：取用户ID后四位（最多4位数字）
+#   - 库路由：后四位 % 2
+#   - 表路由：后四位 % 4
+#
+# 注意：ShardingSphere 5.4.1 数据源属性需平铺在条目下（不支持 props: 子 map）
+# 注意：5.5.0 的 $${ENV::默认值} 占位符必须位于行尾且需在 SS URL 声明 placeholder-type=ENVIRONMENT
+# 当前仅 username/password 走环境变量（DB_USER / DB_PASSWORD），host/port 直接写死
+# ============================================================
+
+mode:
+  type: Standalone
+  repository:
+    type: JDBC
+    props:
+      provider: H2
+      jdbc_url: jdbc:h2:mem:aics_user_mode;DB_CLOSE_DELAY=-1
+      username: sa
+      password: ""
+
+dataSources:
+  user_db:
+    dataSourceClassName: com.zaxxer.hikari.HikariDataSource
+    driverClassName: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://123.60.31.79:3306/user_db?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: $${DB_USER::root}
+    password: $${DB_PASSWORD::root}
+    maximumPoolSize: 10
+    minimumIdle: 2
+    connectionTimeout: 30000
+  user_db_0:
+    dataSourceClassName: com.zaxxer.hikari.HikariDataSource
+    driverClassName: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://123.60.31.79:3306/user_db_0?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: $${DB_USER::root}
+    password: $${DB_PASSWORD::root}
+    maximumPoolSize: 10
+    minimumIdle: 2
+    connectionTimeout: 30000
+  user_db_1:
+    dataSourceClassName: com.zaxxer.hikari.HikariDataSource
+    driverClassName: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://123.60.31.79:3306/user_db_1?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: $${DB_USER::root}
+    password: $${DB_PASSWORD::root}
+    maximumPoolSize: 10
+    minimumIdle: 2
+    connectionTimeout: 30000
+
+rules:
+  # 单表规则：sys_role、sys_user_role 等非分片表收敛到 user_db
+  - !SINGLE
+    tables:
+      - "*.*"
+    defaultDataSource: user_db
+
+  # 分片规则：sys_user 逻辑表 -> user_db_${0..1}.sys_user_${0..3}
+  - !SHARDING
+    tables:
+      sys_user:
+        actualDataNodes: user_db_${0..1}.sys_user_${0..3}
+        databaseStrategy:
+          standard:
+            shardingColumn: id
+            shardingAlgorithmName: user-id-last4-db
+        tableStrategy:
+          standard:
+            shardingColumn: id
+            shardingAlgorithmName: user-id-last4-table
+    shardingAlgorithms:
+      user-id-last4-db:
+        type: CLASS_BASED
+        props:
+          strategy: STANDARD
+          algorithmClassName: com.aics.user.sharding.UserIdLast4ModShardingAlgorithm
+          sharding-count: 2
+      user-id-last4-table:
+        type: CLASS_BASED
+        props:
+          strategy: STANDARD
+          algorithmClassName: com.aics.user.sharding.UserIdLast4ModShardingAlgorithm
+          sharding-count: 4
+
+props:
+  sql-show: false

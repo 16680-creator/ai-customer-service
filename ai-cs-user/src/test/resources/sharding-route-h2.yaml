@@ -1,0 +1,69 @@
+# ============================================================
+# 路由集成测试专用：与 sharding-user.yaml 同规则，数据源替换为 H2 内存库
+# 用于验证分片规则解析与路由落表正确性
+# 注意：ShardingSphere 5.4.1 数据源属性需平铺在条目下（不支持 props: 子 map）
+# ============================================================
+
+mode:
+  type: Standalone
+  repository:
+    type: JDBC
+    props:
+      provider: H2
+      jdbc_url: jdbc:h2:mem:ss_mode;DB_CLOSE_DELAY=-1
+      username: sa
+
+dataSources:
+  user_db:
+    dataSourceClassName: com.zaxxer.hikari.HikariDataSource
+    url: jdbc:h2:mem:user_db;MODE=MySQL;CASE_INSENSITIVE_IDENTIFIERS=TRUE;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+    maximumPoolSize: 4
+  user_db_0:
+    dataSourceClassName: com.zaxxer.hikari.HikariDataSource
+    url: jdbc:h2:mem:user_db_0;MODE=MySQL;CASE_INSENSITIVE_IDENTIFIERS=TRUE;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+    maximumPoolSize: 4
+  user_db_1:
+    dataSourceClassName: com.zaxxer.hikari.HikariDataSource
+    url: jdbc:h2:mem:user_db_1;MODE=MySQL;CASE_INSENSITIVE_IDENTIFIERS=TRUE;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+    maximumPoolSize: 4
+
+rules:
+  - !SINGLE
+    tables:
+      - "user_db.*"
+    defaultDataSource: user_db
+
+  - !SHARDING
+    tables:
+      sys_user:
+        actualDataNodes: user_db_${0..1}.sys_user_${0..3}
+        databaseStrategy:
+          standard:
+            shardingColumn: id
+            shardingAlgorithmName: user-id-last4-db
+        tableStrategy:
+          standard:
+            shardingColumn: id
+            shardingAlgorithmName: user-id-last4-table
+    shardingAlgorithms:
+      user-id-last4-db:
+        type: CLASS_BASED
+        props:
+          strategy: STANDARD
+          algorithmClassName: com.aics.user.sharding.UserIdLast4ModShardingAlgorithm
+          sharding-count: 2
+      user-id-last4-table:
+        type: CLASS_BASED
+        props:
+          strategy: STANDARD
+          algorithmClassName: com.aics.user.sharding.UserIdLast4ModShardingAlgorithm
+          sharding-count: 4
+
+props:
+  sql-show: true

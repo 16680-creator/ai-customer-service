@@ -41,7 +41,7 @@
 
         <!-- Database & ORM -->
         <mybatis-plus.version>3.5.6</mybatis-plus.version>
-        <shardingsphere.version>5.4.1</shardingsphere.version>
+        <shardingsphere.version>5.5.0</shardingsphere.version>
         <mysql-connector.version>8.0.33</mysql-connector.version>
 
         <!-- Distributed -->
@@ -118,10 +118,10 @@
                 <version>${mybatis-plus.version}</version>
             </dependency>
 
-            <!-- ShardingSphere-JDBC -->
+            <!-- ShardingSphere-JDBC（5.5.0 起 artifact 改名 shardingsphere-jdbc，适配 snakeyaml 2.x） -->
             <dependency>
                 <groupId>org.apache.shardingsphere</groupId>
-                <artifactId>shardingsphere-jdbc-core</artifactId>
+                <artifactId>shardingsphere-jdbc</artifactId>
                 <version>${shardingsphere.version}</version>
             </dependency>
 

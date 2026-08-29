@@ -29,7 +29,7 @@ if (Test-PortListening 10911) {
     Write-Host "  [Skip] Broker already running on 10911"
 } elseif (Test-PortListening 9876) {
     Start-Sleep -Seconds 3
-    Start-Process cmd -ArgumentList "/c", "set `"JAVA_HOME=$jdk17`" && set `"ROCKETMQ_HOME=$mqHome`" && cd /d $mqBin && .\mqbroker.cmd -n 127.0.0.1:9876 autoCreateTopicEnable=true" -WindowStyle Hidden
+    Start-Process cmd -ArgumentList "/c", "set `"JAVA_HOME=$jdk17`" && set `"ROCKETMQ_HOME=$mqHome`" && cd /d $mqBin && .\mqbroker.cmd -n 127.0.0.1:9876 -c ../conf/broker-aics.conf" -WindowStyle Hidden
     Wait-Port 10911 90 "Broker" | Out-Null
 } else {
     Write-Warning "  [WARN] NameServer not ready, Broker skipped"

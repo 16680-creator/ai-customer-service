@@ -16,7 +16,7 @@
 | Spring Cloud Gateway | 4.1.x | API 网关 |
 | Spring AI | 1.0.0 | AI 能力集成（Chat、RAG、Function Calling） |
 | MyBatis-Plus | 3.5.6 | ORM 框架 |
-| ShardingSphere | 5.4.1 | 分库分表（预留） |
+| ShardingSphere | 5.5.0 | 分库分表（用户表已落地：user_db_0/1 × sys_user_0..3，后四位取模） |
 | SpringDoc OpenAPI | 2.3.0 | API 文档 |
 | Lombok | 1.18.30 | 代码简化 |
 | MapStruct | 1.5.5.Final | 对象映射 |

@@ -3,13 +3,51 @@
 -- 包含: user_db、knowledge_db、chat_db
 -- ============================================================
 
--- ==================== user_db 用户数据库 ====================
+-- ==================== user_db 用户数据库（单表：角色等） ====================
 CREATE DATABASE IF NOT EXISTS user_db DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE user_db;
 
--- 系统用户表
-CREATE TABLE IF NOT EXISTS sys_user (
+-- 系统角色表（不分片，留在单表库）
+CREATE TABLE IF NOT EXISTS sys_role (
     id              BIGINT          NOT NULL COMMENT '主键ID',
+    role_code       VARCHAR(64)     NOT NULL COMMENT '角色编码',
+    role_name       VARCHAR(128)    NOT NULL COMMENT '角色名称',
+    description     VARCHAR(512)    DEFAULT NULL COMMENT '角色描述',
+    status          TINYINT         NOT NULL DEFAULT 1 COMMENT '状态：0-禁用 1-启用',
+    create_time     DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time     DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    deleted         TINYINT         NOT NULL DEFAULT 0 COMMENT '逻辑删除：0-未删除 1-已删除',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_role_code (role_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统角色表';
+
+-- 用户角色关联表（不分片，留在单表库；user_id 为全局用户ID即分片键）
+CREATE TABLE IF NOT EXISTS sys_user_role (
+    id              BIGINT          NOT NULL COMMENT '主键ID',
+    user_id         BIGINT          NOT NULL COMMENT '用户ID（分片键）',
+    role_id         BIGINT          NOT NULL COMMENT '角色ID',
+    create_time     DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_user_role (user_id, role_id),
+    KEY idx_role_id (role_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户角色关联表';
+
+-- 初始化角色数据
+INSERT INTO sys_role (id, role_code, role_name, description) VALUES
+(1, 'admin', '管理员', '系统管理员，拥有所有权限'),
+(2, 'agent', '客服', '客服人员，处理用户咨询'),
+(3, 'user', '普通用户', '普通用户，使用客服服务')
+ON DUPLICATE KEY UPDATE role_name = VALUES(role_name);
+
+-- 注意：sys_user 已分库分表（user_db_0 / user_db_1 各 4 张表），不再在 user_db 中建 sys_user
+-- 注意：uk_username 仅保证单表内唯一，全局唯一由应用层用户名查重（广播查询）保证
+
+-- ==================== user_db_0 / user_db_1 用户库分片 ====================
+-- 分片算法：取用户ID后四位，库 = 后四位 % 2，表 = 后四位 % 4（2 库 × 4 表）
+CREATE DATABASE IF NOT EXISTS user_db_0 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE IF NOT EXISTS user_db_1 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS user_db_0.sys_user_0 (
+    id              BIGINT          NOT NULL COMMENT '主键ID（分片键）',
     username        VARCHAR(64)     NOT NULL COMMENT '用户名',
     password        VARCHAR(128)    NOT NULL COMMENT '密码（加密存储）',
     nickname        VARCHAR(64)     DEFAULT NULL COMMENT '昵称',
@@ -26,49 +64,157 @@ CREATE TABLE IF NOT EXISTS sys_user (
     KEY idx_phone (phone),
     KEY idx_email (email),
     KEY idx_status (status)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统用户表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统用户表分片（user_db_0，第0张）';
 
--- 系统角色表
-CREATE TABLE IF NOT EXISTS sys_role (
-    id              BIGINT          NOT NULL COMMENT '主键ID',
-    role_code       VARCHAR(64)     NOT NULL COMMENT '角色编码',
-    role_name       VARCHAR(128)    NOT NULL COMMENT '角色名称',
-    description     VARCHAR(512)    DEFAULT NULL COMMENT '角色描述',
+CREATE TABLE IF NOT EXISTS user_db_0.sys_user_1 (
+    id              BIGINT          NOT NULL COMMENT '主键ID（分片键）',
+    username        VARCHAR(64)     NOT NULL COMMENT '用户名',
+    password        VARCHAR(128)    NOT NULL COMMENT '密码（加密存储）',
+    nickname        VARCHAR(64)     DEFAULT NULL COMMENT '昵称',
+    phone           VARCHAR(20)     DEFAULT NULL COMMENT '手机号',
+    email           VARCHAR(128)    DEFAULT NULL COMMENT '邮箱',
+    avatar          VARCHAR(512)    DEFAULT NULL COMMENT '头像URL',
     status          TINYINT         NOT NULL DEFAULT 1 COMMENT '状态：0-禁用 1-启用',
+    role            VARCHAR(32)     DEFAULT 'user' COMMENT '角色标识',
     create_time     DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time     DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     deleted         TINYINT         NOT NULL DEFAULT 0 COMMENT '逻辑删除：0-未删除 1-已删除',
     PRIMARY KEY (id),
-    UNIQUE KEY uk_role_code (role_code)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统角色表';
+    UNIQUE KEY uk_username (username),
+    KEY idx_phone (phone),
+    KEY idx_email (email),
+    KEY idx_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统用户表分片（user_db_0，第1张）';
 
--- 用户角色关联表
-CREATE TABLE IF NOT EXISTS sys_user_role (
-    id              BIGINT          NOT NULL COMMENT '主键ID',
-    user_id         BIGINT          NOT NULL COMMENT '用户ID',
-    role_id         BIGINT          NOT NULL COMMENT '角色ID',
+CREATE TABLE IF NOT EXISTS user_db_0.sys_user_2 (
+    id              BIGINT          NOT NULL COMMENT '主键ID（分片键）',
+    username        VARCHAR(64)     NOT NULL COMMENT '用户名',
+    password        VARCHAR(128)    NOT NULL COMMENT '密码（加密存储）',
+    nickname        VARCHAR(64)     DEFAULT NULL COMMENT '昵称',
+    phone           VARCHAR(20)     DEFAULT NULL COMMENT '手机号',
+    email           VARCHAR(128)    DEFAULT NULL COMMENT '邮箱',
+    avatar          VARCHAR(512)    DEFAULT NULL COMMENT '头像URL',
+    status          TINYINT         NOT NULL DEFAULT 1 COMMENT '状态：0-禁用 1-启用',
+    role            VARCHAR(32)     DEFAULT 'user' COMMENT '角色标识',
     create_time     DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time     DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    deleted         TINYINT         NOT NULL DEFAULT 0 COMMENT '逻辑删除：0-未删除 1-已删除',
     PRIMARY KEY (id),
-    UNIQUE KEY uk_user_role (user_id, role_id),
-    KEY idx_role_id (role_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户角色关联表';
+    UNIQUE KEY uk_username (username),
+    KEY idx_phone (phone),
+    KEY idx_email (email),
+    KEY idx_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统用户表分片（user_db_0，第2张）';
 
--- 初始化角色数据
-INSERT INTO sys_role (id, role_code, role_name, description) VALUES
-(1, 'admin', '管理员', '系统管理员，拥有所有权限'),
-(2, 'agent', '客服', '客服人员，处理用户咨询'),
-(3, 'user', '普通用户', '普通用户，使用客服服务')
-ON DUPLICATE KEY UPDATE role_name = VALUES(role_name);
+CREATE TABLE IF NOT EXISTS user_db_0.sys_user_3 (
+    id              BIGINT          NOT NULL COMMENT '主键ID（分片键）',
+    username        VARCHAR(64)     NOT NULL COMMENT '用户名',
+    password        VARCHAR(128)    NOT NULL COMMENT '密码（加密存储）',
+    nickname        VARCHAR(64)     DEFAULT NULL COMMENT '昵称',
+    phone           VARCHAR(20)     DEFAULT NULL COMMENT '手机号',
+    email           VARCHAR(128)    DEFAULT NULL COMMENT '邮箱',
+    avatar          VARCHAR(512)    DEFAULT NULL COMMENT '头像URL',
+    status          TINYINT         NOT NULL DEFAULT 1 COMMENT '状态：0-禁用 1-启用',
+    role            VARCHAR(32)     DEFAULT 'user' COMMENT '角色标识',
+    create_time     DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time     DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    deleted         TINYINT         NOT NULL DEFAULT 0 COMMENT '逻辑删除：0-未删除 1-已删除',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_username (username),
+    KEY idx_phone (phone),
+    KEY idx_email (email),
+    KEY idx_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统用户表分片（user_db_0，第3张）';
+
+CREATE TABLE IF NOT EXISTS user_db_1.sys_user_0 (
+    id              BIGINT          NOT NULL COMMENT '主键ID（分片键）',
+    username        VARCHAR(64)     NOT NULL COMMENT '用户名',
+    password        VARCHAR(128)    NOT NULL COMMENT '密码（加密存储）',
+    nickname        VARCHAR(64)     DEFAULT NULL COMMENT '昵称',
+    phone           VARCHAR(20)     DEFAULT NULL COMMENT '手机号',
+    email           VARCHAR(128)    DEFAULT NULL COMMENT '邮箱',
+    avatar          VARCHAR(512)    DEFAULT NULL COMMENT '头像URL',
+    status          TINYINT         NOT NULL DEFAULT 1 COMMENT '状态：0-禁用 1-启用',
+    role            VARCHAR(32)     DEFAULT 'user' COMMENT '角色标识',
+    create_time     DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time     DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    deleted         TINYINT         NOT NULL DEFAULT 0 COMMENT '逻辑删除：0-未删除 1-已删除',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_username (username),
+    KEY idx_phone (phone),
+    KEY idx_email (email),
+    KEY idx_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统用户表分片（user_db_1，第0张）';
+
+CREATE TABLE IF NOT EXISTS user_db_1.sys_user_1 (
+    id              BIGINT          NOT NULL COMMENT '主键ID（分片键）',
+    username        VARCHAR(64)     NOT NULL COMMENT '用户名',
+    password        VARCHAR(128)    NOT NULL COMMENT '密码（加密存储）',
+    nickname        VARCHAR(64)     DEFAULT NULL COMMENT '昵称',
+    phone           VARCHAR(20)     DEFAULT NULL COMMENT '手机号',
+    email           VARCHAR(128)    DEFAULT NULL COMMENT '邮箱',
+    avatar          VARCHAR(512)    DEFAULT NULL COMMENT '头像URL',
+    status          TINYINT         NOT NULL DEFAULT 1 COMMENT '状态：0-禁用 1-启用',
+    role            VARCHAR(32)     DEFAULT 'user' COMMENT '角色标识',
+    create_time     DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time     DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    deleted         TINYINT         NOT NULL DEFAULT 0 COMMENT '逻辑删除：0-未删除 1-已删除',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_username (username),
+    KEY idx_phone (phone),
+    KEY idx_email (email),
+    KEY idx_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统用户表分片（user_db_1，第1张）';
+
+CREATE TABLE IF NOT EXISTS user_db_1.sys_user_2 (
+    id              BIGINT          NOT NULL COMMENT '主键ID（分片键）',
+    username        VARCHAR(64)     NOT NULL COMMENT '用户名',
+    password        VARCHAR(128)    NOT NULL COMMENT '密码（加密存储）',
+    nickname        VARCHAR(64)     DEFAULT NULL COMMENT '昵称',
+    phone           VARCHAR(20)     DEFAULT NULL COMMENT '手机号',
+    email           VARCHAR(128)    DEFAULT NULL COMMENT '邮箱',
+    avatar          VARCHAR(512)    DEFAULT NULL COMMENT '头像URL',
+    status          TINYINT         NOT NULL DEFAULT 1 COMMENT '状态：0-禁用 1-启用',
+    role            VARCHAR(32)     DEFAULT 'user' COMMENT '角色标识',
+    create_time     DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time     DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    deleted         TINYINT         NOT NULL DEFAULT 0 COMMENT '逻辑删除：0-未删除 1-已删除',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_username (username),
+    KEY idx_phone (phone),
+    KEY idx_email (email),
+    KEY idx_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统用户表分片（user_db_1，第2张）';
+
+CREATE TABLE IF NOT EXISTS user_db_1.sys_user_3 (
+    id              BIGINT          NOT NULL COMMENT '主键ID（分片键）',
+    username        VARCHAR(64)     NOT NULL COMMENT '用户名',
+    password        VARCHAR(128)    NOT NULL COMMENT '密码（加密存储）',
+    nickname        VARCHAR(64)     DEFAULT NULL COMMENT '昵称',
+    phone           VARCHAR(20)     DEFAULT NULL COMMENT '手机号',
+    email           VARCHAR(128)    DEFAULT NULL COMMENT '邮箱',
+    avatar          VARCHAR(512)    DEFAULT NULL COMMENT '头像URL',
+    status          TINYINT         NOT NULL DEFAULT 1 COMMENT '状态：0-禁用 1-启用',
+    role            VARCHAR(32)     DEFAULT 'user' COMMENT '角色标识',
+    create_time     DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time     DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    deleted         TINYINT         NOT NULL DEFAULT 0 COMMENT '逻辑删除：0-未删除 1-已删除',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_username (username),
+    KEY idx_phone (phone),
+    KEY idx_email (email),
+    KEY idx_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统用户表分片（user_db_1，第3张）';
 
 -- 初始化管理员用户（密码: admin123 的BCrypt加密）
-INSERT INTO sys_user (id, username, password, nickname, role, status) VALUES
+-- id=1：后四位 "1"，1 % 2 = 1 -> user_db_1，1 % 4 = 1 -> sys_user_1
+INSERT INTO user_db_1.sys_user_1 (id, username, password, nickname, role, status) VALUES
 (1, 'admin', '$2a$10$hEUYL34lpABtLWdPb.QC9uUnz0ehZwNrq9aOzdCjtmzvme0gf7.Fq', '系统管理员', 'admin', 1)
 ON DUPLICATE KEY UPDATE username = VALUES(username);
 
-INSERT INTO sys_user_role (id, user_id, role_id) VALUES
+INSERT INTO user_db.sys_user_role (id, user_id, role_id) VALUES
 (1, 1, 1)
 ON DUPLICATE KEY UPDATE user_id = VALUES(user_id);
-
 
 -- ==================== knowledge_db 知识库数据库 ====================
 CREATE DATABASE IF NOT EXISTS knowledge_db DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;

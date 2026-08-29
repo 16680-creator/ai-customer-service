@@ -4,6 +4,11 @@ server:
 spring:
   application:
     name: ai-cs-user
+  # 分库分表数据源：ShardingSphereDriver 加载 classpath 下的 sharding-user.yaml
+  # 连接信息（DB_HOST/DB_PORT/DB_USER/DB_PASSWORD）由 sharding-user.yaml 内环境变量占位符管理
+  datasource:
+    driver-class-name: org.apache.shardingsphere.driver.ShardingSphereDriver
+    url: jdbc:shardingsphere:classpath:sharding-user.yaml?placeholder-type=ENVIRONMENT
   cloud:
     nacos:
       discovery:
