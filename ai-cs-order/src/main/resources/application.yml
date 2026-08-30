@@ -19,3 +19,30 @@ spring:
     import:
       - optional:nacos:aics-shared.yml
       - optional:nacos:ai-cs-order.yml
+
+# ===== Seata AT 分布式事务（order 为全局事务发起方） =====
+# registry=file + grouplist：本地开发直连 TC，不依赖注册中心；集群部署可切 nacos registry
+seata:
+  enabled: true
+  application-id: ${spring.application.name}
+  tx-service-group: aics_tx_group
+  service:
+    vgroup-mapping:
+      aics_tx_group: default
+    grouplist:
+      default: ${SEATA_ADDR:127.0.0.1:8091}
+  registry:
+    type: file
+  config:
+    type: file
+  data-source-proxy-mode: AT
+  enable-auto-data-source-proxy: true
+
+# ===== XXL-Job 执行器（默认关闭，本地无 admin 也能启动；见 learning-docs 07-运维部署） =====
+aics:
+  xxl-job:
+    enabled: ${XXL_JOB_ENABLED:false}
+    admin-addresses: ${XXL_JOB_ADMIN:http://127.0.0.1:8099/xxl-job-admin}
+    access-token: default_token
+    executor:
+      port: 9999

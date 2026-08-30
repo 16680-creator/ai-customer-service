@@ -155,8 +155,6 @@ class CartServiceTest {
         remote.setData(data);
 
         when(restTemplate.getForObject(anyString(), eq(ProductRemoteDTO.class), anyLong())).thenReturn(remote);
-        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(valueOperations.get("stock:1001")).thenReturn(null);
         when(cartItemMapper.selectOne(any())).thenReturn(null);
         when(cartItemMapper.insert(any())).thenReturn(1);
         when(cartItemMapper.selectList(any())).thenReturn(Collections.singletonList(sampleCartItem));
@@ -183,8 +181,6 @@ class CartServiceTest {
         remote.setData(data);
 
         when(restTemplate.getForObject(anyString(), eq(ProductRemoteDTO.class), anyLong())).thenReturn(remote);
-        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(valueOperations.get("stock:1001")).thenReturn("100");
         when(cartItemMapper.selectOne(any())).thenReturn(sampleCartItem);
         when(cartItemMapper.selectList(any())).thenReturn(Collections.singletonList(sampleCartItem));
 
@@ -235,13 +231,11 @@ class CartServiceTest {
         data.setId(1001L);
         data.setName("无线蓝牙耳机");
         data.setPrice(new BigDecimal("199.00"));
-        data.setStock(100);
+        data.setStock(5); // 商品服务 DB 库存（优先来源）不足
         data.setStatus(1);
         remote.setData(data);
 
         when(restTemplate.getForObject(anyString(), eq(ProductRemoteDTO.class), anyLong())).thenReturn(remote);
-        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(valueOperations.get("stock:1001")).thenReturn("5");
 
         BusinessException exception = assertThrows(BusinessException.class,
                 () -> cartService.addToCart(100L, 1001L, 10));

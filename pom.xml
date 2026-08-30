@@ -71,6 +71,10 @@
 
         <!-- Resilience4j -->
         <resilience4j.version>2.2.0</resilience4j.version>
+
+        <!-- 分布式协调 -->
+        <redisson.version>3.27.2</redisson.version>
+        <xxl-job.version>2.4.1</xxl-job.version>
     </properties>
 
     <dependencyManagement>
@@ -248,6 +252,20 @@
                 <version>${resilience4j.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+
+            <!-- Redisson（分布式锁/延迟队列） -->
+            <dependency>
+                <groupId>org.redisson</groupId>
+                <artifactId>redisson-spring-boot-starter</artifactId>
+                <version>${redisson.version}</version>
+            </dependency>
+
+            <!-- XXL-Job 分布式调度 -->
+            <dependency>
+                <groupId>com.xuxueli</groupId>
+                <artifactId>xxl-job-core</artifactId>
+                <version>${xxl-job.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

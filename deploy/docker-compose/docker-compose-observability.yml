@@ -1,0 +1,73 @@
+version: '3.8'
+
+# ============================================================
+# 可观测性栈：Prometheus（指标）+ Grafana（看板）+ Tempo（链路）+ OTel Collector
+#
+# 学习要点：
+#   - Micrometer 已把各服务的 /actuator/prometheus 暴露为 OpenMetrics 格式，
+#     Prometheus 按固定间隔抓取（pull 模型），配置见 deploy/observability/prometheus.yml
+#   - chat 服务已接入 micrometer-tracing-bridge-otel 并输出 OTLP，链路经
+#     OTel Collector 汇入 Tempo，Grafana 里用 TraceQL 查询
+#   - 本机无 Docker 时，仅 /actuator/prometheus 部分可用（已验证）；
+#     完整看板在有 Docker 的环境执行：docker compose -f 本文件 up -d
+# ============================================================
+
+networks:
+  aics-observe:
+    driver: bridge
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: aics-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ../observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=7d
+    networks: [aics-observe]
+
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: aics-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - ../observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
+    depends_on: [prometheus, tempo]
+    networks: [aics-observe]
+
+  tempo:
+    image: grafana/tempo:2.4.1
+    container_name: aics-tempo
+    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    ports:
+      - "3200:3200"   # Tempo API / TraceQL
+      - "4317"        # OTLP gRPC（经 collector 转发）
+    volumes:
+      - ../observability/tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - tempo-data:/var/tempo
+    networks: [aics-observe]
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.97.0
+    container_name: aics-otel-collector
+    command: ["--config=/etc/otel/config.yaml"]
+    ports:
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+    volumes:
+      - ../observability/otel-collector.yaml:/etc/otel/config.yaml:ro
+    depends_on: [tempo]
+    networks: [aics-observe]
+
+volumes:
+  prometheus-data:
+  grafana-data:
+  tempo-data:

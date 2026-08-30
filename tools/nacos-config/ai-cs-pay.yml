@@ -17,3 +17,10 @@ aics:
       cashier-url: http://localhost:5173/mock-pay
 pay:
   sandbox: true
+
+# ===== RocketMQ（支付成功事务消息） =====
+rocketmq:
+  name-server: ${ROCKETMQ_ADDR:127.0.0.1:9876}
+  producer:
+    group: pay-producer-group
+    send-message-timeout: 10000

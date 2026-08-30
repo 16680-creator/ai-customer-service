@@ -6,7 +6,9 @@ spring:
     redis:
       host: 123.60.31.79
       port: 6379
-      password: ""
+      # 注意：不要写 password: ""（空串）——Redisson 会拿空串发 AUTH 被拒
+      # Redis 未设密码，显式留空（null）即可，Lettuce/Redisson 均不发 AUTH
+      password:
       database: 0
 rocketmq:
   name-server: 127.0.0.1:9876
@@ -20,3 +22,17 @@ aics:
     base-url: https://api.siliconflow.cn
     api-key: sk-aonceapnbwfoswegzsieghnijdddzbsccsitmndyevpfdwcs
     model: BAAI/bge-m3
+
+# ===== 可观测性：Actuator 端点 + Prometheus 指标（所有服务统一暴露） =====
+# 抓取端点：http://{host}:{port}/actuator/prometheus（见 deploy/observability/prometheus.yml）
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: never
+  metrics:
+    tags:
+      application: ${spring.application.name}

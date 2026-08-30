@@ -4,7 +4,10 @@ import com.aics.pay.channel.NotifyContext;
 import com.aics.pay.channel.NotifyResult;
 import com.aics.pay.channel.PayChannel;
 import com.aics.pay.channel.PayChannelFactory;
+import com.aics.common.mq.PaySuccessMessage;
 import com.aics.pay.client.OrderPayClient;
+import com.aics.pay.mq.PaySuccessMessageProducer;
+import org.springframework.beans.factory.annotation.Value;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -20,6 +23,11 @@ public class PayNotifyService {
     private final PayChannelFactory payChannelFactory;
     private final PayTransactionService payTransactionService;
     private final OrderPayClient orderPayClient;
+    private final PaySuccessMessageProducer paySuccessMessageProducer;
+
+    /** 支付成功通知模式：tx-message=RocketMQ 事务消息（默认），feign=旧同步回调（保留对比） */
+    @Value("${aics.pay.tx-notify.enabled:true}")
+    private boolean txNotifyEnabled;
 
     public void processNotify(String paymentMethod, NotifyContext context) {
         PayChannel channel = payChannelFactory.getChannel(paymentMethod);
@@ -31,8 +39,7 @@ public class PayNotifyService {
             return;
         }
 
-        payTransactionService.markSuccess(result.getOrderNo(), result.getTransactionId(), result.getAmount());
-        orderPayClient.confirmPay(result.getOrderNo(), paymentMethod, result.getAmount(), result.getTransactionId());
+        notifyOrderSuccess(result.getOrderNo(), paymentMethod, result.getAmount(), result.getTransactionId());
         log.info("支付通知处理完成: orderNo={}, method={}, amount={}", result.getOrderNo(), paymentMethod, result.getAmount());
     }
 
@@ -41,11 +48,28 @@ public class PayNotifyService {
         String channelStatus = channel.queryPayment(orderNo);
         if (PayChannel.STATUS_SUCCESS.equals(channelStatus)) {
             log.info("查单兜底命中已支付: orderNo={}, method={}", orderNo, paymentMethod);
-            payTransactionService.markSuccess(orderNo, null, null);
-            orderPayClient.confirmPay(orderNo, paymentMethod, null, null);
+            notifyOrderSuccess(orderNo, paymentMethod, null, null);
             return true;
         }
         return false;
+    }
+
+    /**
+     * 通知订单服务「支付成功」。
+     *
+     * <p>tx-message 模式：本地事务（流水 markSuccess）移入
+     * {@link PaySuccessTransactionListener#executeLocalTransaction}，由事务消息机制保证
+     * 「流水落库成功 ⇒ 消息必达 order」；feign 模式为旧同步回调（回查期 Feign 失败即丢事件）。</p>
+     */
+    private void notifyOrderSuccess(String orderNo, String paymentMethod, java.math.BigDecimal amount, String tradeNo) {
+        if (txNotifyEnabled) {
+            paySuccessMessageProducer.sendSuccess(PaySuccessMessage.builder()
+                    .orderNo(orderNo).paymentMethod(paymentMethod).amount(amount).tradeNo(tradeNo)
+                    .build());
+            return;
+        }
+        payTransactionService.markSuccess(orderNo, tradeNo, amount);
+        orderPayClient.confirmPay(orderNo, paymentMethod, amount, tradeNo);
     }
 
     /** 关单（订单取消/超时后由订单服务回调） */

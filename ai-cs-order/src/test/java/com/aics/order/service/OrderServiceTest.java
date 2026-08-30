@@ -54,9 +54,20 @@ class OrderServiceTest {
     private RocketMQTemplate rocketMQTemplate;
     @Mock
     private OrderPayClient orderPayClient;
+    @Mock
+    private com.aics.order.lock.OrderCreateLockService orderCreateLockService;
 
     @InjectMocks
     private OrderServiceImpl orderService;
+
+    @BeforeEach
+    void setUpLockPassThrough() {
+        // 锁服务在单测中直通：拿到锁立即执行业务（分布式锁行为由 OrderCreateLockServiceTest 覆盖）
+        // lenient：仅下单用例会实际使用该 stub
+        org.mockito.Mockito.lenient().when(orderCreateLockService.withCreateLock(
+                org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any()))
+                .thenAnswer(inv -> ((java.util.function.Supplier<?>) inv.getArgument(1)).get());
+    }
 
     private CartItem cartItem1;
     private CartItem cartItem2;

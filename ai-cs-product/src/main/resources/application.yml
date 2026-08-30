@@ -19,3 +19,20 @@ spring:
     import:
       - optional:nacos:aics-shared.yml
       - optional:nacos:ai-cs-product.yml
+
+# ===== Seata AT 分支事务（product 扣/补库存作为分支注册进全局事务） =====
+seata:
+  enabled: true
+  application-id: ${spring.application.name}
+  tx-service-group: aics_tx_group
+  service:
+    vgroup-mapping:
+      aics_tx_group: default
+    grouplist:
+      default: ${SEATA_ADDR:127.0.0.1:8091}
+  registry:
+    type: file
+  config:
+    type: file
+  data-source-proxy-mode: AT
+  enable-auto-data-source-proxy: true

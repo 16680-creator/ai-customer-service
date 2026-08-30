@@ -24,7 +24,10 @@ import java.util.Map;
 @Component
 @RocketMQMessageListener(
         topic = "notify-topic",
-        consumerGroup = "notify-consumer-group"
+        consumerGroup = "notify-consumer-group",
+        // 学习要点（死信队列）：重试 3 次仍失败的消息进入 %DLQ%notify-consumer-group，
+        // 可通过 mq 服务的 /mq/dead-letter 接口观测并人工介入
+        maxReconsumeTimes = 3
 )
 public class OrderNotifyConsumer implements RocketMQListener<Map<String, String>> {
 

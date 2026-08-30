@@ -1,6 +1,7 @@
 package com.aics.product.service.impl;
 
 import com.aics.common.exception.BusinessException;
+import org.springframework.transaction.annotation.Transactional;
 import com.aics.common.result.ResultCode;
 import com.aics.product.dto.ProductCreateDTO;
 import com.aics.product.dto.ProductUpdateDTO;
@@ -180,6 +181,7 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void deductStock(Long productId, int quantity) {
         // 实时库存扣减：以 DB 为权威源，用「条件更新」保证原子性，避免并发超卖。
         // 仅当当前库存 >= 扣减数量时才执行 stock = stock - qty，返回受影响行数（0 表示不足/不存在）。
@@ -204,6 +206,7 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void restoreStock(Long productId, int quantity) {
         // 实时回补：DB 原子 stock = stock + qty，sales 同步回退（不低于 0）
         int rows = productMapper.update(null, new LambdaUpdateWrapper<Product>()

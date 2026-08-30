@@ -25,6 +25,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import com.aics.order.lock.OrderCreateLockService;
+import io.seata.spring.annotation.GlobalTransactional;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -46,6 +48,7 @@ public class OrderServiceImpl implements OrderService {
     private final CouponMapper couponMapper;
     private final PromotionService promotionService;
     private final ProductStockClient productStockClient;
+    private final OrderCreateLockService orderCreateLockService;
     private final RocketMQTemplate rocketMQTemplate;
     private final OrderPayClient orderPayClient;
 
@@ -55,6 +58,18 @@ public class OrderServiceImpl implements OrderService {
     private static final AtomicInteger SEQUENCE = new AtomicInteger(0);
 
     @Override
+    /**
+     * 创建订单（入口）：分布式锁防重 + 委托 {@link #doCreateOrder} 执行全局事务。
+     *
+     * <p>锁在全局事务外层：同一用户的并发下单请求快速失败，拿到锁才进入
+     * {@code @GlobalTransactional} 边界，避免锁内空占事务资源。</p>
+     */
+    public OrderVO createOrder(Long userId, List<Long> cartItemIds, Long couponId, String paymentMethod) {
+        return orderCreateLockService.withCreateLock(userId,
+                () -> doCreateOrder(userId, cartItemIds, couponId, paymentMethod));
+    }
+
+    @GlobalTransactional(rollbackFor = Exception.class, name = "order-create")
     @Transactional(rollbackFor = Exception.class)
     /**
      * 创建订单：由购物车条目生成订单，应用优惠券并计算应付金额。
@@ -68,37 +83,21 @@ public class OrderServiceImpl implements OrderService {
      * @param paymentMethod 支付方式（见 ai-cs-common PaymentMethod）
      * @return 创建后的订单 VO
      */
-    public OrderVO createOrder(Long userId, List<Long> cartItemIds, Long couponId, String paymentMethod) {
+    public OrderVO doCreateOrder(Long userId, List<Long> cartItemIds, Long couponId, String paymentMethod) {
         // 1. 获取购物车商品
         List<CartItem> cartItems = cartItemMapper.selectBatchIds(cartItemIds);
         if (cartItems.isEmpty()) {
             throw new BusinessException(ResultCode.ORDER_CART_EMPTY);
         }
 
-        // 2. 实时扣减库存（以商品服务 DB 为权威源，原子扣减；失败回滚已扣项）
-        //    注意：跨服务调用不在本地事务内，采用「先扣后用、失败回补」的尽力一致策略。
-        List<Long> deductedProducts = new ArrayList<>();
-        try {
-            for (CartItem item : cartItems) {
-                productStockClient.deductStock(item.getProductId(), item.getQuantity());
-                deductedProducts.add(item.getProductId());
-            }
-        } catch (Exception e) {
-            // 回滚本次已成功扣减的商品（按商品聚合本次订单数量，避免重复回补）
-            for (Long pid : deductedProducts) {
-                int qty = cartItems.stream()
-                        .filter(i -> i.getProductId().equals(pid))
-                        .mapToInt(CartItem::getQuantity)
-                        .sum();
-                try {
-                    productStockClient.restoreStock(pid, qty);
-                } catch (Exception ignore) {
-                    log.warn("库存回滚失败（需人工核查）: productId={}, qty={}", pid, qty);
-                }
-            }
-            log.warn("库存扣减失败，已回滚已扣项: err={}", e.getMessage());
-            throw new BusinessException(ResultCode.ORDER_STOCK_INSUFFICIENT,
-                    "商品库存不足或服务异常，请稍后再试");
+        // 2. 实时扣减库存（以商品服务 DB 为权威源，原子扣减）
+        //    学习要点（Seata AT）：扣库存是 Feign 调用 product 的分支事务——XID 随请求头传播，
+        //    product 侧数据源代理生成 undo_log；任一环节失败（如库存不足），
+        //    全局事务二阶段回滚时按 undo_log 反向补偿已提交的分支，无需手写「失败回补」。
+        //    注意：MQ 不是 Seata 资源，全局回滚时下方延迟消息已发出——但消息消费侧
+        //    cancelExpiredOrder 查不到订单会直接返回，天然幂等安全。
+        for (CartItem item : cartItems) {
+            productStockClient.deductStock(item.getProductId(), item.getQuantity());
         }
 
         // 3. 计算价格

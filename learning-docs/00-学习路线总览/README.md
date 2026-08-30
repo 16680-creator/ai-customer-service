@@ -145,3 +145,19 @@ cd ai-cs-frontend && npm install && npm run dev
 # 网关: http://localhost:8080
 # Nacos: http://localhost:8848/nacos
 ```
+
+---
+
+## 进阶专题（2026-08 一二梯队落地）
+
+| 专题 | 文档 | 分类 |
+|---|---|---|
+| Sentinel 入口限流（WarmUp + QPS） | [04-中间件/06-Sentinel限流与熔断降级.md](../04-中间件/06-Sentinel限流与熔断降级.md) | 限流熔断 |
+| Redisson 分布式锁（看门狗/可重入） | [04-中间件/07-Redisson分布式锁.md](../04-中间件/07-Redisson分布式锁.md) | 分布式协调 |
+| RocketMQ 事务消息 + 死信队列 | [04-中间件/08-RocketMQ事务消息与死信队列.md](../04-中间件/08-RocketMQ事务消息与死信队列.md) | 消息一致性 |
+| Seata AT 分布式事务 | [02-Spring微服务/06-Seata分布式事务AT模式.md](../02-Spring微服务/06-Seata分布式事务AT模式.md) | 分布式事务 |
+| Prometheus/Grafana/Tempo 可观测性 | [07-运维部署/04-Prometheus可观测性.md](../07-运维部署/04-Prometheus可观测性.md) | 运维监控 |
+| XXL-Job 分布式调度 | [07-运维部署/05-XXL-Job分布式调度.md](../07-运维部署/05-XXL-Job分布式调度.md) | 任务调度 |
+| ShardingSphere 用户表分库分表 | [03-数据库与ORM/03-ShardingSphere用户表分库分表实战.md](../03-数据库与ORM/03-ShardingSphere用户表分库分表实战.md) | 分库分表 |
+| Testcontainers / 安全框架选型 | [08-测试/02-Testcontainers与安全框架技术选型.md](../08-测试/02-Testcontainers与安全框架技术选型.md) | 测试与安全 |
+| 一二梯队集成验证清单 | [08-测试/03-一等公民验证清单（一二梯队落地）.md](../08-测试/03-一等公民验证清单（一二梯队落地）.md) | 验收回归 |

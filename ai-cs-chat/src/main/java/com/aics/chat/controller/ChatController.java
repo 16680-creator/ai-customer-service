@@ -6,6 +6,7 @@ import com.aics.chat.dto.VisionChatRequest;
 import com.aics.chat.dto.VisionChatResponse;
 import com.aics.chat.service.ChatService;
 import com.aics.chat.service.VisionChatService;
+import com.aics.chat.config.SentinelRules;
 import com.aics.chat.util.ChatUserContext;
 import com.aics.common.exception.BusinessException;
 import com.aics.common.result.Result;
@@ -14,7 +15,10 @@ import com.aics.common.storage.FileStorageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.NotBlank;
+import com.alibaba.csp.sentinel.annotation.SentinelResource;
+import com.alibaba.csp.sentinel.slots.block.BlockException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -43,6 +47,7 @@ import java.util.Set;
  */
 @Tag(name = "AI对话")
 @RestController
+@Slf4j
 @RequestMapping("/chat")
 @RequiredArgsConstructor
 @Validated
@@ -71,6 +76,7 @@ public class ChatController {
      */
     @Operation(summary = "发送对话消息")
     @PostMapping("/send")
+    @SentinelResource(value = SentinelRules.RESOURCE_CHAT_SEND, blockHandler = "chatSendBlocked")
     public Result<String> chat(@RequestParam("sessionId") @NotBlank(message = "会话ID不能为空") String sessionId,
                                @RequestParam("message") @NotBlank(message = "消息内容不能为空") String message,
                                @RequestHeader(value = "X-User-Id", required = false) Long userId) {
@@ -82,6 +88,19 @@ public class ChatController {
             // 必须清理：Tomcat 线程被复用，否则下个请求会读到上个用户的 ID
             ChatUserContext.clear();
         }
+    }
+
+    /**
+     * {@code /chat/send} 触发 Sentinel 流控/降级规则时的兜底响应。
+     *
+     * <p>学习要点：blockHandler 的方法签名必须与原方法一致，且末尾多一个
+     * {@link BlockException} 参数——Sentinel 拦截到规则命中后把异常从这里交给业务，
+     * 由业务决定限流响应（此处返回 429 语义的业务码，而非直接抛 500）。</p>
+     */
+    public Result<String> chatSendBlocked(String sessionId, String message, Long userId, BlockException ex) {
+        log.warn("对话接口触发Sentinel流控: resource={}, rule={}", SentinelRules.RESOURCE_CHAT_SEND,
+                ex.getRule() != null ? ex.getRule().getClass().getSimpleName() : "unknown");
+        return Result.fail(ResultCode.TOO_MANY_REQUESTS, "当前对话人数过多，请稍后再试");
     }
 
     /**
