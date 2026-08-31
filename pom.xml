@@ -75,6 +75,7 @@
         <!-- 分布式协调 -->
         <redisson.version>3.27.2</redisson.version>
         <xxl-job.version>2.4.1</xxl-job.version>
+        <statemachine.version>4.0.0</statemachine.version>
     </properties>
 
     <dependencyManagement>
@@ -139,6 +140,12 @@
                 <groupId>com.alibaba.cloud</groupId>
                 <artifactId>spring-cloud-starter-alibaba-seata</artifactId>
                 <version>${spring-cloud-alibaba.version}</version>
+            </dependency>
+            <!-- Seata HTTP 集成（服务端从 TX_XID 请求头绑定全局事务） -->
+            <dependency>
+                <groupId>io.seata</groupId>
+                <artifactId>seata-http</artifactId>
+                <version>${seata.version}</version>
             </dependency>
 
             <!-- MySQL -->
@@ -236,6 +243,13 @@
                 <groupId>org.springdoc</groupId>
                 <artifactId>springdoc-openapi-starter-webflux-ui</artifactId>
                 <version>${springdoc.version}</version>
+            </dependency>
+
+            <!-- Spring Statemachine（订单状态流转治理） -->
+            <dependency>
+                <groupId>org.springframework.statemachine</groupId>
+                <artifactId>spring-statemachine-starter</artifactId>
+                <version>${statemachine.version}</version>
             </dependency>
 
             <!-- Internal Modules -->

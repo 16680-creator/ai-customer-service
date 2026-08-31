@@ -20,6 +20,7 @@ public enum ResultCode {
     METHOD_NOT_ALLOWED(405, "请求方法不允许"),
     TOO_MANY_REQUESTS(429, "请求过于频繁，请稍后再试"),
     INTERNAL_ERROR(500, "系统内部错误"),
+    GATEWAY_SERVICE_UNAVAILABLE(503, "服务暂时不可用，请稍后再试"),
 
     // ==================== 用户模块 1xxx ====================
     USER_NOT_FOUND(1001, "用户不存在"),

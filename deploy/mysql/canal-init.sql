@@ -1,0 +1,4 @@
+-- Canal CDC 复制账号（仅用于读取 MySQL binlog，不授予业务 DML 权限）
+CREATE USER IF NOT EXISTS 'canal'@'%' IDENTIFIED BY 'canal';
+GRANT SELECT, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO 'canal'@'%';
+FLUSH PRIVILEGES;

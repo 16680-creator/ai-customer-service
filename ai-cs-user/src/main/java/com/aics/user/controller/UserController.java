@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -38,12 +39,14 @@ public class UserController {
 
     @Operation(summary = "查询用户信息")
     @GetMapping("/{id}")
-    public Result<User> getUserById(@PathVariable Long id) {
+    @PreAuthorize("authentication.name == #p0.toString() or hasRole('ADMIN')")
+    public Result<User> getUserById(@PathVariable("id") Long id) {
         return userService.getUserById(id);
     }
 
     @Operation(summary = "更新用户信息")
     @PutMapping
+    @PreAuthorize("authentication.name == #p0.id.toString() or hasRole('ADMIN')")
     public Result<Void> updateUser(@RequestBody User user) {
         return userService.updateUser(user);
     }

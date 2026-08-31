@@ -1,7 +1,10 @@
 server:
+  shutdown: graceful
   port: 8083
 
 spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
   application:
     name: ai-cs-chat
   # 彻底排除 Embedding 自动配置（与 @SpringBootApplication.exclude 双保险）
@@ -49,6 +52,9 @@ spring:
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
       database: ${REDIS_DATABASE:0}
+    # Mongo 只用于可选审计归档；archive.enabled=false 时不会写入。
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://127.0.0.1:27017/aics_chat}
 
 # ===== RocketMQ 配置（对话消息投递/落库） =====
 rocketmq:
@@ -158,6 +164,10 @@ resilience4j:
 # ===== 缓存层配置（向量缓存 / 语义缓存 / 热门问答缓存） =====
 # 查询命中顺序：热门问答（精确 O(1)）→ 语义缓存（向量相似）→ 完整 RAG 链路
 aics:
+  chat:
+    # Mongo 对话审计归档：默认关闭，Redis+MQ/message 表主链路不变
+    mongo-archive:
+      enabled: ${MONGO_ARCHIVE_ENABLED:false}
   cache:
     # 向量缓存：相同文本的 Embedding 不再重复调用向量化 API（L1 进程内 LRU + L2 Redis）
     vector:

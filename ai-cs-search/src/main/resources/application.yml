@@ -1,7 +1,10 @@
 server:
+  shutdown: graceful
   port: 8084
 
 spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
   application:
     name: ai-cs-search
   # 排除 OpenAI Embedding 自动装配（由 SpringAiConfig 手动提供，走硅基流动 bge-m3）
@@ -41,3 +44,24 @@ spring:
         client:
           host: http://${aics.mysql.host:123.60.31.79}
           port: ${CHROMA_PORT:8000}
+
+# ===== RocketMQ（Canal CDC 商品变更） =====
+rocketmq:
+  name-server: ${ROCKETMQ_NAME_SERVER:127.0.0.1:9876}
+  consumer:
+    group: search-product-cdc-consumer
+
+# ===== Canal CDC 商品同步（默认关闭，Canal 基础设施部署后开启） =====
+aics:
+  cdc:
+    product:
+      enabled: ${CANAL_PRODUCT_CDC_ENABLED:false}
+
+# ===== 全链路追踪（03-P5）：OTLP 导出至 OTel Collector（observability compose 4318 端口） =====
+management:
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING:1.0}   # 生产可调低采样率，本地全采样
+  otlp:
+    tracing:
+      endpoint: ${OTLP_ENDPOINT:http://127.0.0.1:4318/v1/traces}

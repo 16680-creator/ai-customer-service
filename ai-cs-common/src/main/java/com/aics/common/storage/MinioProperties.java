@@ -2,13 +2,11 @@ package com.aics.common.storage;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.stereotype.Component;
 
 /**
  * MinIO 对象存储配置
  */
 @Data
-@Component
 @ConfigurationProperties(prefix = "aics.minio")
 public class MinioProperties {
 

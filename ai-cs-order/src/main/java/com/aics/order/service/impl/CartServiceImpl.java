@@ -2,6 +2,7 @@ package com.aics.order.service.impl;
 
 import com.aics.common.exception.BusinessException;
 import com.aics.common.result.ResultCode;
+import com.aics.order.client.ProductClient;
 import com.aics.order.dto.ProductRemoteDTO;
 import com.aics.order.entity.CartItem;
 import com.aics.order.mapper.CartItemMapper;
@@ -13,7 +14,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -29,7 +29,7 @@ public class CartServiceImpl implements CartService {
 
     private final CartItemMapper cartItemMapper;
     private final StringRedisTemplate stringRedisTemplate;
-    private final RestTemplate restTemplate;
+    private final ProductClient productClient;
 
     @Override
     /** 查询购物车列表（含商品信息与选中状态，供结算试算使用） */
@@ -63,8 +63,7 @@ public class CartServiceImpl implements CartService {
         // 1. 从商品服务获取商品信息（名称/价格/库存/上下架状态）
         ProductRemoteDTO remote;
         try {
-            remote = restTemplate.getForObject(
-                    "http://ai-cs-product/product/{id}", ProductRemoteDTO.class, productId);
+            remote = productClient.getProduct(productId);
         } catch (Exception e) {
             log.error("获取商品信息失败: productId={}", productId, e);
             throw new BusinessException(ResultCode.PRODUCT_NOT_FOUND, "商品服务暂时不可用，请稍后再试");
@@ -178,8 +177,7 @@ public class CartServiceImpl implements CartService {
      */
     private int currentStock(Long productId) {
         try {
-            ProductRemoteDTO remote = restTemplate.getForObject(
-                    "http://ai-cs-product/product/{id}", ProductRemoteDTO.class, productId);
+            ProductRemoteDTO remote = productClient.getProduct(productId);
             if (remote != null && remote.getData() != null && remote.getData().getStock() != null) {
                 return remote.getData().getStock();
             }

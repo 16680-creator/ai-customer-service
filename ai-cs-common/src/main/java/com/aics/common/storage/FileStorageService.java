@@ -11,7 +11,6 @@ import io.minio.RemoveObjectArgs;
 import io.minio.http.Method;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -25,7 +24,6 @@ import java.util.concurrent.TimeUnit;
  * MinIO 文件存储服务：上传、删除、生成访问 URL
  */
 @Slf4j
-@Service
 @RequiredArgsConstructor
 public class FileStorageService {
 

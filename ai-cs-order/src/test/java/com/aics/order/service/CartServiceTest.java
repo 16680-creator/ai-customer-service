@@ -15,7 +15,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
-import org.springframework.web.client.RestTemplate;
+import com.aics.order.client.ProductClient;
 
 import java.math.BigDecimal;
 import java.util.Arrays;
@@ -42,7 +42,7 @@ class CartServiceTest {
     private ValueOperations<String, String> valueOperations;
 
     @Mock
-    private RestTemplate restTemplate;
+    private ProductClient productClient;
 
     @InjectMocks
     private CartServiceImpl cartService;
@@ -154,7 +154,7 @@ class CartServiceTest {
         data.setStatus(1);
         remote.setData(data);
 
-        when(restTemplate.getForObject(anyString(), eq(ProductRemoteDTO.class), anyLong())).thenReturn(remote);
+        when(productClient.getProduct(anyLong())).thenReturn(remote);
         when(cartItemMapper.selectOne(any())).thenReturn(null);
         when(cartItemMapper.insert(any())).thenReturn(1);
         when(cartItemMapper.selectList(any())).thenReturn(Collections.singletonList(sampleCartItem));
@@ -180,7 +180,7 @@ class CartServiceTest {
         data.setStatus(1);
         remote.setData(data);
 
-        when(restTemplate.getForObject(anyString(), eq(ProductRemoteDTO.class), anyLong())).thenReturn(remote);
+        when(productClient.getProduct(anyLong())).thenReturn(remote);
         when(cartItemMapper.selectOne(any())).thenReturn(sampleCartItem);
         when(cartItemMapper.selectList(any())).thenReturn(Collections.singletonList(sampleCartItem));
 
@@ -202,7 +202,7 @@ class CartServiceTest {
         data.setStatus(0);
         remote.setData(data);
 
-        when(restTemplate.getForObject(anyString(), eq(ProductRemoteDTO.class), anyLong())).thenReturn(remote);
+        when(productClient.getProduct(anyLong())).thenReturn(remote);
 
         BusinessException exception = assertThrows(BusinessException.class,
                 () -> cartService.addToCart(100L, 1001L, 1));
@@ -215,7 +215,7 @@ class CartServiceTest {
         ProductRemoteDTO remote = new ProductRemoteDTO();
         remote.setCode(200);
         remote.setData(null);
-        when(restTemplate.getForObject(anyString(), eq(ProductRemoteDTO.class), anyLong())).thenReturn(remote);
+        when(productClient.getProduct(anyLong())).thenReturn(remote);
 
         BusinessException exception = assertThrows(BusinessException.class,
                 () -> cartService.addToCart(100L, 9999L, 1));
@@ -235,7 +235,7 @@ class CartServiceTest {
         data.setStatus(1);
         remote.setData(data);
 
-        when(restTemplate.getForObject(anyString(), eq(ProductRemoteDTO.class), anyLong())).thenReturn(remote);
+        when(productClient.getProduct(anyLong())).thenReturn(remote);
 
         BusinessException exception = assertThrows(BusinessException.class,
                 () -> cartService.addToCart(100L, 1001L, 10));

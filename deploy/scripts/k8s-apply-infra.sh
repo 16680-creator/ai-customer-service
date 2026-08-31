@@ -21,6 +21,12 @@ kubectl apply -f deploy/k8s/redis.yaml
 kubectl apply -f deploy/k8s/elasticsearch.yaml
 kubectl apply -f deploy/k8s/rocketmq.yaml
 kubectl apply -f deploy/k8s/minio.yaml
+# AI data layer + control planes. neo4j-secret / xxl-job-admin-config must exist first;
+# copy deploy/k8s/middleware-secrets.example.yaml outside Git and apply it with real credentials.
+kubectl apply -f deploy/k8s/chroma.yaml
+kubectl apply -f deploy/k8s/neo4j.yaml
+kubectl apply -f deploy/k8s/xxl-job.yaml
+kubectl apply -f deploy/k8s/sentinel-dashboard.yaml
 
 kubectl rollout status deployment/nacos -n "${NAMESPACE}" --timeout=300s || true
 kubectl rollout status statefulset/redis -n "${NAMESPACE}" --timeout=300s || true
@@ -28,5 +34,9 @@ kubectl rollout status statefulset/elasticsearch -n "${NAMESPACE}" --timeout=300
 kubectl rollout status deployment/rocketmq-namesrv -n "${NAMESPACE}" --timeout=300s || true
 kubectl rollout status deployment/rocketmq-broker -n "${NAMESPACE}" --timeout=300s || true
 kubectl rollout status statefulset/minio -n "${NAMESPACE}" --timeout=300s || true
+kubectl rollout status statefulset/chroma -n "${NAMESPACE}" --timeout=300s || true
+kubectl rollout status statefulset/neo4j -n "${NAMESPACE}" --timeout=300s || true
+kubectl rollout status deployment/xxl-job-admin -n "${NAMESPACE}" --timeout=300s || true
+kubectl rollout status deployment/sentinel-dashboard -n "${NAMESPACE}" --timeout=300s || true
 
 echo "Infrastructure deployment completed."

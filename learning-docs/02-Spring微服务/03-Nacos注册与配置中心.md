@@ -326,6 +326,35 @@ spring:
 
 ---
 
+## 九、动态配置的两种机制（2026-08 补，03-P4 落地记录）
+
+> 全项目此前只有 chat 的 `ModelRouterProperties` 一处用到了动态刷新能力，
+> 改配置要重启服务。本节补齐两种机制的差异与本项目落地位置。
+
+### 机制一：`@Value` 字段 → 必须配 `@RefreshScope`
+
+`@Value` 在 Bean 初始化时一次性注入。Nacos 配置变更 → ContextRefresher 发布
+RefreshEvent → RefreshScope 里缓存的 Bean 被**销毁重建**，字段才重新注入。
+不加 `@RefreshScope` 的 `@Value` 永远是旧值。
+
+反模式（不生效）：静态字段、构造期读取、`final` 字段——RefreshScope 重建代理
+救不了这三类。
+
+### 机制二：`@ConfigurationProperties` → 自动重绑定（推荐）
+
+spring-cloud-context 在 RefreshEvent 后执行 `ConfigurationPropertiesRebinder`：
+对**所有** `@ConfigurationProperties` Bean 重新 bind 环境里的新值，**不需要**
+`@RefreshScope`，使用方 Bean 也不重建。更轻、无代理重建成本，是首选。
+
+### 项目落地
+
+| 位置 | 改造 |
+|---|---|
+| `ai-cs-gateway/.../config/RateLimitProperties.java` | 新增 `@ConfigurationProperties("aics.gateway.rate-limit")`，`RateLimitFilter` 的 5 个 `@Value` 全部迁入；Nacos 改限流阈值 10s 内生效不重启 |
+| GatewayApplication | `@ConfigurationPropertiesScan("com.aics.gateway.config")` 注册 |
+
+---
+
 ## 学习检查清单
 
 - [ ] 理解 Nacos 的两个角色：注册中心 + 配置中心
@@ -335,6 +364,8 @@ spring:
 - [ ] 会创建和修改 Nacos 配置
 - [ ] 理解 @RefreshScope 动态刷新原理
 - [ ] 知道本地开发如何绕过 Nacos
+- [ ] 说得清 @RefreshScope（销毁重建）与 @ConfigurationProperties（重绑定）的机制差异
+- [ ] 知道 @Value + 静态字段/final 字段动态刷新不生效的原因
 
 ---
 

@@ -1,8 +1,11 @@
 package com.aics.product.service.impl;
 
 import com.aics.common.exception.BusinessException;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.transaction.annotation.Transactional;
 import com.aics.common.result.ResultCode;
+import com.aics.product.config.ProductCacheConfig;
 import com.aics.product.dto.ProductCreateDTO;
 import com.aics.product.dto.ProductUpdateDTO;
 import com.aics.product.entity.Product;
@@ -103,6 +106,7 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+    @Cacheable(cacheNames = ProductCacheConfig.PRODUCT_DETAIL, key = "#id", sync = true)
     public ProductVO getProductDetail(Long id) {
         Product product = productMapper.selectById(id);
         if (product == null) {
@@ -112,6 +116,7 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+    @CacheEvict(cacheNames = ProductCacheConfig.PRODUCT_DETAIL, key = "#id")
     public ProductVO updateProduct(Long id, ProductUpdateDTO dto) {
         Product product = productMapper.selectById(id);
         if (product == null) {
@@ -151,6 +156,7 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+    @CacheEvict(cacheNames = ProductCacheConfig.PRODUCT_DETAIL, key = "#id")
     public void deleteProduct(Long id) {
         Product product = productMapper.selectById(id);
         if (product == null) {
@@ -182,6 +188,7 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @CacheEvict(cacheNames = ProductCacheConfig.PRODUCT_DETAIL, key = "#productId")
     public void deductStock(Long productId, int quantity) {
         // 实时库存扣减：以 DB 为权威源，用「条件更新」保证原子性，避免并发超卖。
         // 仅当当前库存 >= 扣减数量时才执行 stock = stock - qty，返回受影响行数（0 表示不足/不存在）。
@@ -207,6 +214,7 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @CacheEvict(cacheNames = ProductCacheConfig.PRODUCT_DETAIL, key = "#productId")
     public void restoreStock(Long productId, int quantity) {
         // 实时回补：DB 原子 stock = stock + qty，sales 同步回退（不低于 0）
         int rows = productMapper.update(null, new LambdaUpdateWrapper<Product>()
@@ -233,6 +241,7 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+    @CacheEvict(cacheNames = ProductCacheConfig.PRODUCT_CATEGORIES, allEntries = true)
     public ProductCategory createCategory(String name, Long parentId) {
         ProductCategory category = new ProductCategory();
         category.setName(name);
@@ -244,6 +253,7 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+    @Cacheable(cacheNames = ProductCacheConfig.PRODUCT_CATEGORIES, key = "'all'", sync = true)
     public List<ProductCategory> listCategories() {
         return categoryMapper.selectList(
                 new LambdaQueryWrapper<ProductCategory>().orderByAsc(ProductCategory::getSort));

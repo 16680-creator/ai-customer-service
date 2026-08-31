@@ -4,12 +4,15 @@ import cn.hutool.core.util.IdUtil;
 import com.aics.common.exception.BusinessException;
 import com.aics.common.result.ResultCode;
 import com.aics.order.bo.PriceCalcBO;
-import com.aics.order.client.OrderPayClient;
-import com.aics.order.client.ProductStockClient;
+import com.aics.order.client.PayClient;
+import com.aics.order.client.ProductClient;
 import com.aics.order.entity.*;
 import com.aics.order.enums.CouponStatus;
 import com.aics.order.enums.OrderStatus;
+import com.aics.order.event.OrderPaidEvent;
 import com.aics.order.mapper.*;
+import com.aics.order.statemachine.OrderEvent;
+import com.aics.order.statemachine.OrderStateTransitionService;
 import com.aics.order.service.OrderService;
 import com.aics.order.service.PromotionService;
 import com.aics.order.vo.OrderVO;
@@ -18,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.rocketmq.spring.core.RocketMQTemplate;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -47,10 +51,12 @@ public class OrderServiceImpl implements OrderService {
     private final CartItemMapper cartItemMapper;
     private final CouponMapper couponMapper;
     private final PromotionService promotionService;
-    private final ProductStockClient productStockClient;
+    private final ProductClient productClient;
     private final OrderCreateLockService orderCreateLockService;
     private final RocketMQTemplate rocketMQTemplate;
-    private final OrderPayClient orderPayClient;
+    private final PayClient payClient;
+    private final ApplicationEventPublisher eventPublisher;
+    private final OrderStateTransitionService orderStateTransitionService;
 
     @Value("${order.timeout-minutes:30}")
     private int timeoutMinutes;
@@ -97,7 +103,7 @@ public class OrderServiceImpl implements OrderService {
         //    注意：MQ 不是 Seata 资源，全局回滚时下方延迟消息已发出——但消息消费侧
         //    cancelExpiredOrder 查不到订单会直接返回，天然幂等安全。
         for (CartItem item : cartItems) {
-            productStockClient.deductStock(item.getProductId(), item.getQuantity());
+            productClient.deductStock(item.getProductId(), item.getQuantity());
         }
 
         // 3. 计算价格
@@ -210,10 +216,10 @@ public class OrderServiceImpl implements OrderService {
                 new LambdaQueryWrapper<Order>()
                         .eq(Order::getOrderNo, orderNo)
                         .eq(Order::getUserId, userId));
-        if (order == null || !OrderStatus.PENDING_PAY.getCode().equals(order.getStatus())) {
+        if (order == null) {
             throw new BusinessException(ResultCode.ORDER_NOT_FOUND, "订单不存在或状态不允许取消");
         }
-        doCancelOrder(order);
+        doCancelOrder(order, OrderEvent.CANCEL);
     }
 
     @Override
@@ -226,14 +232,15 @@ public class OrderServiceImpl implements OrderService {
             return;
         }
 
-        // 幂等：已支付则直接返回
+        // 状态机是迁移唯一入口：PAID 回调仍幂等，其他非法态忽略。
         if (OrderStatus.PAID.getCode().equals(order.getStatus())) {
             log.info("订单已支付，忽略重复确认: orderNo={}", orderNo);
             return;
         }
-
-        if (!OrderStatus.PENDING_PAY.getCode().equals(order.getStatus())) {
-            log.warn("订单状态异常，忽略确认: orderNo={}, status={}", orderNo, order.getStatus());
+        try {
+            order.setStatus(orderStateTransitionService.transit(order.getStatus(), OrderEvent.PAY).getCode());
+        } catch (BusinessException e) {
+            log.warn("订单状态不允许支付确认，忽略: orderNo={}, status={}", orderNo, order.getStatus());
             return;
         }
 
@@ -245,21 +252,13 @@ public class OrderServiceImpl implements OrderService {
             throw new BusinessException(ResultCode.ORDER_PAY_AMOUNT_MISMATCH);
         }
 
-        // 更新订单状态
-        order.setStatus(OrderStatus.PAID.getCode());
+        // 更新订单状态（前面已由状态机计算 PENDING_PAY -> PAID）
         order.setPayTime(LocalDateTime.now());
         orderMapper.updateById(order);
 
-        // 投递支付成功通知（notify 服务消费后 WebSocket 推送）
-        try {
-            Map<String, String> notify = new LinkedHashMap<>();
-            notify.put("userId", String.valueOf(order.getUserId()));
-            notify.put("message", "您的订单 " + orderNo + " 已支付成功，感谢您的购买！");
-            rocketMQTemplate.convertAndSend("notify-topic", notify);
-            log.info("支付成功通知已投递: orderNo={}, userId={}", orderNo, order.getUserId());
-        } catch (Exception e) {
-            log.warn("支付成功通知投递失败: orderNo={}, err={}", orderNo, e.getMessage());
-        }
+        // 事务内只发布领域事实；通知 MQ 投递由 OrderPaidEventListener 在 AFTER_COMMIT 执行。
+        // 这样订单事务若在后续「清购物车」等步骤回滚，用户不会收到错误的支付成功通知。
+        eventPublisher.publishEvent(new OrderPaidEvent(orderNo, order.getUserId()));
 
         // 清除购物车中已下单商品
         List<OrderItem> items = orderItemMapper.selectList(
@@ -282,7 +281,7 @@ public class OrderServiceImpl implements OrderService {
         if (order == null || !OrderStatus.PENDING_PAY.getCode().equals(order.getStatus())) {
             return; // 已支付或已取消，忽略
         }
-        doCancelOrder(order);
+        doCancelOrder(order, OrderEvent.TIMEOUT);
         log.info("订单超时自动取消: orderNo={}", orderNo);
     }
 
@@ -291,19 +290,22 @@ public class OrderServiceImpl implements OrderService {
     public void refundConfirm(String orderNo) {
         Order order = orderMapper.selectOne(
                 new LambdaQueryWrapper<Order>().eq(Order::getOrderNo, orderNo));
-        if (order == null || !OrderStatus.PAID.getCode().equals(order.getStatus())) {
+        if (order == null) {
             throw new BusinessException(ResultCode.ORDER_NOT_FOUND, "仅已支付订单可退款");
         }
 
-        order.setStatus(OrderStatus.REFUNDED.getCode());
+        // 退款是两段迁移：先校验 PAID -> REFUNDING，库存回补成功后再落 REFUNDED。
+        order.setStatus(orderStateTransitionService.transit(order.getStatus(), OrderEvent.REFUND_REQUEST).getCode());
         orderMapper.updateById(order);
 
         // 回补库存（实时回补商品服务 DB 库存）
         List<OrderItem> items = orderItemMapper.selectList(
                 new LambdaQueryWrapper<OrderItem>().eq(OrderItem::getOrderNo, orderNo));
         for (OrderItem item : items) {
-            productStockClient.restoreStock(item.getProductId(), item.getQuantity());
+            productClient.restoreStock(item.getProductId(), item.getQuantity());
         }
+        order.setStatus(orderStateTransitionService.transit(order.getStatus(), OrderEvent.REFUND_SUCCESS).getCode());
+        orderMapper.updateById(order);
 
         log.info("订单退款确认: orderNo={}", orderNo);
     }
@@ -327,8 +329,8 @@ public class OrderServiceImpl implements OrderService {
 
     // ==================== 私有方法 ====================
 
-    private void doCancelOrder(Order order) {
-        order.setStatus(OrderStatus.CANCELLED.getCode());
+    private void doCancelOrder(Order order, OrderEvent event) {
+        order.setStatus(orderStateTransitionService.transit(order.getStatus(), event).getCode());
         order.setCancelTime(LocalDateTime.now());
         orderMapper.updateById(order);
 
@@ -336,7 +338,7 @@ public class OrderServiceImpl implements OrderService {
         List<OrderItem> items = orderItemMapper.selectList(
                 new LambdaQueryWrapper<OrderItem>().eq(OrderItem::getOrderNo, order.getOrderNo()));
         for (OrderItem item : items) {
-            productStockClient.restoreStock(item.getProductId(), item.getQuantity());
+            productClient.restoreStock(item.getProductId(), item.getQuantity());
         }
 
         // 通知支付服务关闭渠道订单（使二维码失效）
@@ -354,13 +356,20 @@ public class OrderServiceImpl implements OrderService {
         }
     }
 
-    /** 通知支付服务关闭渠道订单（尽力而为） */
+    /**
+     * 通知支付服务关闭渠道订单（尽力而为）：关单失败不阻断取消主流程，
+     * 仅告警日志，渠道订单残留由支付服务侧超时兜底。
+     */
     private void closePayChannel(Order order) {
         if (order.getPaymentMethod() == null) {
             return;
         }
         try {
-            orderPayClient.closeChannel(order.getPaymentMethod(), order.getOrderNo());
+            Map<String, String> body = new LinkedHashMap<>();
+            body.put("orderNo", order.getOrderNo());
+            body.put("paymentMethod", order.getPaymentMethod());
+            payClient.closeOrder(body);
+            log.info("已通知支付服务关单: orderNo={}, method={}", order.getOrderNo(), order.getPaymentMethod());
         } catch (Exception e) {
             log.warn("通知支付服务关单失败: orderNo={}, err={}", order.getOrderNo(), e.getMessage());
         }

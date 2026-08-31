@@ -7,7 +7,7 @@ import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 /**
  * RocketMQ 管理服务启动类
  */
-@SpringBootApplication(scanBasePackages = {"com.aics.mq", "com.aics.common"})
+@SpringBootApplication(scanBasePackages = {"com.aics.mq"})
 @EnableDiscoveryClient
 public class MqApplication {
 

@@ -39,7 +39,7 @@ class AuthFilterTest {
     @Test
     void 伪造身份头被移除_仅透传可信身份() {
         // 客户端携带伪造身份头 + 合法 JWT（userId=1）
-        String token = JwtUtil.generateToken("1", Map.of("username", "zhangsan"), SECRET, 60_000L);
+        String token = JwtUtil.generateToken("1", Map.of("username", "zhangsan", "role", "admin"), SECRET, 60_000L);
         MockServerHttpRequest request = MockServerHttpRequest
                 .method(HttpMethod.POST, "/chat/stream/sse")
                 .header("Authorization", "Bearer " + token)
@@ -56,6 +56,7 @@ class AuthFilterTest {
             // 下游只收到可信身份，且伪造值被移除
             assertEquals(List.of("1"), headers.get("X-User-Id"), "伪造的 X-User-Id 必须被移除");
             assertEquals(List.of("zhangsan"), headers.get("X-User-Name"), "伪造的 X-User-Name 必须被移除");
+            assertEquals(List.of("ROLE_ADMIN"), headers.get("X-User-Roles"), "角色必须从 JWT 可信透传并标准化");
             return Mono.empty();
         });
 

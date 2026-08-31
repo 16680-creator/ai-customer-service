@@ -1,13 +1,15 @@
 package com.aics.order.service;
 
 import com.aics.common.exception.BusinessException;
+import com.aics.common.result.Result;
 import com.aics.common.result.ResultCode;
-import com.aics.order.client.OrderPayClient;
-import com.aics.order.client.ProductStockClient;
+import com.aics.order.client.PayClient;
+import com.aics.order.client.ProductClient;
 import com.aics.order.entity.CartItem;
 import com.aics.order.entity.Order;
 import com.aics.order.entity.OrderItem;
 import com.aics.order.enums.OrderStatus;
+import com.aics.order.event.OrderPaidEvent;
 import com.aics.order.mapper.CartItemMapper;
 import com.aics.order.mapper.CouponMapper;
 import com.aics.order.mapper.OrderItemMapper;
@@ -22,6 +24,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.util.Arrays;
@@ -49,13 +52,17 @@ class OrderServiceTest {
     @Mock
     private PromotionService promotionService;
     @Mock
-    private ProductStockClient productStockClient;
+    private ProductClient productClient;
     @Mock
     private RocketMQTemplate rocketMQTemplate;
     @Mock
-    private OrderPayClient orderPayClient;
+    private PayClient payClient;
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
     @Mock
     private com.aics.order.lock.OrderCreateLockService orderCreateLockService;
+    @Mock
+    private com.aics.order.statemachine.OrderStateTransitionService orderStateTransitionService;
 
     @InjectMocks
     private OrderServiceImpl orderService;
@@ -67,6 +74,22 @@ class OrderServiceTest {
         org.mockito.Mockito.lenient().when(orderCreateLockService.withCreateLock(
                 org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any()))
                 .thenAnswer(inv -> ((java.util.function.Supplier<?>) inv.getArgument(1)).get());
+        // 状态迁移规则由 OrderStateTransitionServiceTest 全量覆盖；此处只提供业务流测试需要的目标态。
+        org.mockito.Mockito.lenient().when(orderStateTransitionService.transit(anyString(), any()))
+                .thenAnswer(inv -> {
+                    String current = inv.getArgument(0);
+                    com.aics.order.statemachine.OrderEvent event = inv.getArgument(1);
+                    if (event == com.aics.order.statemachine.OrderEvent.REFUND_REQUEST
+                            && !OrderStatus.PAID.getCode().equals(current)) {
+                        throw new BusinessException(ResultCode.BAD_REQUEST, "非法退款迁移");
+                    }
+                    return switch (event) {
+                        case PAY -> OrderStatus.PAID;
+                        case CANCEL, TIMEOUT -> OrderStatus.CANCELLED;
+                        case REFUND_REQUEST -> OrderStatus.REFUNDING;
+                        case REFUND_SUCCESS -> OrderStatus.REFUNDED;
+                    };
+                });
     }
 
     private CartItem cartItem1;
@@ -97,7 +120,7 @@ class OrderServiceTest {
     @DisplayName("正常下单 - 生成待支付订单")
     void createOrder_shouldSucceed() {
         when(cartItemMapper.selectBatchIds(anyList())).thenReturn(Arrays.asList(cartItem1, cartItem2));
-        doNothing().when(productStockClient).deductStock(anyLong(), anyInt());
+        when(productClient.deductStock(anyLong(), anyInt())).thenReturn(Result.success());
         when(promotionService.calculatePrice(any(), eq(100L), isNull()))
                 .thenReturn(buildPriceCalcBO());
         when(orderMapper.insert(any())).thenReturn(1);
@@ -108,8 +131,8 @@ class OrderServiceTest {
         assertNotNull(result.getOrderNo());
         assertEquals("PENDING_PAY", result.getStatus());
         verify(orderMapper).insert(any());
-        verify(productStockClient).deductStock(eq(1001L), eq(2));
-        verify(productStockClient).deductStock(eq(1002L), eq(1));
+        verify(productClient).deductStock(eq(1001L), eq(2));
+        verify(productClient).deductStock(eq(1002L), eq(1));
         verify(rocketMQTemplate).syncSend(eq("order-timeout-topic"), any(), anyLong(), anyInt());
     }
 
@@ -117,14 +140,14 @@ class OrderServiceTest {
     @DisplayName("库存不足 - 拒绝下单")
     void createOrder_stockInsufficient_shouldThrow() {
         when(cartItemMapper.selectBatchIds(anyList())).thenReturn(Arrays.asList(cartItem1));
-        // 商品服务扣减库存返回 4xx（库存不足），RestTemplate 抛异常 -> 下单拒绝
+        // 商品服务扣减库存失败（4xx → 调用方翻译为业务异常）-> 下单拒绝
         doThrow(new BusinessException(ResultCode.ORDER_STOCK_INSUFFICIENT, "库存不足"))
-                .when(productStockClient).deductStock(eq(1001L), eq(2));
+                .when(productClient).deductStock(eq(1001L), eq(2));
 
         assertThrows(BusinessException.class,
                 () -> orderService.createOrder(100L, Arrays.asList(1L), null, "WECHAT"));
         // 单个商品即失败，无已扣项需回滚
-        verify(productStockClient, never()).restoreStock(anyLong(), anyInt());
+        verify(productClient, never()).restoreStock(anyLong(), anyInt());
     }
 
     @Test
@@ -173,6 +196,13 @@ class OrderServiceTest {
         orderService.confirmPay("20260801143022010003", "WECHAT", new BigDecimal("199.00"), "tx1");
 
         verify(orderMapper).updateById(argThat(o -> OrderStatus.PAID.getCode().equals(o.getStatus())));
+        org.mockito.ArgumentCaptor<Object> eventCaptor = org.mockito.ArgumentCaptor.forClass(Object.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        OrderPaidEvent paid = assertInstanceOf(OrderPaidEvent.class, eventCaptor.getValue());
+        assertEquals("20260801143022010003", paid.orderNo());
+        assertEquals(100L, paid.userId());
+        // 通知不在事务内直接投递，由 AFTER_COMMIT 监听器负责
+        verify(rocketMQTemplate, never()).convertAndSend(eq("notify-topic"), any(Map.class));
     }
 
     @Test
@@ -191,14 +221,15 @@ class OrderServiceTest {
 
         when(orderMapper.selectOne(any())).thenReturn(order);
         when(orderItemMapper.selectList(any())).thenReturn(List.of(item));
-        doNothing().when(productStockClient).restoreStock(eq(1001L), eq(2));
+        when(productClient.restoreStock(eq(1001L), eq(2))).thenReturn(Result.success());
 
         orderService.cancelExpiredOrder("20260801143022010001");
 
         verify(orderMapper).updateById(argThat(o ->
                 OrderStatus.CANCELLED.getCode().equals(o.getStatus())));
-        verify(productStockClient).restoreStock(eq(1001L), eq(2));
-        verify(orderPayClient).closeChannel("WECHAT", "20260801143022010001");
+        verify(productClient).restoreStock(eq(1001L), eq(2));
+        verify(payClient).closeOrder(argThat(body ->
+                "20260801143022010001".equals(body.get("orderNo"))));
     }
 
     @Test
@@ -217,11 +248,11 @@ class OrderServiceTest {
 
         when(orderMapper.selectOne(any())).thenReturn(order);
         when(orderItemMapper.selectList(any())).thenReturn(Arrays.asList(item));
-        doNothing().when(productStockClient).restoreStock(eq(1001L), eq(2));
+        when(productClient.restoreStock(eq(1001L), eq(2))).thenReturn(Result.success());
 
         assertDoesNotThrow(() -> orderService.refundConfirm("ORD20260809001"));
         assertEquals(OrderStatus.REFUNDED.getCode(), order.getStatus());
-        verify(productStockClient).restoreStock(eq(1001L), eq(2));
+        verify(productClient).restoreStock(eq(1001L), eq(2));
     }
 
     @Test

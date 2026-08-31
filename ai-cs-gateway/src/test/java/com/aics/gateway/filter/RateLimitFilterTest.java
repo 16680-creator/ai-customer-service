@@ -1,5 +1,6 @@
 package com.aics.gateway.filter;
 
+import com.aics.gateway.config.RateLimitProperties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
@@ -7,7 +8,6 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
 import org.springframework.mock.web.server.MockServerWebExchange;
-import org.springframework.test.util.ReflectionTestUtils;
 import reactor.core.publisher.Mono;
 
 import java.util.concurrent.atomic.AtomicInteger;
@@ -25,11 +25,13 @@ import static org.mockito.Mockito.when;
 class RateLimitFilterTest {
 
     private RateLimitFilter filter;
+    private RateLimitProperties props;
     private AtomicInteger forwarded;
 
     @BeforeEach
     void setUp() {
-        filter = new RateLimitFilter();
+        props = new RateLimitProperties();
+        filter = new RateLimitFilter(props);
         forwarded = new AtomicInteger();
     }
 
@@ -53,9 +55,9 @@ class RateLimitFilterTest {
 
     @Test
     void 超限返回429_不转发下游() {
-        ReflectionTestUtils.setField(filter, "requests", 2);
-        ReflectionTestUtils.setField(filter, "windowSeconds", 60);
-        ReflectionTestUtils.setField(filter, "enabled", true);
+        props.setRequests(2);
+        props.setWindowSeconds(60);
+        props.setEnabled(true);
 
         // 前 2 次放行（转发下游）
         filter.filter(newExchange("1"), countingChain()).block();
@@ -72,9 +74,9 @@ class RateLimitFilterTest {
 
     @Test
     void 不同用户独立限流() {
-        ReflectionTestUtils.setField(filter, "requests", 1);
-        ReflectionTestUtils.setField(filter, "windowSeconds", 60);
-        ReflectionTestUtils.setField(filter, "enabled", true);
+        props.setRequests(1);
+        props.setWindowSeconds(60);
+        props.setEnabled(true);
 
         filter.filter(newExchange("1"), countingChain()).block();
         assertEquals(1, forwarded.get());
@@ -86,9 +88,9 @@ class RateLimitFilterTest {
 
     @Test
     void 关闭限流时全部放行() {
-        ReflectionTestUtils.setField(filter, "requests", 1);
-        ReflectionTestUtils.setField(filter, "windowSeconds", 60);
-        ReflectionTestUtils.setField(filter, "enabled", false);
+        props.setRequests(1);
+        props.setWindowSeconds(60);
+        props.setEnabled(false);
 
         for (int i = 0; i < 3; i++) {
             filter.filter(newExchange("1"), countingChain()).block();
@@ -98,9 +100,9 @@ class RateLimitFilterTest {
 
     @Test
     void 令牌桶模式_突发耗尽后429() {
-        ReflectionTestUtils.setField(filter, "algorithm", "token-bucket");
-        ReflectionTestUtils.setField(filter, "qps", 2);
-        ReflectionTestUtils.setField(filter, "enabled", true);
+        props.setAlgorithm("token-bucket");
+        props.setQps(2);
+        props.setEnabled(true);
 
         // qps=2 即桶容量 2：突发 2 次放行，第 3 次（未等补充）429
         filter.filter(newExchange("u9"), countingChain()).block();

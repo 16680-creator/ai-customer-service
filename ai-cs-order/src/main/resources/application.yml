@@ -1,7 +1,10 @@
 server:
+  shutdown: graceful
   port: 8087
 
 spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
   application:
     name: ai-cs-order
   cloud:
@@ -19,6 +22,13 @@ spring:
     import:
       - optional:nacos:aics-shared.yml
       - optional:nacos:ai-cs-order.yml
+  cloud:
+    openfeign:
+      # Feign 熔断（03-P2）：所有 Feign 调用自动包裹 Resilience4j CircuitBreaker，
+      # 实例名 = FeignClient contextId（productClient / payClient）；
+      # 降级行为由各 FallbackFactory 决定：读类/关键写类快速失败，尽力而为类 fail+告警
+      circuitbreaker:
+        enabled: true
 
 # ===== Seata AT 分布式事务（order 为全局事务发起方） =====
 # registry=file + grouplist：本地开发直连 TC，不依赖注册中心；集群部署可切 nacos registry
@@ -46,3 +56,12 @@ aics:
     access-token: default_token
     executor:
       port: 9999
+
+# ===== 全链路追踪（03-P5）：OTLP 导出至 OTel Collector（observability compose 4318 端口） =====
+management:
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING:1.0}   # 生产可调低采样率，本地全采样
+  otlp:
+    tracing:
+      endpoint: ${OTLP_ENDPOINT:http://127.0.0.1:4318/v1/traces}

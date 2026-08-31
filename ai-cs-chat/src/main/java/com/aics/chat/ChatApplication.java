@@ -12,7 +12,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  */
 @EnableFeignClients
 @EnableScheduling
-@SpringBootApplication(scanBasePackages = {"com.aics.chat", "com.aics.common"}, exclude = {
+@SpringBootApplication(scanBasePackages = {"com.aics.chat"}, exclude = {
         org.springframework.ai.model.openai.autoconfigure.OpenAiEmbeddingAutoConfiguration.class
 })
 public class ChatApplication {

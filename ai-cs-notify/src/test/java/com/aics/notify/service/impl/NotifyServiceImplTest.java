@@ -2,48 +2,36 @@ package com.aics.notify.service.impl;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.MockedStatic;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.*;
 
 /**
- * NotifyServiceImpl 单元测试（静态推送委托）
+ * NotifyServiceImpl 单测：通知通过 STOMP user destination/topic 推送。
  */
 class NotifyServiceImplTest {
 
-    private final NotifyServiceImpl notifyService = new NotifyServiceImpl();
+    private final SimpMessagingTemplate messagingTemplate = mock(SimpMessagingTemplate.class);
+    private final NotifyServiceImpl notifyService = new NotifyServiceImpl(messagingTemplate);
 
     @Test
-    @DisplayName("sendToUser - 委托静态定向推送")
-    void sendToUser_shouldDelegate() {
-        try (MockedStatic<com.aics.notify.websocket.NotifyWebSocketHandler> mocked =
-                     mockStatic(com.aics.notify.websocket.NotifyWebSocketHandler.class)) {
-            notifyService.sendToUser("1001", "hello");
-
-            mocked.verify(() -> com.aics.notify.websocket.NotifyWebSocketHandler.sendMessageToUser("1001", "hello"));
-        }
+    @DisplayName("sendToUser - 委托 STOMP user destination")
+    void sendToUserShouldDelegateToStompUserDestination() {
+        notifyService.sendToUser("1001", "hello");
+        verify(messagingTemplate).convertAndSendToUser("1001", NotifyServiceImpl.USER_NOTIFY_DESTINATION, "hello");
     }
 
     @Test
-    @DisplayName("broadcast - 委托静态广播")
-    void broadcast_shouldDelegate() {
-        try (MockedStatic<com.aics.notify.websocket.NotifyWebSocketHandler> mocked =
-                     mockStatic(com.aics.notify.websocket.NotifyWebSocketHandler.class)) {
-            notifyService.broadcast("hello-all");
-
-            mocked.verify(() -> com.aics.notify.websocket.NotifyWebSocketHandler.broadcastMessage("hello-all"));
-        }
+    @DisplayName("broadcast - 委托 STOMP topic")
+    void broadcastShouldDelegateToStompTopic() {
+        notifyService.broadcast("hello-all");
+        verify(messagingTemplate).convertAndSend("/topic/notify", "hello-all");
     }
 
     @Test
-    @DisplayName("getOnlineCount - 返回在线用户数")
-    void getOnlineCount_shouldReturn() {
-        try (MockedStatic<com.aics.notify.websocket.NotifyWebSocketHandler> mocked =
-                     mockStatic(com.aics.notify.websocket.NotifyWebSocketHandler.class)) {
-            mocked.when(com.aics.notify.websocket.NotifyWebSocketHandler::getOnlineCount).thenReturn(3);
-
-            assertEquals(3, notifyService.getOnlineCount());
-        }
+    @DisplayName("getOnlineCount - simple broker 不维护跨会话计数，返回0")
+    void getOnlineCountShouldReturnZero() {
+        assertEquals(0, notifyService.getOnlineCount());
     }
 }

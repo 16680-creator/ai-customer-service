@@ -8,7 +8,7 @@ import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 /**
  * 支付服务启动类
  */
-@SpringBootApplication(scanBasePackages = {"com.aics.pay", "com.aics.common"})
+@SpringBootApplication(scanBasePackages = {"com.aics.pay"})
 @EnableDiscoveryClient
 @MapperScan("com.aics.pay.mapper")
 public class PayApplication {

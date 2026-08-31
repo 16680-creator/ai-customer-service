@@ -1,8 +1,9 @@
 package com.aics.gateway.filter;
 
+import com.aics.gateway.config.RateLimitProperties;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
@@ -33,6 +34,7 @@ import reactor.core.publisher.Mono;
  * qps（默认 5，token-bucket 生效）。</p>
  */
 @Component
+@RequiredArgsConstructor
 public class RateLimitFilter implements GlobalFilter, Ordered {
 
     private static final Logger log = LoggerFactory.getLogger(RateLimitFilter.class);
@@ -40,22 +42,7 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
     /** 网关透传的可信用户头（与 AuthFilter 一致） */
     private static final String USER_ID_HEADER = "X-User-Id";
 
-    @Value("${aics.gateway.rate-limit.enabled:true}")
-    private boolean enabled;
-
-    /** 限流算法：sliding-window（默认）/ token-bucket */
-    @Value("${aics.gateway.rate-limit.algorithm:sliding-window}")
-    private String algorithm;
-
-    @Value("${aics.gateway.rate-limit.requests:60}")
-    private int requests;
-
-    @Value("${aics.gateway.rate-limit.window-seconds:60}")
-    private int windowSeconds;
-
-    /** token-bucket 算法的每秒补充令牌数（= 每用户长期 QPS 上限） */
-    @Value("${aics.gateway.rate-limit.qps:5}")
-    private int qps;
+    private final RateLimitProperties properties;
 
     private final SlidingWindowRateLimiter slidingWindowLimiter = new SlidingWindowRateLimiter();
     private final TokenBucketRateLimiter tokenBucketLimiter = new TokenBucketRateLimiter();
@@ -65,7 +52,7 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
         // 学习点：限流过滤器放在认证之后（order +150 > AuthFilter +100）——
         // 认证前客户端可伪造 X-User-Id 刷不同的限流桶，认证后只能拿到可信身份，
         // 所以优先用“可信用户ID”做限流键，未认证/白名单路径退化为客户端 IP。
-        if (!enabled) {
+        if (!properties.isEnabled()) {
             return chain.filter(exchange);
         }
         String key = resolveKey(exchange);
@@ -81,10 +68,10 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
      * 常量写在前的 equalsIgnoreCase，algorithm 未配置（null）时安全回退滑动窗口。
      */
     private boolean tryAcquire(String key) {
-        if ("token-bucket".equalsIgnoreCase(algorithm)) {
-            return tokenBucketLimiter.tryAcquire(key, Math.max(1, qps), Math.max(1, qps));
+        if ("token-bucket".equalsIgnoreCase(properties.getAlgorithm())) {
+            return tokenBucketLimiter.tryAcquire(key, Math.max(1, properties.getQps()), Math.max(1, properties.getQps()));
         }
-        return slidingWindowLimiter.tryAcquire(key, Math.max(1, requests), Math.max(1, windowSeconds));
+        return slidingWindowLimiter.tryAcquire(key, Math.max(1, properties.getRequests()), Math.max(1, properties.getWindowSeconds()));
     }
 
     /**

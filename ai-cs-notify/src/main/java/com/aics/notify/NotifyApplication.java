@@ -7,7 +7,7 @@ import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 /**
  * 通知服务启动类
  */
-@SpringBootApplication(scanBasePackages = {"com.aics.notify", "com.aics.common"})
+@SpringBootApplication(scanBasePackages = {"com.aics.notify"})
 @EnableDiscoveryClient
 public class NotifyApplication {
 

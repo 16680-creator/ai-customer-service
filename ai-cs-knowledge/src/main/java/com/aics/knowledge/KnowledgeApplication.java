@@ -13,15 +13,15 @@ import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
  *
  * <p>技术要点：</p>
  * <ul>
- *   <li>scanBasePackages 同时扫描 com.aics.knowledge（本模块）与 com.aics.common（公共模块），
- *       以便引用通用组件（Result、BusinessException 等）</li>
+ *   <li>scanBasePackages 只扫描 com.aics.knowledge；公共 Web/MinIO/Embedding 能力由
+ *       ai-cs-common 的 {@code AutoConfiguration.imports} 自动装配，不再依赖跨模块包扫描</li>
  *   <li>exclude 排除 Spring AI 默认的 OpenAiEmbeddingAutoConfiguration，
  *       改由 {@link com.aics.knowledge.config.KnowledgeAiConfig} 自定义 EmbeddingModel
  *       （使用硅基流动 bge-m3 模型，与 ai-cs-chat 共用同一向量空间）</li>
  *   <li>@EnableDiscoveryClient 向 Nacos 注册，供 ai-cs-chat 等模块通过服务发现调用</li>
  * </ul>
  */
-@SpringBootApplication(scanBasePackages = {"com.aics.knowledge", "com.aics.common"}, exclude = {org.springframework.ai.model.openai.autoconfigure.OpenAiEmbeddingAutoConfiguration.class})
+@SpringBootApplication(scanBasePackages = {"com.aics.knowledge"}, exclude = {org.springframework.ai.model.openai.autoconfigure.OpenAiEmbeddingAutoConfiguration.class})
 @EnableDiscoveryClient
 @MapperScan("com.aics.knowledge.mapper")
 public class KnowledgeApplication {

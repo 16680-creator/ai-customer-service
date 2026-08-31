@@ -43,7 +43,13 @@
         </dependency>
 
 
-        <!-- Spring Cloud LoadBalancer：服务间调用（如购物车获取商品信息） -->
+        <!-- Spring Cloud OpenFeign：声明式服务间调用（Seata XID 经 Feign 拦截器自动传播） -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-openfeign</artifactId>
+        </dependency>
+
+        <!-- Spring Cloud LoadBalancer：Feign 底层负载均衡 -->
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-loadbalancer</artifactId>
@@ -140,6 +146,17 @@
             <groupId>com.alibaba.cloud</groupId>
             <artifactId>spring-cloud-starter-alibaba-seata</artifactId>
         </dependency>
+        <!-- Spring Cloud CircuitBreaker (Resilience4j)：Feign 调用熔断
+             （spring.cloud.openfeign.circuitbreaker.enabled=true 自动包裹所有 Feign 调用） -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-circuitbreaker-resilience4j</artifactId>
+        </dependency>
+        <!-- Spring Statemachine：订单合法状态迁移集中声明 -->
+        <dependency>
+            <groupId>org.springframework.statemachine</groupId>
+            <artifactId>spring-statemachine-starter</artifactId>
+        </dependency>
         <!-- Actuator 健康与指标端点 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -149,6 +166,16 @@
         <dependency>
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+        <!-- 全链路追踪（03-P5）：Micrometer Tracing + OTLP 导出（版本 BOM 管理）
+             配合 management.otlp.tracing.endpoint，Span 经 OTel Collector 导出至 Tempo -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-tracing-bridge-otel</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-exporter-otlp</artifactId>
         </dependency>
     </dependencies>
 

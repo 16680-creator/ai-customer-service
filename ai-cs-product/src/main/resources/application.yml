@@ -1,9 +1,18 @@
 server:
+  shutdown: graceful
   port: 8088
 
 spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
   application:
     name: ai-cs-product
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+  cache:
+    type: redis
   cloud:
     nacos:
       discovery:
@@ -36,3 +45,12 @@ seata:
     type: file
   data-source-proxy-mode: AT
   enable-auto-data-source-proxy: true
+
+# ===== 全链路追踪（03-P5）：OTLP 导出至 OTel Collector（observability compose 4318 端口） =====
+management:
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING:1.0}   # 生产可调低采样率，本地全采样
+  otlp:
+    tracing:
+      endpoint: ${OTLP_ENDPOINT:http://127.0.0.1:4318/v1/traces}

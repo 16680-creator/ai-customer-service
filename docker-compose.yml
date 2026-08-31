@@ -18,6 +18,8 @@ services:
       - mysql-data:/var/lib/mysql
       - ./deploy/mysql/mysql.cnf:/etc/mysql/conf.d/mysql.cnf
       - ./deploy/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./deploy/mysql/xxl-job-init.sql:/docker-entrypoint-initdb.d/xxl-job-init.sql
+      - ./deploy/mysql/canal-init.sql:/docker-entrypoint-initdb.d/canal-init.sql
     command: --default-authentication-plugin=mysql_native_password
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
@@ -165,11 +167,118 @@ services:
     networks:
       - aics-network
 
+  # ==================== 对话审计文档库（MongoDB） ====================
+  mongodb:
+    image: mongo:7.0
+    container_name: aics-mongodb
+    restart: always
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: aics_chat
+    volumes:
+      - mongodb-data:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval 'db.adminCommand(\"ping\").ok' localhost:27017/test | grep 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - aics-network
+
+  # ==================== AI 数据层（向量库 / 图数据库） ====================
+  chroma:
+    image: chromadb/chroma:0.5.20
+    container_name: aics-chroma
+    restart: always
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma-data:/chroma/chroma
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/api/v1/heartbeat\")' || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - aics-network
+
+  neo4j:
+    image: neo4j:5-community
+    container_name: aics-neo4j
+    restart: always
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      NEO4J_AUTH: ${NEO4J_AUTH:-neo4j/aics-neo4j-password}
+      NEO4J_server_memory_heap_initial__size: 256m
+      NEO4J_server_memory_heap_max__size: 512m
+    volumes:
+      - neo4j-data:/data
+      - neo4j-logs:/logs
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:7474 >/dev/null || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+      start_period: 40s
+    networks:
+      - aics-network
+
+  # ==================== 调度与流控控制台 ====================
+  xxl-job-admin:
+    image: xuxueli/xxl-job-admin:2.4.1
+    container_name: aics-xxl-job-admin
+    restart: always
+    ports:
+      - "8099:8080"
+    environment:
+      PARAMS: >-
+        --spring.datasource.url=jdbc:mysql://mysql:3306/xxl_job?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
+        --spring.datasource.username=root
+        --spring.datasource.password=root
+        --xxl.job.accessToken=default_token
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/xxl-job-admin/ >/dev/null || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+      start_period: 45s
+    networks:
+      - aics-network
+
+  sentinel-dashboard:
+    image: bladex/sentinel-dashboard:1.8.6
+    container_name: aics-sentinel-dashboard
+    restart: always
+    ports:
+      - "8858:8858"
+    environment:
+      JAVA_OPTS: "-Dserver.port=8858 -Dcsp.sentinel.dashboard.server=localhost:8858 -Dproject.name=sentinel-dashboard"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8858/ >/dev/null || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    networks:
+      - aics-network
+
 # ==================== 数据卷 ====================
 volumes:
   mysql-data:
   redis-data:
   es-data:
+  mongodb-data:
+  chroma-data:
+  neo4j-data:
+  neo4j-logs:
 
 # ==================== 网络 ====================
 networks:

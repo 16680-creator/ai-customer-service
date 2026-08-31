@@ -100,6 +100,7 @@ public class AuthFilter implements GlobalFilter, Ordered {
     private static final String API_KEY_HEADER = "X-API-Key";
     private static final String USER_ID_HEADER = "X-User-Id";
     private static final String USER_NAME_HEADER = "X-User-Name";
+    private static final String USER_ROLES_HEADER = "X-User-Roles";
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
@@ -113,6 +114,7 @@ public class AuthFilter implements GlobalFilter, Ordered {
                     .headers(headers -> {
                         headers.remove(USER_ID_HEADER);
                         headers.remove(USER_NAME_HEADER);
+                        headers.remove(USER_ROLES_HEADER);
                     })
                     .build();
             return chain.filter(exchange.mutate().request(stripped).build());
@@ -144,15 +146,20 @@ public class AuthFilter implements GlobalFilter, Ordered {
         // 解析用户信息并透传至下游
         try {
             String userId = JwtUtil.getSubject(token, jwtSecret);
+            Map<String, Object> claims = JwtUtil.parseToken(token, jwtSecret);
+            String role = String.valueOf(claims.getOrDefault("role", "USER"));
+            String normalizedRole = role.startsWith("ROLE_") ? role : "ROLE_" + role.toUpperCase();
             ServerHttpRequest mutatedRequest = request.mutate()
                     // 3.2 F2 身份可信透传：先移除客户端伪造的 X-User-Id/X-User-Name，
                     // 再注入从 JWT 解析的可信身份，下游只信任网关透传的身份头
                     .headers(headers -> {
                         headers.remove(USER_ID_HEADER);
                         headers.remove(USER_NAME_HEADER);
+                        headers.remove(USER_ROLES_HEADER);
                     })
                     .header(USER_ID_HEADER, userId)
-                    .header(USER_NAME_HEADER, String.valueOf(JwtUtil.parseToken(token, jwtSecret).get("username")))
+                    .header(USER_NAME_HEADER, String.valueOf(claims.get("username")))
+                    .header(USER_ROLES_HEADER, normalizedRole)
                     .build();
             return chain.filter(exchange.mutate().request(mutatedRequest).build());
         } catch (Exception e) {
@@ -208,6 +215,7 @@ public class AuthFilter implements GlobalFilter, Ordered {
                 })
                 .header(USER_ID_HEADER, keyId)
                 .header(USER_NAME_HEADER, "api-key:" + keyId)
+                .header(USER_ROLES_HEADER, "ROLE_SERVICE")
                 .build();
         return chain.filter(exchange.mutate().request(mutatedRequest).build());
     }

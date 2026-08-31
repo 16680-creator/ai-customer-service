@@ -27,6 +27,11 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
+        <!-- Spring Cache 声明式缓存（商品详情/分类列表） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-cache</artifactId>
+        </dependency>
 
         <!-- Spring Boot Validation -->
         <dependency>
@@ -113,6 +118,12 @@
             <groupId>com.alibaba.cloud</groupId>
             <artifactId>spring-cloud-starter-alibaba-seata</artifactId>
         </dependency>
+        <!-- Seata HTTP 集成：SeataHttpAutoConfiguration 按 ConditionalOnClass 装配
+             JakartaSeataWebMvcConfigurer，从 TX_XID 请求头绑定全局事务上下文 -->
+        <dependency>
+            <groupId>io.seata</groupId>
+            <artifactId>seata-http</artifactId>
+        </dependency>
         <!-- Actuator 健康与指标端点 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -122,6 +133,16 @@
         <dependency>
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+        <!-- 全链路追踪（03-P5）：Micrometer Tracing + OTLP 导出（版本 BOM 管理）
+             配合 management.otlp.tracing.endpoint，Span 经 OTel Collector 导出至 Tempo -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-tracing-bridge-otel</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-exporter-otlp</artifactId>
         </dependency>
     </dependencies>
 

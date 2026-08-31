@@ -285,6 +285,61 @@ globalcors:
 
 ---
 
+## 九、网关三层韧性：分布式限流 / 断路器 / 重试（2026-08 补，03-P3 落地记录）
+
+### 9.1 分布式限流：RequestRateLimiter（Redis + Lua 令牌桶）
+
+旧实现 `RateLimitFilter` 是**本地内存**限流（实例字段里的滑动窗口）——网关起两个实例，
+配额各算各的，全局限流形同虚设。新方案用 SCG 内置 `RequestRateLimiter`：
+
+```
+每请求 → Lua 脚本在 Redis 原子执行令牌桶扣减（多实例共享一份计数）→ 超限 429
+```
+
+落点：
+
+```java
+// RouteConfig：每条路由挂 requestRateLimiter
+c.setRateLimiter(redisRateLimiter);   // 自定义 Bean：new RedisRateLimiter(replenishRate, burstCapacity)
+c.setKeyResolver(userKeyResolver);    // 键 = X-User-Id（可信用户），未认证退化为 IP
+```
+
+- 自动装配的 `redisRateLimiter` 带 `@ConditionalOnMissingBean`，自定义同名 Bean 即接管
+- 速率参数进 `RateLimitProperties`（`@ConfigurationProperties`），Nacos 改值免重启
+- **键策略与旧实现一致**（可信用户优先），迁移前后限流粒度不变
+- Redis 不可用时：旧 `RateLimitFilter` 保留作兜底开关（`aics.gateway.rate-limit.enabled`）
+
+### 9.2 断路器：CircuitBreaker filter（按路由独立命名）
+
+下游挂掉时网关不再透传 500，而是熔断并 forward 到统一降级端点：
+
+```java
+.circuitBreaker(c -> c.setName("cb-user").setFallbackUri("forward:/gateway-fallback"))
+```
+
+- **为什么每条路由独立命名**：断路器实例按 name 隔离，共享 name 会让一个服务的
+  失败统计污染所有路由（一个服务挂 → 全站熔断）
+- 降级端点 `GatewayFallbackController` 返回统一 `Result` 结构 503（`GATEWAY_SERVICE_UNAVAILABLE`）
+- 依赖：`spring-cloud-starter-circuitbreaker-reactor-resilience4j`
+
+### 9.3 重试：只对幂等 GET
+
+```java
+f.retry(c -> c.setRetries(2).setMethods(HttpMethod.GET)
+        .setStatuses(HttpStatus.INTERNAL_SERVER_ERROR, HttpStatus.BAD_GATEWAY))
+```
+
+**POST/PUT 绝不在网关层重试**——重复下单/重复扣款是非幂等灾难；
+写路径的容错交给调用方（Feign fallback + 熔断，见 03-P2）。
+
+### 9.4 Java DSL 的一个坑
+
+`RouteSpec.filters(...)` 的参数是 `UnaryOperator<GatewayFilterSpec>`（要返回值），
+不是 `Consumer`——lambda 里必须 `return`，多个 filter 用
+`addResilience(f.stripPrefix(1), ...)` 链式组合而非语句块。
+
+---
+
 ## 学习检查清单
 
 - [ ] 理解网关的五大职责
@@ -293,6 +348,9 @@ globalcors:
 - [ ] 会写全局过滤器做 JWT 鉴权
 - [ ] 理解 CORS 跨域问题的原因和解决方案
 - [ ] 理解 `lb://` 负载均衡的含义
+- [ ] 说得清本地内存限流 vs Redis 分布式限流的差异
+- [ ] 理解断路器按路由命名的必要性（失败统计隔离）
+- [ ] 记住网关重试只对幂等 GET 的原因
 
 ---
 

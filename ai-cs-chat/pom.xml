@@ -207,6 +207,11 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
+        <!-- MongoDB 对话审计归档（默认由 aics.chat.mongo-archive.enabled=false 关闭） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-mongodb</artifactId>
+        </dependency>
         <!-- Prometheus 指标注册表 -->
         <dependency>
             <groupId>io.micrometer</groupId>

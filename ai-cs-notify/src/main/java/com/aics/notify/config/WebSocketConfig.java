@@ -24,7 +24,9 @@ public class WebSocketConfig implements WebSocketConfigurer {
 
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
+        // 旧 /ws/notify 保留一版灰度期；新客户端应使用 STOMP /ws-stomp。
+        // 禁止 "*"：跨站连接可携带伪造 userId 查询参数，生产须显式白名单。
         registry.addHandler(new NotifyWebSocketHandler(), "/ws/notify")
-                .setAllowedOrigins("*");
+                .setAllowedOriginPatterns("${AICS_ALLOWED_ORIGINS:http://localhost:5173}");
     }
 }

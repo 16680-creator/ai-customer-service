@@ -1,10 +1,11 @@
 package com.aics.order.listener;
 
-import com.aics.order.service.OrderService;
+import com.aics.order.event.OrderTimeoutEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.rocketmq.spring.annotation.RocketMQMessageListener;
 import org.apache.rocketmq.spring.core.RocketMQListener;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
 /**
@@ -20,15 +21,15 @@ import org.springframework.stereotype.Component;
 )
 public class OrderTimeoutListener implements RocketMQListener<String> {
 
-    private final OrderService orderService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     public void onMessage(String orderNo) {
-        log.info("收到订单超时消息: orderNo={}", orderNo);
+        log.info("收到订单超时消息，发布领域事件: orderNo={}", orderNo);
         try {
-            orderService.cancelExpiredOrder(orderNo);
+            eventPublisher.publishEvent(new OrderTimeoutEvent(orderNo));
         } catch (Exception e) {
-            log.error("处理订单超时取消失败: orderNo={}", orderNo, e);
+            log.error("发布订单超时领域事件失败: orderNo={}", orderNo, e);
         }
     }
 }

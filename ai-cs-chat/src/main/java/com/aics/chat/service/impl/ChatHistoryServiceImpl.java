@@ -2,6 +2,7 @@ package com.aics.chat.service.impl;
 
 import com.aics.chat.dto.ChatHistoryMessage;
 import com.aics.chat.feign.MessageFeignClient;
+import com.aics.chat.history.mongo.MongoChatHistoryArchiveService;
 import com.aics.chat.mq.ChatMessageProducer;
 import com.aics.chat.service.ChatHistoryService;
 import com.aics.common.result.Result;
@@ -10,6 +11,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
@@ -31,6 +33,7 @@ public class ChatHistoryServiceImpl implements ChatHistoryService {
     private final ObjectMapper objectMapper;
     private final MessageFeignClient messageFeignClient;
     private final ChatMessageProducer chatMessageProducer;
+    private final ObjectProvider<MongoChatHistoryArchiveService> mongoArchiveProvider;
 
     /** Redis key 前缀 */
     private static final String KEY_PREFIX = "chat:history:";
@@ -70,8 +73,13 @@ public class ChatHistoryServiceImpl implements ChatHistoryService {
         } catch (Exception e) {
             log.warn("写入 Redis 会话历史失败: sessionKey={}, err={}", sessionKey, e.getMessage());
         }
-        // 2. MQ 落库（作为最终持久化事实源）
+        // 2. MQ 落库（作为现有最终持久化事实源）
         chatMessageProducer.send(sessionKey, role, content);
+        // 3. Mongo 审计归档（可选、最佳努力）：默认关闭，不影响 Redis/MQ 主链路。
+        MongoChatHistoryArchiveService archiveService = mongoArchiveProvider.getIfAvailable();
+        if (archiveService != null) {
+            archiveService.archive(sessionKey, role, content);
+        }
     }
 
     /** 回源 ai-cs-message 按 sessionKey 拉历史，重建 Redis 缓存；失败降级为空列表 */
