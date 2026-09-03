@@ -192,6 +192,7 @@ chat(8083)/knowledge(8082) 新 jar，逐项实测：
 
 - [x] Neo4j 图存储实现（`Neo4jGraphStore` + `Neo4jConfig` + 驱动依赖；`aics.rag.graph.storage=neo4j` 切换，5 个单测通过）
 - [x] CI 流水线接入 `-Peval` 评估门禁（Jenkinsfile 新增「RAG 评估门禁」阶段）
+  > ⚠️ 注意：该阶段在提交 `c06ba69`（RAG 进阶六件套）中加入，当前分支（feature/ai-chat-and-frontend）的 Jenkinsfile 是后改的 K8s 版，暂未包含此阶段。如需启用，把 `stage('RAG 评估门禁')`（`mvn -pl ai-cs-chat -am test -Peval`）合入现有流水线的 Maven 测试阶段之后即可。
 - [x] Nacos 配置发布（`publish-to-nacos.ps1` 执行成功 11/11，已读回验证 `aics.rag.*` 生效）
 - [x] 任务清单 T001-T068 全部勾选，文档与实现一致
 

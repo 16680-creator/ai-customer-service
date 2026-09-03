@@ -4,7 +4,7 @@
 > 功能分支：`005-after-sales-agent`
 > 完成日期：2026-08-14
 > SDD 产物：[specs/005-after-sales-agent/](../../../specs/005-after-sales-agent/spec.md)（规格/计划/任务/契约/数据模型/快速启动）
-> 需求来源：[15-AI功能与技术缺口分析.md](../../../docs/15-AI功能与技术缺口分析.md) 第 3.1 节（P0）
+> 需求来源：[08-AI功能与技术缺口分析.md](./08-AI功能与技术缺口分析.md) 第 3.1 节（P0）
 
 ---
 
@@ -316,7 +316,7 @@ curl http://localhost:8080/chat/agent/runs/<runId> -H "X-User-Id: 1"
 
 ## 十、相关文档
 
-- 需求来源：[15-AI功能与技术缺口分析.md](../../../docs/15-AI功能与技术缺口分析.md)（3.1 / 五 / 六节）
+- 需求来源：[08-AI功能与技术缺口分析.md](./08-AI功能与技术缺口分析.md)（3.1 / 五 / 六节）
 - 功能规格：[specs/005-after-sales-agent/spec.md](../../../specs/005-after-sales-agent/spec.md)
 - 实施计划：[specs/005-after-sales-agent/plan.md](../../../specs/005-after-sales-agent/plan.md)
 - 任务清单：[specs/005-after-sales-agent/tasks.md](../../../specs/005-after-sales-agent/tasks.md)
