@@ -3,6 +3,9 @@ target/
 *.jar
 *.war
 
+# Node
+node_modules/
+
 # IDE
 .idea/
 *.iml
