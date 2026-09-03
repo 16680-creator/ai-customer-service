@@ -243,6 +243,7 @@ A：namespace 打 `istio-injection=enabled` 标签（或 Pod 模板注解 sideca
 3. 用 VirtualService 给 ai-chat-service 写一份"header `X-Canary: true` 走新版本"的分流规则（目标态练习，不必真实两版本），并回答：没有 Mesh 时，同样的分流要在本项目哪个组件里实现？改多少代码？
 4. 写一份"Mesh 触发条件评估报告"：对照 §五 六条触发条件逐条给出本项目的当前信号（有/无/证据），形成可存档的决策记录。
 5. 反向练习：假设 Sentinel 被弃用（触发条件 6 成立），列出需要从 Sentinel 迁移到 Mesh 的具体配置项（限流规则、熔断窗口），估算迁移工作量，写进决策记录的"预案"栏。
+6. 用 `kubectl get pods -n istio-system` 观察 demo profile 装完后的组件（istiod、ingressgateway），估算这套控制面 + 每Pod 一个 sidecar 的内存开销，对照 §4.3 的代价清单形成体感。
 
 ---
 

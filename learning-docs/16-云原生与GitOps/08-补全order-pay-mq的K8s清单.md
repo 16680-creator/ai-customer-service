@@ -146,12 +146,10 @@ spec:
           env:
             - name: NACOS_ADDR
               value: "nacos:8848"
-            # DB_PASSWORD：Nacos 配置 ai-cs-order.yml:11 的 ${DB_PASSWORD} 占位所需；
-            # 明文仅为与现有清单风格一致，生产应换 secretKeyRef（07 篇 §2.7）
+            # DB_PASSWORD：Nacos 配置 ai-cs-order.yml:11 的 ${DB_PASSWORD} 占位所需（明文与现有清单风格一致，生产应换 secretKeyRef，见 07 篇 §2.7）
             - name: DB_PASSWORD
               value: "root"
-            # SEATA_ADDR：compose/K8s 均无 Seata Server（grep 实证），全局事务暂不可用，
-            # 占位指向未来 Service 名，部署 Seata 后无需改清单
+            # SEATA_ADDR：compose/K8s 均无 Seata Server，全局事务暂不可用，占位指向未来 Service 名
             - name: SEATA_ADDR
               value: "seata:8091"
             - name: XXL_JOB_ENABLED   # application.yml:54 默认 false，显式写出防歧义
@@ -259,8 +257,7 @@ spec:
 
 ```yaml
 # MQ管理服务部署（端口 8090：ai-cs-mq/src/main/resources/application.yml:3）
-# 前置：Nacos 配置 ai-cs-mq.yml:2 的 rocketmq.name-server 写死 127.0.0.1:9876，
-#       需改为 rocketmq-namesrv:9876 或参数化，否则 MQ 功能连不上（见 §1.2）。
+# 前置：Nacos 配置 ai-cs-mq.yml:2 的 rocketmq.name-server 写死 127.0.0.1:9876，需先参数化否则连不上（见 §1.2）
 apiVersion: v1
 kind: Service
 metadata:
@@ -356,17 +353,14 @@ string(name: 'SERVICES', defaultValue: 'ai-cs-gateway ai-cs-user ai-cs-knowledge
 
 ```bash
 # 0. 前置确认
-ls deploy/k8s/services/          # 放入三份 yaml 后应为 11 份
-ls ai-cs-pay/Dockerfile ai-cs-mq/Dockerfile   # §三 的两份镜像构建文件已就位
+ls deploy/k8s/services/ ai-cs-pay/Dockerfile ai-cs-mq/Dockerfile   # 清单应为 11 份，两份 Dockerfile 已就位
 
 # 1. 构建（依赖 §五 的映射扩容；REGISTRY/VERSION 沿用流水线参数）
 REGISTRY=192.168.56.12:5000 VERSION=1 SERVICES="ai-cs-order ai-cs-pay ai-cs-mq" \
   bash deploy/scripts/k8s-build-push.sh
 
-# 2. apply（与现有 8 份同目录，整目录生效）
-kubectl apply -f deploy/k8s/services/order-service.yaml
-kubectl apply -f deploy/k8s/services/pay-service.yaml
-kubectl apply -f deploy/k8s/services/mq-service.yaml
+# 2. apply（与现有 8 份同目录）
+kubectl apply -f deploy/k8s/services/order-service.yaml -f deploy/k8s/services/pay-service.yaml -f deploy/k8s/services/mq-service.yaml
 
 # 3. 观察（对照 07-运维部署/02 §7.2 的做法）
 for d in order-service pay-service mq-service; do
@@ -374,10 +368,9 @@ for d in order-service pay-service mq-service; do
 done
 
 # 4. 健康验证（探针同路径，集群内直测；三行分别改端口 8087/8089/8090）
-kubectl run tmp --rm -it --image=curlimages/curl -n ai-customer-service -- sh
-#   curl http://order-service:8087/actuator/health   → {"status":"UP"}   （pay/mq 同理改名字与端口）
+kubectl run tmp --rm -it --image=curlimages/curl -n ai-customer-service -- curl -s http://order-service:8087/actuator/health   # 期望 {"status":"UP"}，pay/mq 同理改名字与端口
 
-# 5. Nacos 控制台确认三服务已注册（namespace aics；与服务名 ai-cs-order/ai-cs-pay/ai-cs-mq 对应，
+# 5. Nacos 控制台确认三服务已注册（namespace aics，注册名 ai-cs-order/ai-cs-pay/ai-cs-mq；
 #    注意 k8s Service 名 order-service 与 Nacos 注册名是两回事，调用方走 Feign 用的是 Nacos 名）
 ```
 
@@ -409,10 +402,7 @@ A：按依赖与职责分档：order 是 Seata 全局事务发起方 + Feign 消
 **Q5：DB_PASSWORD 为什么明文写在清单里？正确做法是什么？**
 A：是与现有清单风格（MYSQL_PASSWORD: root）保持一致的学习环境取值，且 Nacos 配置的 ${DB_PASSWORD} 占位必需。正确做法是 secretKeyRef（项目里 aics-secrets 已有先例：Jenkinsfile:79-84），并在漂移治理篇 §2.7 的密钥面治理中统一收口。
 
-**Q6：交付型文档和教程文档最大的区别是什么？**
-A：交付型文档的每个字段必须可追溯到来源（file:line），且要写清"前置缺口、验证步骤、预期故障"三件套——读者要能照着执行并判断结果对不对；教程文档重在讲原理，可以有省略。本篇的三个前置缺口（Dockerfile×2、RocketMQ 地址、Seata）就是"不给这三段说明，清单就是坑"的部分。
-
-**Q7：这三份清单上完线，项目的 K8s 部署缺口就算关了吗？**
+**Q6：这三份清单上完线，项目的 K8s 部署缺口就算关了吗？**
 A：manifest 数量上 8→11 关了"缺清单"子项，但映射表扩容（§五）、product 清单修正（namespace 漂移）、pay/mq Dockerfile 落盘、Nacos 地址参数化这四个配套动作没做完，验收标准"k8s 全量 11 服务可部署"还不能勾。验收要看端到端健康检查通过，不是文件存在。
 
 ---

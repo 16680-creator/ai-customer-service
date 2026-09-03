@@ -129,6 +129,8 @@
 | "听说 Istio 好，先上了再说" | Sentinel/R4j/自研限流已覆盖大半治理 | 先做重叠矩阵再决策（[05](./05-ServiceMesh与Istio边界.md)） |
 | "镜像能跑就行，root 也没事" | 9 份 Dockerfile 全 root | 非 root + 只读 fs 是 K8s 安全基线（[06](./06-镜像构建优化与安全扫描.md)） |
 | "新服务部署 = 复制一份 YAML 改改" | product 清单就是"复制后风格漂移"的产物 | 按 checklist 交付（[08](./08-补全order-pay-mq的K8s清单.md)）或 Helm 化（[01](./01-Helm从零到参数化.md)） |
+| "Spring 宽松绑定能兜底任何变量名" | `MINIO_*` 注入清单，但消费前缀是 `aics.minio`（要 `AICS_MINIO_*`） | 宽松绑定只做 `-`/`_` 与大小写转换，不改前缀；前缀错了就是死变量（[07](./07-多环境配置与漂移治理.md) §二） |
+| "docker-compose 里有的中间件，K8s 里就也有" | compose 12 个中间件服务与 `deploy/k8s/` 的中间件清单并不对齐 | 交付面漂移：两套环境要按同一份清单对账（[07](./07-多环境配置与漂移治理.md) §2） |
 
 ---
 
@@ -163,6 +165,12 @@ trivy image --format cyclonedx -o sbom.json <image>          # SBOM
 # ===== 配置漂移（07 篇）=====
 grep -rn "pay.sandbox" tools/nacos-config/          # 死键定位
 diff -r tools/nacos-config/ tools/nacos/data/tenant-config-data/   # 两份 Nacos 配置源比对
+
+# ===== 新服务交付（08 篇，复制 manifest 后）=====
+kubectl apply -f deploy/k8s/services/order-service.yaml
+kubectl rollout status deploy/order-service -n ai-customer-service
+kubectl logs -f deploy/order-service -n ai-customer-service --tail=100
+kubectl get pods -n ai-customer-service -o wide
 ```
 
 ---
@@ -185,6 +193,7 @@ diff -r tools/nacos-config/ tools/nacos/data/tenant-config-data/   # 两份 Naco
 - [ ] 能用"重叠/互补矩阵"论证本项目暂不引入 Istio，并说出至少 3 条触发条件
 - [ ] 能写出一份带正确 env（非死键）与 httpGet 探针的新服务 manifest（08 篇验收）
 - [ ] 能用三集合对账模型（代码消费键 / Nacos 键 / 注入变量）定位死配置
+- [ ] 能说出本项目两个 git 仓库真相源问题：镜像 tag 不回写、Nacos 配置双份拷贝
 
 ---
 
