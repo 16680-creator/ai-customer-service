@@ -1,3 +1,4 @@
 com.aics.common.autoconfigure.CommonWebAutoConfiguration
 com.aics.common.autoconfigure.MinioAutoConfiguration
 com.aics.common.ai.embedding.EmbeddingAutoConfig
+com.aics.common.idempotent.IdempotentAutoConfiguration

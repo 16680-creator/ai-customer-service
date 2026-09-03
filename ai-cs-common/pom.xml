@@ -68,6 +68,19 @@
             <artifactId>spring-ai-vector-store</artifactId>
         </dependency>
 
+        <!-- AOP（幂等切面 @Aspect 织入，随 common 传递给全部服务） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+        </dependency>
+
+        <!-- Redis（幂等组件依赖，optional：由各服务自带的 redis starter 提供，无 Redis 的服务自动跳过装配） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+            <optional>true</optional>
+        </dependency>
+
         <!-- Jackson (for JSON processing) -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>

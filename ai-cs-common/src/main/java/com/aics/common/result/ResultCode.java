@@ -19,6 +19,7 @@ public enum ResultCode {
     NOT_FOUND(404, "资源不存在"),
     METHOD_NOT_ALLOWED(405, "请求方法不允许"),
     TOO_MANY_REQUESTS(429, "请求过于频繁，请稍后再试"),
+    DUPLICATE_REQUEST(409, "重复请求，请勿重复提交"),
     INTERNAL_ERROR(500, "系统内部错误"),
     GATEWAY_SERVICE_UNAVAILABLE(503, "服务暂时不可用，请稍后再试"),
 
