@@ -228,6 +228,9 @@ A：不能直接覆盖。ArgoCD 只调和 K8s 资源，Nacos 配置内容不在�
 **Q8：迁移 GitOps 后 Jenkins 还有存在价值吗？**
 A：有，且是必要的一半。构建、测试、镜像推送、安全扫描是 CI 职责，天然由 Jenkins 承担；GitOps 只接管"从 git 到集群"的交付段。完整链路=Jenkins 推镜像并回写 tag，ArgoCD 拉取并调和。
 
+**Q9：ArgoCD 的 Application 应该放在哪个 git 仓库？**
+A：两个选择：放进应用代码仓库（本项目起步零改造的做法）或独立的 config/deploy 仓库（职责清晰、CI/CD 权限分离）。规模小用前者够用，团队一多就拆后者——关键是仓库里始终有"集群应该长什么样"的唯一真相。
+
 ---
 
 ## 动手练习
@@ -237,6 +240,10 @@ A：有，且是必要的一半。构建、测试、镜像推送、安全扫描�
 3. 手动 `kubectl scale deploy/ai-chat-service --replicas=2` 制造漂移，用 `argocd app diff` 观察报告，再手动 sync 收敛——体会"检测在先、自愈在后"。
 4. 给 Jenkinsfile 伪代码实现 §4.1 的 tag 回写（sed + git commit），思考：为什么建议回写后**让 ArgoCD 自动同步**而不是继续让 Jenkins 直接 apply？
 5. 画出本项目 §六 共存方案的演进时序图（三个阶段，标出 Jenkinsfile 哪个 stage 在哪一步被移除），并回答：基础设施（mysql/nacos）为什么放在最后迁移？
+6. 为 `product-service`（namespace 是 `aics` 而非 `ai-customer-service`，见 product-service.yaml:5）单独创建一个 Application：destination.namespace 填 `aics`，体会"一个 namespace 不一致就会 OutOfSync"的真实成本——这也是 01 篇主张 Helm 统一 namespace 的原因。
+7. 用 `git log --oneline -- deploy/k8s/services/` 查看清单最近 10 次提交，回答：哪几次是"应发尽发"、哪几次是"救火手改"？后者就是 selfHeal 要拦下的操作。
+8. 给 ArgoCD 配一条 Notifications 通知（webhook 到企业微信/钉钉），验证 OutOfSync 时能收到消息——GitOps 没有告警就等于没有检测。
+9. 对比 `Jenkinsfile` 与 `Jenkinsfile-k8s` 的参数默认值（各自开头 env/parameters 段），列出漂移点，并回答：单仓库双流水线该合并还是明确分工？
 
 ---
 
