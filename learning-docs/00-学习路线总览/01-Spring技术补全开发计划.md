@@ -62,7 +62,7 @@ P6 独立
    （RestTemplate）与 chat 的 Feign 客户端需要透传 `X-User-Id/X-User-Roles`，
    给 RestTemplate / Feign 加统一的请求拦截器。
 
-### 任务清单（✅ 2026-08 user 试点落地，技术文档见 [09-安全与设计模式/03](../../09-安全与设计模式/03-SpringSecurity微服务两层安全模型.md)）
+### 任务清单（✅ 2026-08 user 试点落地，技术文档见 [09-安全与设计模式/03](../09-安全与设计模式/03-SpringSecurity微服务两层安全模型.md)）
 
 - [x] AuthFilter 补 `X-User-Roles` 可信透传（JWT role 标准化 ROLE_*；API Key=ROLE_SERVICE；
       白名单与普通路径均先清洗伪造头），AuthFilterTest 锁定
@@ -122,7 +122,7 @@ P6 独立
    避免回滚后仍推送
 4. 与 RocketMQ 分工写进文档：进程内领域事件（同一服务、强一致边界内）vs 跨服务事件（MQ）
 
-### 任务清单（✅ 2026-08 已落地，技术文档见 [02-Spring微服务/09](../../02-Spring微服务/09-SpringCache与事务领域事件.md)）
+### 任务清单（✅ 2026-08 已落地，技术文档见 [02-Spring微服务/09](../02-Spring微服务/09-SpringCache与事务领域事件.md)）
 
 - [x] ProductCacheConfig + 分 cacheName TTL（详情30min/分类10min）+ 缓存契约测试
 - [x] `@Cacheable`（详情/分类）+ `@CacheEvict`（更新/删除/扣补库存/建分类）契约测试；
@@ -200,7 +200,7 @@ Spring Cache 三层抽象（CacheManager/Cache/注解 AOP）；缓存一致性�
 3. 各服务 `Application` 类检查：去掉不再需要的 `scanBasePackages` 范围、显式 `@Import`
 4. **进阶可选**（时间富余再做）：抽 `ai-cs-common-starter` 独立模块，common 退回纯工具库
 
-### 任务清单（✅ 2026-08 已落地，技术文档见 [02-Spring微服务/10](../../02-Spring微服务/10-自定义Starter与自动装配.md)）
+### 任务清单（✅ 2026-08 已落地，技术文档见 [02-Spring微服务/10](../02-Spring微服务/10-自定义Starter与自动装配.md)）
 
 - [x] AutoConfiguration.imports + 3 个自动配置（Web/MinIO/Embedding）；
       `ApplicationContextRunner` 条件装配/覆盖测试 5 项
@@ -240,7 +240,7 @@ Spring Cache 三层抽象（CacheManager/Cache/注解 AOP）；缓存一致性�
    `@stomp/stompjs` 后移除；网关确认 notify 路由的 WebSocket upgrade 透传
 5. 顺手修掉 `setAllowedOrigins("*")` → 白名单
 
-### 任务清单（✅ 后端主路径已落地，技术文档见 [02-Spring微服务/11](../../02-Spring微服务/11-STOMP实时通知与用户目的地.md)）
+### 任务清单（✅ 后端主路径已落地，技术文档见 [02-Spring微服务/11](../02-Spring微服务/11-STOMP实时通知与用户目的地.md)）
 
 - [x] STOMP 配置 + CONNECT Bearer JWT 鉴权拦截器单测（合法 token → Principal，无 token 拒绝）
 - [x] 转人工/通知推送迁 `convertAndSendToUser` + user destination/topic 单测；notify 25 tests + JaCoCo 门禁通过
@@ -277,7 +277,7 @@ broker 简单实现 vs 外置 RabbitMQ relay 的扩展边界。
 4. 每条 transition 的 action 与 P2 的领域事件衔接（如 `REFUND_SUCCESS` 后发
    `OrderRefundedEvent`）
 
-### 任务清单（✅ 2026-08 已落地，技术文档见 [02-Spring微服务/12](../../02-Spring微服务/12-订单状态机治理.md)）
+### 任务清单（✅ 2026-08 已落地，技术文档见 [02-Spring微服务/12](../02-Spring微服务/12-订单状态机治理.md)）
 
 - [x] 状态机配置 + 合法迁移矩阵单测（待支付三路径、退款两路径、非法迁移拒绝）
 - [x] `OrderServiceImpl` 支付/取消/超时/退款接入状态机；退款显式两段 PAID→REFUNDING→REFUNDED
