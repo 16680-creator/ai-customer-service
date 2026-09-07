@@ -1,79 +1,119 @@
 # Spring Cloud Gateway 网关
 
 > 本项目使用 **Spring Cloud Gateway** 作为统一 API 入口（端口 8080）。
-> 对应项目文件：`ai-cs-gateway/` 模块
+> 对应项目文件：`ai-cs-gateway/` 模块（WebFlux 响应式技术栈——pom 里排除了 `spring-boot-starter-web`，网关基于 Netty，不能与 Spring MVC 共存）。
+
+核心源码一览：
+
+```
+ai-cs-gateway/src/main/java/com/aics/gateway/
+├── config/
+│   ├── RouteConfig.java          # Java DSL 路由 + 每路由三层韧性（限流/熔断/重试）
+│   ├── CorsConfig.java           # 全局跨域（CorsWebFilter Bean）
+│   ├── LoadBalancerConfig.java   # 负载均衡算法切换（轮询 / 最少连接）
+│   └── RateLimitProperties.java  # aics.gateway.rate-limit.* 动态配置
+├── filter/
+│   ├── AuthFilter.java           # JWT + API Key 双凭证鉴权、身份可信透传
+│   ├── RateLimitFilter.java      # 旧内存限流（默认关闭，Redis 故障时兜底）
+│   ├── SlidingWindowRateLimiter.java
+│   └── TokenBucketRateLimiter.java
+├── loadbalancer/
+│   ├── LeastConnectionsLoadBalancer.java
+│   ├── InstanceInFlightFilter.java   # 实例在途请求统计（配合最少连接）
+│   └── InstanceInFlightRegistry.java
+└── controller/
+    ├── GatewayFallbackController.java  # 断路器统一降级端点
+    └── HealthController.java           # /api/health 服务健康面板
+```
 
 ---
 
 ## 一、网关解决什么问题？
 
 ```
-【没有网关】前端要对接 N 个服务
-  登录 → localhost:8081/api/user/login
-  对话 → localhost:8083/api/chat/send
-  下单 → localhost:8087/api/order/create
-  搜索 → localhost:8086/api/search/query
+【没有网关】前端要对接 N 个服务（每个服务 Controller 前缀还不一样）
+  登录 → localhost:8081/user/login
+  对话 → localhost:8083/chat/send
+  下单 → localhost:8087/order/create
+  商品 → localhost:8088/product/**
 
-【有网关】前端只对接一个地址
-  所有 → localhost:8080/xxx → 网关自动路由
+【有网关】前端只对接一个地址，统一走 /api 前缀
+  所有 → localhost:8080/api/xxx → 网关按路由规则转发
 ```
 
-网关的核心职责：
-1. **路由转发**：根据路径把请求分发到对应服务
-2. **统一鉴权**：在网关层校验 JWT，不合法直接拒绝
-3. **跨域处理**：统一配置 CORS
-4. **限流熔断**：保护后端服务
-5. **日志监控**：统一记录请求日志
+网关的核心职责（本项目全部落地）：
+
+1. **路由转发**：按路径把请求分发到对应服务（`RouteConfig`，见第四节）
+2. **统一鉴权**：JWT（人）+ API Key（机器）双凭证校验，不合法直接 401（`AuthFilter`）
+3. **身份可信透传**：剥离客户端伪造的 `X-User-Id`，注入网关验证过的可信身份
+4. **跨域处理**：统一 CORS（`CorsConfig`）
+5. **分布式限流**：Redis + Lua 令牌桶，多实例共享配额（`RequestRateLimiter`）
+6. **熔断降级**：下游挂了返回统一 503 格式，不透传 500（`CircuitBreaker` filter）
+7. **重试**：只对幂等 GET 重试（`Retry` filter）
+8. **负载均衡**：轮询 / 最少连接可配置切换（`LoadBalancerConfig`）
+9. **可观测**：Actuator + Prometheus 指标 + OTLP 链路追踪导出
 
 ---
 
 ## 二、本项目网关配置详解
 
 ```yaml
-# ai-cs-gateway/src/main/resources/application.yml
+# ai-cs-gateway/src/main/resources/application.yml（节选，注释有删减）
 server:
-  port: 8080                          # 网关端口
+  shutdown: graceful                    # 优雅停机：等在途请求处理完再下线
+  port: 8080
 
 spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
   application:
     name: ai-cs-gateway
+  data:
+    # Redis 供 RequestRateLimiter（分布式令牌桶）使用
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
   cloud:
     nacos:
       discovery:
-        server-addr: 127.0.0.1:8848
+        server-addr: ${NACOS_ADDR:127.0.0.1:8848}
         namespace: aics
       config:
-        server-addr: 127.0.0.1:8848
+        server-addr: ${NACOS_ADDR:127.0.0.1:8848}
         namespace: aics
         file-extension: yml
-    gateway:
-      discovery:
-        locator:
-          enabled: true               # 自动根据服务名创建路由
-          lower-case-service-id: true  # 服务名转小写
-      globalcors:
-        cors-configurations:
-          '[/**]':                     # 所有路径
-            allowed-origins: "*"       # 允许所有来源（开发用）
-            allowed-methods: "*"       # 允许所有方法
-            allowed-headers: "*"       # 允许所有请求头
-            allow-credentials: true    # 允许携带 Cookie
+  config:
+    import:                             # 从 Nacos 拉公共配置与网关专属配置
+      - optional:nacos:aics-shared.yml
+      - optional:nacos:ai-cs-gateway.yml
+
+# ===== 网关能力配置 =====
+aics:
+  gateway:
+    rate-limit:
+      enabled: false          # 旧内存限流开关，默认关闭（多实例配额不共享）
+      algorithm: sliding-window
+      requests: 60
+      window-seconds: 60
+      qps: 5
+      replenish-rate: 5       # 分布式限流：每用户每秒补充令牌数
+      burst-capacity: 10      # 分布式限流：桶容量（短时突发上限）
+    auth:
+      api-keys: ""            # API Key 白名单（keyId:secret,逗号分隔），空=仅 JWT
+    loadbalancer:
+      algorithm: round-robin  # round-robin | least-connections
+
+# ===== 全链路追踪：Span 经 OTel Collector 导出至 Tempo =====
+management:
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING:1.0}
+  otlp:
+    tracing:
+      endpoint: ${OTLP_ENDPOINT:http://127.0.0.1:4318/v1/traces}
 ```
 
-### 自动路由规则
-
-开启 `discovery.locator.enabled=true` 后：
-
-```
-请求: GET http://localhost:8080/ai-cs-chat/api/chat/send
-                                 ^^^^^^^^^^
-                                 服务名部分
-
-网关处理:
-  1. 识别服务名: ai-cs-chat
-  2. 从 Nacos 查询 ai-cs-chat 的实例地址
-  3. 转发到: http://192.168.1.10:8083/api/chat/send
-```
+**注意**：路由规则和 CORS 都**不在 yml 里配置**——路由在 `RouteConfig`（Java DSL），CORS 在 `CorsConfig`（Java Bean）。也没有开启 `discovery.locator` 自动路由（原因见第四节）。
 
 ---
 
@@ -90,139 +130,295 @@ spring:
 │  │   • Header=X-Token, \d+                      │
 │  │                                              │
 │  ├── Filter（过滤器）：处理请求/响应               │
-│  │   • AddRequestHeader                         │
-│  │   • StripPrefix                              │
-│  │   • RequestRateLimiter                       │
+│  │   • StripPrefix（剥离路径前缀）                │
+│  │   • RewritePath（正则重写路径）                │
+│  │   • RequestRateLimiter（分布式限流）           │
+│  │   • CircuitBreaker（断路器）                  │
 │  │                                              │
 │  └── URI（目标地址）                              │
-│      • lb://ai-cs-user  （负载均衡）              │
-│      • http://localhost:8081（直连）              │
+│      • lb://ai-cs-user  （从 Nacos 负载均衡）     │
+│      • http://localhost:8081（直连，少用）        │
 └─────────────────────────────────────────────────┘
 ```
 
+两类过滤器的区别：
+
+| | GlobalFilter | GatewayFilter |
+|---|---|---|
+| 作用范围 | **所有路由** | **单条路由** |
+| 注册方式 | `@Component` | 路由定义里 `.filters(...)` |
+| 本项目例子 | `AuthFilter`、`RateLimitFilter`、`InstanceInFlightFilter` | retry / circuitBreaker / requestRateLimiter / stripPrefix |
+
 ---
 
-## 四、自定义路由配置
+## 四、路由配置：RouteConfig（Java DSL）
+
+### 4.1 为什么不用 discovery.locator 自动路由？
+
+`discovery.locator.enabled=true` 能按服务名自动建路由（`/ai-cs-chat/**` → ai-cs-chat），
+但**每条路由无法单独挂过滤器**（限流/熔断/重试）、前缀规则也只能一刀切。
+本项目改用 Java DSL 显式声明 16 条路由，每条路由都通过统一的 `addResilience` 挂上三层韧性。
+
+### 4.2 路由定义（节选自 RouteConfig）
+
+```java
+@Bean
+public RouteLocator customRouteLocator(RouteLocatorBuilder builder,
+                                       RedisRateLimiter redisRateLimiter,
+                                       KeyResolver userKeyResolver) {
+    return builder.routes()
+            // 模式一：stripPrefix(1) —— 去掉 /api 前缀再转发
+            // 下游 UserController 映射为 /user/**，所以 /api/user/** → /user/**
+            .route("ai-cs-user", r -> r
+                    .path("/api/user/**")
+                    .filters(f -> addResilience(f.stripPrefix(1), "cb-user", redisRateLimiter, userKeyResolver))
+                    .uri("lb://ai-cs-user"))
+            // 模式二：透传 —— 下游 Controller 本来就映射 /api/xxx，不去前缀
+            .route("ai-cs-message", r -> r
+                    .path("/api/message/**")
+                    .filters(f -> addResilience(f, "cb-message", redisRateLimiter, userKeyResolver))
+                    .uri("lb://ai-cs-message"))
+            // 模式三：rewritePath —— 正则重写（Agent 接口在 chat 服务内是 /chat/agent/**）
+            .route("ai-cs-agent", r -> r
+                    .path("/api/agent/**")
+                    .filters(f -> addResilience(
+                            f.rewritePath("/api/agent/(?<segment>.*)", "/chat/agent/${segment}"),
+                            "cb-agent", redisRateLimiter, userKeyResolver))
+                    .uri("lb://ai-cs-chat"))
+            .build();
+}
+```
+
+### 4.3 全量路由表（16 条）
+
+| 路由 id | 网关路径 | 目标服务 | 前缀处理 | 转发后路径 |
+|---|---|---|---|---|
+| ai-cs-user | /api/user/** | lb://ai-cs-user | stripPrefix(1) | /user/** |
+| ai-cs-knowledge | /api/knowledge/** | lb://ai-cs-knowledge | stripPrefix(1) | /knowledge/** |
+| ai-cs-rag | /api/rag/** | lb://ai-cs-chat | stripPrefix(1) | /rag/** |
+| ai-cs-chat | /api/chat/** | lb://ai-cs-chat | stripPrefix(1) | /chat/** |
+| ai-cs-observability | /api/observability/** | lb://ai-cs-chat | 透传 | /api/observability/** |
+| ai-cs-prompt | /api/prompts/** | lb://ai-cs-chat | 透传 | /api/prompts/** |
+| ai-cs-agent-chat | /api/agent/chat | lb://ai-cs-chat | rewritePath | /chat/agent |
+| ai-cs-agent | /api/agent/** | lb://ai-cs-chat | rewritePath | /chat/agent/** |
+| ai-cs-search | /api/search/** | lb://ai-cs-search | stripPrefix(1) | /search/** |
+| ai-cs-message | /api/message/** | lb://ai-cs-message | 透传 | /api/message/** |
+| ai-cs-notify | /api/notify/** | lb://ai-cs-notify | 透传 | /api/notify/** |
+| ai-cs-order | /api/order/** | lb://ai-cs-order | stripPrefix(1) | /order/** |
+| ai-cs-cart | /api/cart/** | lb://ai-cs-order | stripPrefix(1) | /cart/** |
+| ai-cs-pay | /api/pay/** | lb://ai-cs-pay | stripPrefix(1) | /pay/** |
+| ai-cs-mq | /api/mq/** | lb://ai-cs-mq | stripPrefix(1) | /mq/** |
+| ai-cs-product | /api/product/** | lb://ai-cs-product | stripPrefix(1) | /product/** |
+
+学习点：**rag / cart 两条路由证明"路由 ≠ 服务"**——路径前缀按业务划分，目标服务按部署划分，
+一条路径前缀可以指向任意服务（RAG 归 chat 服务托管、购物车归 order 服务托管）。
+
+### 4.4 每条路由的统一韧性：addResilience
+
+16 条路由都调用这个私有方法，一次叠加三层韧性过滤器——它是"路由内 filter 组合"的最佳样本，下面逐层拆开讲。
+
+```java
+/** 给单条路由叠加三层韧性：GET 重试 → 断路器 → Redis 分布式限流。 */
+private GatewayFilterSpec addResilience(GatewayFilterSpec f, String cbName,
+                           RedisRateLimiter redisRateLimiter, KeyResolver userKeyResolver) {
+    f.retry(c -> c.setRetries(2)
+                    .setMethods(HttpMethod.GET)
+                    .setStatuses(HttpStatus.INTERNAL_SERVER_ERROR, HttpStatus.BAD_GATEWAY))
+            .circuitBreaker(c -> c.setName(cbName)
+                    .setFallbackUri("forward:/gateway-fallback"))
+            .requestRateLimiter(c -> {
+                c.setRateLimiter(redisRateLimiter);
+                c.setKeyResolver(userKeyResolver);
+            });
+    return f;
+}
+
+/** 限流键：优先可信用户ID（AuthFilter 注入的 X-User-Id），未认证退化为客户端 IP。 */
+@Bean
+public KeyResolver userKeyResolver() {
+    return exchange -> {
+        String userId = exchange.getRequest().getHeaders().getFirst("X-User-Id");
+        if (userId != null && !userId.isBlank()) {
+            return Mono.just("u:" + userId);
+        }
+        InetSocketAddress remote = exchange.getRequest().getRemoteAddress();
+        String ip = remote == null ? "unknown" : remote.getAddress().getHostAddress();
+        return Mono.just("ip:" + ip);
+    };
+}
+```
+
+### 三层如何协作：执行顺序与 retryWhen 重新订阅
+
+前置处理按声明顺序执行，异常/后置处理反向传播：
+
+```
+请求 → ①Retry → ②CircuitBreaker → ③RequestRateLimiter → lb:// 转发下游
+          ▲                                             │
+          └──── 5xx 且 GET 时：重新订阅整条内层链（含②③）◄─┘
+```
+
+**为什么 Retry 放最外层**：SCG 的 Retry filter 实现是 `chain.filter(exchange).retryWhen(...)`——
+`retryWhen` 会**重新订阅**上游 Mono，即重新执行整条内层链。由此产生三个重要行为：
+
+- **重试请求也消耗限流配额**：重新订阅会再跑一次 Lua 扣令牌，限流计数包含重试流量；
+- **重试的失败也计入断路器**：连续失败会加速熔断打开（都失败说明下游真挂了，合理）；
+- 断路器按"每次真实尝试"统计，而不是把一次带重试的请求算成一笔——失败统计不失真。
+
+#### ① Retry：只对幂等 GET，只对瞬时错误
+
+| 配置 | 值 | 含义 |
+|---|---|---|
+| setRetries(2) | 2 | 最多**额外**重试 2 次（单请求最多 3 次尝试） |
+| setMethods(GET) | GET | 只有幂等请求可安全重试；POST/PUT 重复执行 = 重复下单/扣款 |
+| setStatuses(500, 502) | 500/502 | 只重试瞬时错误：500 下游内部错误、502 连不上下游 |
+
+状态码里**刻意不含 503**——本项目的 503 是断路器自己的降级响应（见②），
+对降级响应再重试只会放大流量。另外默认**无退避**（未配置 backoff），
+失败后立即重试，只适合瞬时抖动，不适合下游过载场景。
+
+#### ② CircuitBreaker：按路由命名 + forward 降级 + 默认 1s TimeLimiter（坑）
+
+```
+CLOSED（放行+统计失败率）──失败率超阈值──▶ OPEN（直接拒绝，不打下游）
+    ▲                                          │ 冷却 60s（默认）
+    └──── 试探成功 ◀── HALF_OPEN（放少量试探请求）◀──┘
+```
+
+- 断路器实例按 name 隔离（cb-user / cb-chat / ...），失败统计互不污染——
+  这就是 cbName 参数必须按路由传入的原因；
+- 触发 fallback（调用异常或 OPEN 拒绝）→ `forward:/gateway-fallback` →
+  网关**内部跳转**到 GatewayFallbackController 返回统一 503，不发新 HTTP 请求、不占下游资源；
+- ⚠️ **隐藏的第四层：默认 TimeLimiter（1 秒超时）**。Spring Cloud CircuitBreaker Resilience4j
+  的 `run()` 会给整条下游 Mono/Flux 套 `timeout(1s)`（resilience4j `TimeLimiterConfig`
+  默认值，`disableTimeLimiter` 默认 false）。**对 chat 路由是现实隐患**：LLM 同步对话
+  2~30s、SSE 流几十秒，超过 1 秒即被判超时 → 走降级 → 503。
+  超时职责本应属于下游（chat 服务 ResilientAiService 自带超时/熔断），网关层这 1s 是误伤。
+  修复（推荐方式一，直接禁用）：
 
 ```yaml
 spring:
   cloud:
-    gateway:
-      routes:
-        # 用户服务
-        - id: user-route
-          uri: lb://ai-cs-user           # lb:// = 从 Nacos 负载均衡
-          predicates:
-            - Path=/api/user/**          # 路径匹配
-          filters:
-            - StripPrefix=0              # 不剥离路径前缀
-
-        # AI 对话服务（需要更长超时）
-        - id: chat-route
-          uri: lb://ai-cs-chat
-          predicates:
-            - Path=/api/chat/**
-          metadata:
-            response-timeout: 60000      # AI 回复慢，超时 60 秒
-            connect-timeout: 5000
-
-        # 订单服务（需要限流）
-        - id: order-route
-          uri: lb://ai-cs-order
-          predicates:
-            - Path=/api/order/**, /api/cart/**
-          filters:
-            - name: RequestRateLimiter
-              args:
-                redis-rate-limiter.replenishRate: 10   # 每秒 10 个令牌
-                redis-rate-limiter.burstCapacity: 20   # 突发最多 20 个
-                key-resolver: "#{@userKeyResolver}"    # 按用户限流
+    circuitbreaker:
+      resilience4j:
+        disable-time-limiter: true   # 网关层不做时间限制，交由下游自控
 ```
+
+#### ③ RequestRateLimiter：Redis + Lua 分布式令牌桶
+
+```java
+.requestRateLimiter(c -> {
+    c.setRateLimiter(redisRateLimiter);  // 自定义 Bean：replenish-rate=5 / burst-capacity=10
+    c.setKeyResolver(userKeyResolver);   // 键 = u:{可信userId} 或 ip:{客户端IP}
+})
+```
+
+- 语义：`replenish-rate=5`（每用户每秒补 5 个令牌 = 长期 QPS 上限），
+  `burst-capacity=10`（桶容量 = 允许的短时突发上限）；
+- 实现：每个键对应两个 Redis key（剩余令牌数 + 上次补充时间戳），请求到达时
+  Lua 脚本原子执行"按流逝时间补令牌 → 判断够不够扣 → 扣减"，网关多实例共享同一份计数；
+  超限返回 429 并携带 `X-RateLimit-*` 响应头；
+- **Redis 挂掉会发生什么（连锁反应）**：`isAllowed()` 连不上 Redis → 异常沿链上抛 →
+  被外层②断路器计为失败并触发 fallback → 所有路由 503。
+  这就是 8.1 里"Redis 不可用时切回内存限流兜底"开关（`aics.gateway.rate-limit.enabled=true`）
+  存在的意义——它是 Redis 故障时的逃生门。
 
 ---
 
-## 五、全局过滤器（鉴权）
+## 五、全局过滤器：JWT + API Key 双凭证鉴权（AuthFilter）
 
-本项目在网关层做统一 JWT 鉴权：
+### 5.1 为什么是"双凭证"？
+
+| | JWT（Bearer Token） | API Key（X-API-Key 头） |
+|---|---|---|
+| 面向对象 | **人**（浏览器会话） | **机器**（第三方系统、定时任务、内部脚本） |
+| 获取方式 | 登录后签发 | 预共享密钥（配置中心下发） |
+| 格式 | `Authorization: Bearer <token>` | `X-API-Key: <keyId>:<secret>` |
+| 透传身份 | JWT subject → X-User-Id | keyId → X-User-Id，角色固定 ROLE_SERVICE |
+
+机器没有登录态，走预共享密钥；校验通过后同样注入 `X-User-Id`，
+下游的权限与限流逻辑对"人/机器"两种来源**完全无感知**。
+
+### 5.2 过滤器核心逻辑（节选）
 
 ```java
 @Component
-public class AuthGlobalFilter implements GlobalFilter, Ordered {
+public class AuthFilter implements GlobalFilter, Ordered {
 
-    private static final Logger log = LoggerFactory.getLogger(AuthGlobalFilter.class);
+    /** JWT 验签密钥（Nacos aics-shared.yml 下发，需与 user 服务签发密钥一致） */
+    @Value("${aics.jwt.secret:...}")
+    private String jwtSecret;
 
-    /** 白名单路径（不需要登录） */
-    private static final Set<String> WHITE_LIST = Set.of(
-        "/api/user/login",
-        "/api/user/register",
-        "/actuator/health",
-        "/swagger-ui",
-        "/v3/api-docs"
-    );
+    /** 白名单（不需要认证），前缀匹配 */
+    private static final List<String> WHITE_LIST = List.of(
+            "/user/login", "/user/register", "/user/captcha",          // 直连下游用
+            "/api/user/login", "/api/user/register", "/api/user/captcha", // 走网关用
+            "/api/health", "/health",
+            "/doc.html", "/webjars/", "/v3/api-docs", "/swagger-resources");
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
-        ServerHttpRequest request = exchange.getRequest();
-        String path = request.getPath().value();
+        String path = exchange.getRequest().getURI().getPath();
 
-        // 1. 白名单放行
+        // 1. 白名单放行——但先剥掉客户端伪造的身份头（防注入下游）
         if (isWhiteListed(path)) {
-            return chain.filter(exchange);
+            return chain.filter(exchange.mutate()
+                    .request(stripIdentityHeaders(exchange.getRequest())).build());
         }
 
-        // 2. 提取 Token
-        String authHeader = request.getHeaders().getFirst("Authorization");
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            return unauthorized(exchange, "缺少认证信息");
+        // 2. 提取并校验 JWT
+        String token = extractToken(exchange.getRequest());
+        if (token != null && JwtUtil.validateToken(token, jwtSecret)) {
+            Claims claims = JwtUtil.parseToken(token, jwtSecret);
+            // 3. 先移除伪造头，再注入可信身份（3.2 F2：下游只信任网关透传的身份）
+            ServerHttpRequest mutated = exchange.getRequest().mutate()
+                    .headers(h -> { h.remove("X-User-Id"); h.remove("X-User-Name"); h.remove("X-User-Roles"); })
+                    .header("X-User-Id", JwtUtil.getSubject(token, jwtSecret))
+                    .header("X-User-Name", String.valueOf(claims.get("username")))
+                    .header("X-User-Roles", normalizeRole(claims.get("role")))
+                    .build();
+            return chain.filter(exchange.mutate().request(mutated).build());
         }
 
-        String token = authHeader.substring(7);
-
-        // 3. 验证 Token
-        if (!JwtUtil.validateToken(token)) {
-            return unauthorized(exchange, "Token 无效或已过期");
+        // 4. 无 Token / Token 无效 → 回退 API Key 认证（机器调用）
+        Mono<Void> apiKeyResult = tryApiKeyAuth(exchange, chain);
+        if (apiKeyResult != null) {
+            return apiKeyResult;
         }
-
-        // 4. 解析用户信息，传递给下游服务
-        String userId = JwtUtil.getSubject(token);
-        ServerHttpRequest mutatedRequest = request.mutate()
-            .header("X-User-Id", userId)  // 下游服务通过 Header 获取用户 ID
-            .build();
-
-        return chain.filter(exchange.mutate().request(mutatedRequest).build());
-    }
-
-    private boolean isWhiteListed(String path) {
-        return WHITE_LIST.stream().anyMatch(path::startsWith);
-    }
-
-    private Mono<Void> unauthorized(ServerWebExchange exchange, String message) {
-        ServerHttpResponse response = exchange.getResponse();
-        response.setStatusCode(HttpStatus.UNAUTHORIZED);
-        response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
-        String body = "{\"code\":401,\"message\":\"" + message + "\",\"data\":null}";
-        return response.writeWith(
-            Mono.just(response.bufferFactory().wrap(body.getBytes()))
-        );
+        return unauthorized(exchange.getResponse(), "未认证，请先登录");
     }
 
     @Override
     public int getOrder() {
-        return -100;  // 数字越小优先级越高
+        return Ordered.HIGHEST_PRECEDENCE + 100;  // 最先执行；限流过滤器 +150 跟在后面
     }
 }
 ```
 
-### 下游服务获取用户 ID
+### 5.3 API Key 认证的三个安全细节
+
+1. **常量时间比较**：secret 用 `MessageDigest.isEqual()` 比对，防止时序侧信道逐字节猜测；
+2. **密钥不透传**：校验通过后移除原始 `X-API-Key` 头，密钥不会流向下游；
+3. **身份注入对齐 JWT 路径**：`X-User-Id = keyId`、`X-User-Roles = ROLE_SERVICE`，下游无感知。
+
+### 5.4 下游服务获取用户身份
 
 ```java
-// 在任意微服务的 Controller 中
-@GetMapping("/api/order/list")
-public Result<List<OrderVO>> getOrders(
-        @RequestHeader("X-User-Id") Long userId) {  // 从网关传递的 Header 中获取
-    return Result.success(orderService.getByUserId(userId));
+// 订单服务 OrderController：必填——没有网关注入的身份头直接 400
+@GetMapping("/list")
+public Result<List<OrderVO>> listOrders(@RequestHeader("X-User-Id") Long userId) {
+    return Result.success(orderService.listOrders(userId));
+}
+
+// 对话服务 ChatController：可空——匿名也能对话，但订单查询工具拿不到用户
+@PostMapping("/send")
+public Result<String> chat(@RequestHeader(value = "X-User-Id", required = false) Long userId, ...) {
+    ChatUserContext.setUserId(userId);   // ThreadLocal，供 @Tool 方法（订单查询）读取
+    ...
 }
 ```
+
+完整身份链路：**网关 AuthFilter 校验 → 注入 X-User-Id → Controller 读请求头 → ThreadLocal → @Tool 工具按用户取数（数据权限）**。
 
 ---
 
@@ -233,35 +429,142 @@ public Result<List<OrderVO>> getOrders(
 ```
 前端: http://localhost:5173  （Vite 开发服务器）
 后端: http://localhost:8080  （Gateway）
-
-浏览器同源策略：端口不同 → 跨域 → 被拦截
+浏览器同源策略：端口不同 → 跨域 → 浏览器拦截响应
 ```
 
-### 本项目的解决方式
+### 本项目的解决方式（CorsConfig Bean）
 
-在 Gateway 统一配置（见上面的 `globalcors`），前端不需要额外处理。
+```java
+@Configuration
+public class CorsConfig {
+
+    @Bean
+    public CorsWebFilter corsWebFilter() {
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowedOriginPatterns(List.of("*"));   // 注意：不是 setAllowedOrigins！
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+        config.setAllowedHeaders(List.of("*"));
+        config.setAllowCredentials(true);
+        config.setMaxAge(3600L);                          // 预检请求缓存 1 小时
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        return new CorsWebFilter(source);
+    }
+}
+```
+
+**学习点：`allowedOriginPatterns` vs `allowedOrigins`**
+`allowCredentials(true)`（允许携带 Cookie）与 `allowedOrigins("*")` **不能同时配置**——
+CORS 规范禁止"通配来源 + 携带凭证"组合，Spring 会直接抛异常。`allowedOriginPatterns("*")`
+会在响应时把 `*` 回写成请求的实际 Origin，是官方提供的折中方案。
 
 ### 生产环境建议
 
-```yaml
-globalcors:
-  cors-configurations:
-    '[/**]':
-      allowed-origins:
-        - "https://your-domain.com"    # 只允许你的域名
-      allowed-methods:
-        - GET
-        - POST
-        - PUT
-        - DELETE
-      allowed-headers: "*"
-      allow-credentials: true
-      max-age: 3600                    # 预检请求缓存 1 小时
-```
+把 `*` 收紧为真实前端域名列表（如 `https://your-domain.com`），方法收紧为实际用到的 GET/POST/PUT/DELETE。
 
 ---
 
-## 七、Gateway vs Nginx
+## 七、负载均衡：轮询 vs 最少连接
+
+`lb://` 背后是 Spring Cloud LoadBalancer。本项目支持两种算法，
+通过 `aics.gateway.loadbalancer.algorithm` 一行配置切换。
+
+```java
+@Configuration
+@LoadBalancerClients(defaultConfiguration = LoadBalancerConfig.LeastConnectionsConfiguration.class)
+public class LoadBalancerConfig {
+
+    public static class LeastConnectionsConfiguration {
+        @Bean
+        @ConditionalOnProperty(name = "aics.gateway.loadbalancer.algorithm",
+                               havingValue = "least-connections")
+        public ReactorLoadBalancer<ServiceInstance> leastConnectionsLoadBalancer(...) {
+            return new LeastConnectionsLoadBalancer(supplierProvider, serviceId, registry);
+        }
+    }
+}
+```
+
+**学习点：LoadBalancer 子上下文**
+LoadBalancer 为每个下游服务创建独立子上下文；内置 `RoundRobinLoadBalancer` 带
+`@ConditionalOnMissingBean`——上面的配置类在每个子上下文里实例化，算法配置为
+`least-connections` 时注册自定义均衡器（默认轮询自动退位），否则不产生 Bean 回退轮询。
+"配置切换算法、不改框架源码"就是靠这两层条件装配实现的。
+
+### 最少连接（Least Connections）的原理
+
+```
+轮询：     请求1→A  请求2→B  请求3→A  请求4→B   （不管每个请求处理多久）
+最少连接：  查每个实例"正在处理的请求数"，把新请求分给最闲的
+```
+
+轮询假设"每个请求耗时相近"——AI 客服场景不成立：LLM 对话耗时从几百毫秒到几十秒不等，
+慢请求会在轮询下持续砸向同一批实例。最少连接按在途请求数分流，耗时方差大时负载更均衡。
+
+- **在途计数从哪来**：`InstanceInFlightFilter`（GlobalFilter）在负载均衡器选定实例后 +1，
+  响应终结时（`doFinally`，覆盖正常完成/异常/客户端断开三种路径）-1，计数不泄漏；
+- **为什么统计放过滤器而不是均衡器内部**：均衡器的 `choose()` 只负责"选谁"，
+  拿不到请求后续生命周期；过滤器能包住 `chain.filter(exchange)` 的整个 Mono，
+  是唯一能同时看到"选了谁"和"什么时候结束"的位置；
+- **并列最少怎么办**：`LeastConnectionsLoadBalancer` 找出所有在途数并列最小的实例，
+  用 `AtomicInteger` 轮询取一个，避免流量集中到"恰好最少"的同一实例。
+
+---
+
+## 八、网关三层韧性：分布式限流 / 断路器 / 重试
+
+### 8.1 分布式限流：RequestRateLimiter（Redis + Lua 令牌桶）
+
+旧实现 `RateLimitFilter` 是**本地内存**限流——网关起两个实例，配额各算各的，全局限流形同虚设。
+新方案用 SCG 内置 `RequestRateLimiter`：
+
+```
+每请求 → Lua 脚本在 Redis 原子执行令牌桶扣减（多实例共享一份计数）→ 超限 429
+```
+
+- 自动装配的 `redisRateLimiter` Bean 带 `@ConditionalOnMissingBean`，
+  `RouteConfig` 定义同名 Bean（速率取 `RateLimitProperties` 的 replenish-rate/burst-capacity）即接管；
+- `RateLimitProperties` 用 `@ConfigurationProperties`：Nacos 改值触发自动重绑定，**免重启**；
+- 键策略 = 可信用户优先（`userKeyResolver`），与旧实现一致，迁移前后限流粒度不变；
+- Redis 不可用时：把 `aics.gateway.rate-limit.enabled` 改回 `true` 切回内存限流兜底
+  （`RateLimitFilter` 保留未删，支持 sliding-window / token-bucket 两种算法）。
+
+### 8.2 断路器：CircuitBreaker filter（按路由独立命名）
+
+下游挂掉时网关不再透传 500，而是熔断并 forward 到统一降级端点：
+
+```java
+.circuitBreaker(c -> c.setName("cb-user").setFallbackUri("forward:/gateway-fallback"))
+```
+
+- **为什么每条路由独立命名**：断路器实例按 name 隔离，共享 name 会让一个服务的
+  失败统计污染所有路由（一个服务挂 → 全站熔断）；
+- 降级端点 `GatewayFallbackController` 返回统一 `Result` 结构的 503
+  （`GATEWAY_SERVICE_UNAVAILABLE`）——前端拿到可识别的业务响应格式而非裸错误页；
+  forward 是网关内部跳转，不占用下游资源；
+- 依赖：`spring-cloud-starter-circuitbreaker-reactor-resilience4j`；
+- ⚠️ 默认还叠加 1s TimeLimiter（长耗时路由会被误熔断转 503），修复方式见 4.4。
+
+### 8.3 重试：只对幂等 GET
+
+```java
+f.retry(c -> c.setRetries(2).setMethods(HttpMethod.GET)
+        .setStatuses(HttpStatus.INTERNAL_SERVER_ERROR, HttpStatus.BAD_GATEWAY))
+```
+
+**POST/PUT 绝不在网关层重试**——重复下单/重复扣款是非幂等灾难；
+写路径的容错交给调用方（Feign fallback + 熔断）。
+
+### 8.4 Java DSL 的一个坑
+
+`RouteSpec.filters(...)` 的参数是 `UnaryOperator<GatewayFilterSpec>`（要返回值），
+不是 `Consumer`——lambda 里必须 `return`，多个 filter 用
+`addResilience(f.stripPrefix(1), ...)` 链式组合而非语句块。
+
+---
+
+## 九、Gateway vs Nginx
 
 | 对比 | Gateway | Nginx |
 |------|---------|-------|
@@ -275,81 +578,40 @@ globalcors:
 
 ---
 
-## 八、动手练习
+## 十、动手练习
 
-1. 启动 Gateway + Chat 服务
-2. 直接访问：`curl http://localhost:8083/api/chat/send?sessionId=1&message=hi`
-3. 通过网关访问：`curl http://localhost:8080/ai-cs-chat/api/chat/send?sessionId=1&message=hi`
-4. 对比两种方式的结果（应该一样）
-5. 不带 Token 访问需要鉴权的接口，观察 401 返回
+前置：启动 Nacos、Redis，然后启动 Gateway（8080）+ Chat 服务（8083）。
 
----
-
-## 九、网关三层韧性：分布式限流 / 断路器 / 重试（2026-08 补，03-P3 落地记录）
-
-### 9.1 分布式限流：RequestRateLimiter（Redis + Lua 令牌桶）
-
-旧实现 `RateLimitFilter` 是**本地内存**限流（实例字段里的滑动窗口）——网关起两个实例，
-配额各算各的，全局限流形同虚设。新方案用 SCG 内置 `RequestRateLimiter`：
-
-```
-每请求 → Lua 脚本在 Redis 原子执行令牌桶扣减（多实例共享一份计数）→ 超限 429
-```
-
-落点：
-
-```java
-// RouteConfig：每条路由挂 requestRateLimiter
-c.setRateLimiter(redisRateLimiter);   // 自定义 Bean：new RedisRateLimiter(replenishRate, burstCapacity)
-c.setKeyResolver(userKeyResolver);    // 键 = X-User-Id（可信用户），未认证退化为 IP
-```
-
-- 自动装配的 `redisRateLimiter` 带 `@ConditionalOnMissingBean`，自定义同名 Bean 即接管
-- 速率参数进 `RateLimitProperties`（`@ConfigurationProperties`），Nacos 改值免重启
-- **键策略与旧实现一致**（可信用户优先），迁移前后限流粒度不变
-- Redis 不可用时：旧 `RateLimitFilter` 保留作兜底开关（`aics.gateway.rate-limit.enabled`）
-
-### 9.2 断路器：CircuitBreaker filter（按路由独立命名）
-
-下游挂掉时网关不再透传 500，而是熔断并 forward 到统一降级端点：
-
-```java
-.circuitBreaker(c -> c.setName("cb-user").setFallbackUri("forward:/gateway-fallback"))
-```
-
-- **为什么每条路由独立命名**：断路器实例按 name 隔离，共享 name 会让一个服务的
-  失败统计污染所有路由（一个服务挂 → 全站熔断）
-- 降级端点 `GatewayFallbackController` 返回统一 `Result` 结构 503（`GATEWAY_SERVICE_UNAVAILABLE`）
-- 依赖：`spring-cloud-starter-circuitbreaker-reactor-resilience4j`
-
-### 9.3 重试：只对幂等 GET
-
-```java
-f.retry(c -> c.setRetries(2).setMethods(HttpMethod.GET)
-        .setStatuses(HttpStatus.INTERNAL_SERVER_ERROR, HttpStatus.BAD_GATEWAY))
-```
-
-**POST/PUT 绝不在网关层重试**——重复下单/重复扣款是非幂等灾难；
-写路径的容错交给调用方（Feign fallback + 熔断，见 03-P2）。
-
-### 9.4 Java DSL 的一个坑
-
-`RouteSpec.filters(...)` 的参数是 `UnaryOperator<GatewayFilterSpec>`（要返回值），
-不是 `Consumer`——lambda 里必须 `return`，多个 filter 用
-`addResilience(f.stripPrefix(1), ...)` 链式组合而非语句块。
+1. **直连下游**：`curl -X POST "http://localhost:8083/chat/send?sessionId=1&message=hi"`
+   （注意是 `/chat/send`，没有 `/api` 前缀）
+2. **通过网关**：先登录拿 Token
+   `curl -X POST http://localhost:8080/api/user/login -H "Content-Type: application/json" -d '{...}'`
+   再带 Token 访问
+   `curl -X POST "http://localhost:8080/api/chat/send?sessionId=1&message=hi" -H "Authorization: Bearer <token>"`
+3. 对比两种方式的响应（应该一样）——同时体会 `stripPrefix(1)` 把 `/api/chat/send` 变成了 `/chat/send`
+4. **观察 401**：不带 Token 访问 `/api/chat/send`，应返回 `{"code":401,...}`
+5. **观察身份防伪造**：带上伪造头 `X-User-Id: 999` 再请求，网关会剥除它，
+   下游拿不到伪造身份（可看 chat 服务日志验证）
+6. **观察 429**：短时间连发超过 `burst-capacity`（10）个请求，观察限流响应
+7. **观察 503 降级**：停掉 Chat 服务再请求，应收到统一格式的
+   `GATEWAY_SERVICE_UNAVAILABLE` 响应（而不是连接拒绝/500）
 
 ---
 
 ## 学习检查清单
 
-- [ ] 理解网关的五大职责
-- [ ] 理解 Route = Predicate + Filter + URI
-- [ ] 会配置基于服务发现的自动路由
-- [ ] 会写全局过滤器做 JWT 鉴权
-- [ ] 理解 CORS 跨域问题的原因和解决方案
-- [ ] 理解 `lb://` 负载均衡的含义
+- [ ] 理解网关的核心职责（路由/鉴权/跨域/限流/熔断/重试/负载均衡）
+- [ ] 理解 Route = Predicate + Filter + URI，以及 GlobalFilter 与 GatewayFilter 的区别
+- [ ] 会用 Java DSL 配置路由，说得出 stripPrefix / 透传 / rewritePath 三种前缀处理模式的适用场景
+- [ ] 理解为什么本项目不用 discovery.locator 自动路由（每条路由要独立挂韧性过滤器）
+- [ ] 会写全局过滤器做 JWT 鉴权，理解 API Key 的机器调用场景
+- [ ] 理解"先剥除伪造身份头、再注入可信身份"的透传原则
+- [ ] 理解 CORS 跨域的原因，以及 allowedOriginPatterns 与 allowedOrigins 的区别
+- [ ] 理解 `lb://` 负载均衡的含义，说得清轮询 vs 最少连接的适用场景（AI 对话耗时方差大）
 - [ ] 说得清本地内存限流 vs Redis 分布式限流的差异
 - [ ] 理解断路器按路由命名的必要性（失败统计隔离）
+- [ ] 知道断路器默认带 1s TimeLimiter，以及为什么网关层应禁用它
+- [ ] 说得出 addResilience 三层的执行顺序，以及重试为什么会重新扣限流令牌
 - [ ] 记住网关重试只对幂等 GET 的原因
 
 ---
