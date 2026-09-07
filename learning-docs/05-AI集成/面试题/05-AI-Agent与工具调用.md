@@ -250,21 +250,22 @@ Agent 之间通过消息总线通信，按需创建和销毁
 - **Resources**：Agent 可读取的数据源
 - **Prompts**：预定义的提示词模板
 
-**Spring AI 集成 MCP：**
+**Spring AI 集成 MCP（1.1.x 真实 API）：**
 ```java
-// 配置 MCP Client
-McpClient mcpClient = McpClient.builder()
-    .transport(new StdioClientTransport("npx", "-y", "@modelcontextprotocol/server-filesystem"))
-    .build();
+// ① 引入 spring-ai-starter-mcp-client，yml 里配置连接（stdio / sse / streamable-http）
+// ② 自动配置会把所有 MCP 工具包装成一个 ToolCallbackProvider，直接注入使用：
+@Autowired
+SyncMcpToolCallbackProvider mcpProvider;
 
-// 使用 MCP 工具
-String response = ChatClient.create(chatModel)
-    .prompt()
+String response = chatClient.prompt()
     .user("读取 /data/report.csv 文件并总结")
-    .toolCallbacks(mcpClient.getTools())  // 获取 MCP 工具
+    .toolCallbacks(mcpProvider.getToolCallbacks())   // MCP 工具 → ToolCallback[]
     .call()
     .content();
 ```
+
+> 深入版（协议原理 / starter 配置 / Bean 冲突踩坑 / 生产化清单）见
+> [11-MCP 协议实战](../01-SpringAI框架集成/11-MCP协议实战-模型上下文协议.md)。
 
 ---
 
