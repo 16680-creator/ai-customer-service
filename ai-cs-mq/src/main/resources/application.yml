@@ -22,6 +22,18 @@ spring:
     import:
       - optional:nacos:aics-shared.yml
       - optional:nacos:ai-cs-mq.yml
+  # 工单演示本地兜底数据源（mq_db）；若 Nacos ai-cs-mq.yml 已发布同名配置则以 Nacos 为准
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:123.60.31.79}:3306/mq_db?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: ${MYSQL_USER:root}
+    password: ${DB_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+# ===== RocketMQ（工单消息闭环演示：work-order-topic 生产/消费/死信） =====
+rocketmq:
+  name-server: ${ROCKETMQ_ADDR:127.0.0.1:9876}
+  producer:
+    group: work-order-producer-group
 
 # ===== 全链路追踪（03-P5）：OTLP 导出至 OTel Collector（observability compose 4318 端口） =====
 management:

@@ -108,6 +108,18 @@ export const promptApiWrappers = {
     promptApi.post('/{scenario}/active'.replace('{scenario}', scenario), null, { params: { version } }),
 }
 
+// ===== MQ 工单消息闭环演示（WorkOrderController）=====
+export const mqApiWrappers = {
+  /** 创建工单并发送 RocketMQ 消息（simulateFail: 模拟消费失败触发重试→死信） */
+  createWorkOrder: (payload) => mqApi.post('/work-order/create', payload),
+  /** 工单列表 */
+  listWorkOrders: () => mqApi.get('/work-order/list'),
+  /** 消费失败记录列表（死信落库） */
+  listFailRecords: () => mqApi.get('/fail-records/list'),
+  /** 重推失败记录 */
+  repushFailRecord: (id) => mqApi.post(`/fail-records/${id}/repush`),
+}
+
 // ===== Agent 编排（AgentController）=====
 export const agentApiWrappers = {
   /** 同步对话 */

@@ -86,6 +86,71 @@
         </el-table>
         <el-empty v-if="!groups.length && !loading" description="暂无消费组" />
       </el-tab-pane>
+
+      <!-- 工单消息闭环演示 -->
+      <el-tab-pane label="工单演示" name="workOrder">
+        <el-card shadow="never" style="margin-bottom: 16px">
+          <el-form :inline="true">
+            <el-form-item label="标题">
+              <el-input v-model="woForm.title" placeholder="工单标题" style="width: 200px" />
+            </el-form-item>
+            <el-form-item label="内容">
+              <el-input v-model="woForm.content" placeholder="工单内容" style="width: 280px" />
+            </el-form-item>
+            <el-form-item label="模拟消费失败">
+              <el-switch v-model="woForm.simulateFail" />
+            </el-form-item>
+            <el-form-item>
+              <el-button type="primary" :loading="woSubmitting" @click="createWorkOrder">创建并发送</el-button>
+              <el-button @click="loadWorkOrders">刷新工单</el-button>
+            </el-form-item>
+          </el-form>
+          <div class="wo-tip">
+            勾选「模拟消费失败」：消费者抛异常 → RocketMQ 自动重试 3 次（约 10s/30s/1m）→ 进入死信队列 →
+            失败记录落库，到「失败记录」Tab 重推后恢复正常消费。
+          </div>
+        </el-card>
+        <el-table :data="workOrders" border stripe v-loading="woLoading">
+          <el-table-column prop="ticketNo" label="工单号" min-width="190" />
+          <el-table-column prop="title" label="标题" min-width="130" />
+          <el-table-column prop="content" label="内容" min-width="200" show-overflow-tooltip />
+          <el-table-column label="状态" width="100">
+            <template #default="{ row }">
+              <el-tag :type="woStatusType(row.status)" size="small">{{ row.status }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="createTime" label="创建时间" width="170" />
+          <el-table-column prop="updateTime" label="更新时间" width="170" />
+        </el-table>
+        <el-empty v-if="!workOrders.length && !woLoading" description="暂无工单，创建一条试试" />
+      </el-tab-pane>
+
+      <!-- 消费失败记录 -->
+      <el-tab-pane label="失败记录" name="failRecords">
+        <div style="margin-bottom: 12px">
+          <el-button :icon="Refresh" @click="loadFailRecords">刷新失败记录</el-button>
+        </div>
+        <el-table :data="failRecords" border stripe v-loading="frLoading">
+          <el-table-column prop="id" label="ID" width="70" />
+          <el-table-column prop="bizKey" label="工单号" min-width="180" />
+          <el-table-column prop="msgId" label="消息ID" min-width="190" show-overflow-tooltip />
+          <el-table-column prop="failReason" label="失败原因" min-width="230" show-overflow-tooltip />
+          <el-table-column prop="reconsumeTimes" label="已重试" width="80" />
+          <el-table-column label="记录状态" width="110">
+            <template #default="{ row }">
+              <el-tag :type="row.status === 'PENDING' ? 'danger' : 'info'" size="small">{{ row.status }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="createTime" label="落库时间" width="170" />
+          <el-table-column prop="repushTime" label="重推时间" width="170" />
+          <el-table-column label="操作" width="110" fixed="right">
+            <template #default="{ row }">
+              <el-button size="small" type="warning" :disabled="row.status !== 'PENDING'" @click="onRepush(row)">重新推送</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+        <el-empty v-if="!failRecords.length && !frLoading" description="暂无消费失败记录（勾选「模拟消费失败」创建工单即可触发）" />
+      </el-tab-pane>
     </el-tabs>
 
     <!-- Topic 详情 -->
@@ -120,8 +185,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ref, computed, onMounted, watch } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
 import { mqApi } from '../api'
 
@@ -196,6 +261,92 @@ async function openGroup(row) {
     ElMessage.error(e.response?.data?.message || '获取消费组详情失败')
   }
 }
+
+// ===== 工单消息闭环演示 =====
+const woForm = ref({ title: '', content: '', simulateFail: false })
+const woSubmitting = ref(false)
+const woLoading = ref(false)
+const workOrders = ref([])
+const frLoading = ref(false)
+const failRecords = ref([])
+
+function woStatusType(status) {
+  return status === 'DONE' ? 'success' : status === 'FAILED' ? 'danger' : 'primary'
+}
+
+async function loadWorkOrders() {
+  woLoading.value = true
+  try {
+    const { data } = await mqApi.get('/work-order/list')
+    if (data.code === 200) workOrders.value = data.data || []
+  } catch (e) {
+    ElMessage.error(e.response?.data?.message || '获取工单列表失败')
+  } finally {
+    woLoading.value = false
+  }
+}
+
+async function createWorkOrder() {
+  if (!woForm.value.title || !woForm.value.content) {
+    ElMessage.warning('请填写标题和内容')
+    return
+  }
+  woSubmitting.value = true
+  try {
+    const { data } = await mqApi.post('/work-order/create', woForm.value)
+    if (data.code === 200) {
+      ElMessage.success(`工单已创建并发送: ${data.data?.ticketNo || ''}`)
+      woForm.value.title = ''
+      woForm.value.content = ''
+      woForm.value.simulateFail = false
+      loadWorkOrders()
+    } else {
+      ElMessage.error(data.message)
+    }
+  } catch (e) {
+    ElMessage.error(e.response?.data?.message || '创建工单失败')
+  } finally {
+    woSubmitting.value = false
+  }
+}
+
+async function loadFailRecords() {
+  frLoading.value = true
+  try {
+    const { data } = await mqApi.get('/fail-records/list')
+    if (data.code === 200) failRecords.value = data.data || []
+  } catch (e) {
+    ElMessage.error(e.response?.data?.message || '获取失败记录失败')
+  } finally {
+    frLoading.value = false
+  }
+}
+
+async function onRepush(row) {
+  try {
+    await ElMessageBox.confirm(`确认重新推送工单 ${row.bizKey} 的失败消息？`, '重新推送', { type: 'warning' })
+  } catch {
+    return
+  }
+  try {
+    const { data } = await mqApi.post(`/fail-records/${row.id}/repush`)
+    if (data.code === 200) {
+      ElMessage.success('已重新投递，消费成功后工单状态将变为 DONE')
+      loadFailRecords()
+      loadWorkOrders()
+    } else {
+      ElMessage.error(data.message)
+    }
+  } catch (e) {
+    ElMessage.error(e.response?.data?.message || '重推失败')
+  }
+}
+
+// 首次切到演示 Tab 时加载数据
+watch(activeTab, (tab) => {
+  if (tab === 'workOrder') loadWorkOrders()
+  if (tab === 'failRecords') loadFailRecords()
+})
 </script>
 
 <style scoped>
@@ -206,4 +357,5 @@ async function openGroup(row) {
 .stat-value { font-size: 24px; font-weight: 700; color: #409eff; }
 .stat-label { color: #909399; font-size: 13px; margin-top: 4px; }
 .clickable { cursor: pointer; }
+.wo-tip { color: #909399; font-size: 12px; line-height: 1.6; }
 </style>
