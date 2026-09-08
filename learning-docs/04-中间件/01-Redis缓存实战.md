@@ -117,15 +117,15 @@ public class CartServiceImpl implements CartService {
 
     public CartVO updateQuantity(Long userId, Long itemId, int quantity) {
         // ...
-        
+
         // 从 Redis 读取库存
         String stockStr = stringRedisTemplate.opsForValue().get("stock:" + productId);
         int stock = Integer.parseInt(stockStr);
-        
+
         if (quantity > stock) {
             throw new BusinessException("库存不足，当前库存: " + stock);
         }
-        
+
         // 更新数据库...
     }
 }
@@ -135,13 +135,13 @@ public class CartServiceImpl implements CartService {
 
 ## 四、Redis 五种数据结构
 
-| 类型 | 命令 | 本项目用途 |
-|------|------|-----------|
-| **String** | GET/SET/INCR | 库存数量、Token、计数器 |
-| **Hash** | HGET/HSET/HGETALL | 用户信息缓存、购物车 |
-| **List** | LPUSH/RPUSH/LRANGE | 消息队列、最近浏览 |
-| **Set** | SADD/SMEMBERS/SISMEMBER | 用户标签、共同好友 |
-| **ZSet** | ZADD/ZRANGE/ZRANK | 排行榜、热度排序 |
+| 类型         | 命令                      | 本项目用途          |
+| ---------- | ----------------------- | -------------- |
+| **String** | GET/SET/INCR            | 库存数量、Token、计数器 |
+| **Hash**   | HGET/HSET/HGETALL       | 用户信息缓存、购物车     |
+| **List**   | LPUSH/RPUSH/LRANGE      | 消息队列、最近浏览      |
+| **Set**    | SADD/SMEMBERS/SISMEMBER | 用户标签、共同好友      |
+| **ZSet**   | ZADD/ZRANGE/ZRANK       | 排行榜、热度排序       |
 
 ### 实际示例
 
@@ -183,12 +183,12 @@ Set<String> top10 = redisTemplate.opsForZSet().reverseRange("hot:keywords", 0, 9
 public ProductVO getProduct(Long id) {
     String key = "product:" + id;
     String cached = redisTemplate.opsForValue().get(key);
-    
+
     if (cached != null) {
         if ("NULL".equals(cached)) return null;  // 缓存了空值
         return JSON.parseObject(cached, ProductVO.class);
     }
-    
+
     ProductVO product = productMapper.selectById(id);
     if (product == null) {
         redisTemplate.opsForValue().set(key, "NULL", 5, TimeUnit.MINUTES);  // 缓存空值 5 分钟
@@ -212,17 +212,17 @@ public ProductVO getProductWithLock(Long id) {
     String key = "product:" + id;
     String cached = redisTemplate.opsForValue().get(key);
     if (cached != null) return JSON.parseObject(cached, ProductVO.class);
-    
+
     // 获取分布式锁
     String lockKey = "lock:product:" + id;
     Boolean locked = redisTemplate.opsForValue().setIfAbsent(lockKey, "1", 10, TimeUnit.SECONDS);
-    
+
     if (Boolean.TRUE.equals(locked)) {
         try {
             // 双重检查
             cached = redisTemplate.opsForValue().get(key);
             if (cached != null) return JSON.parseObject(cached, ProductVO.class);
-            
+
             // 查数据库并回填缓存
             ProductVO product = productMapper.selectById(id);
             redisTemplate.opsForValue().set(key, JSON.toJSONString(product), 30, TimeUnit.MINUTES);
@@ -258,15 +258,15 @@ redisTemplate.opsForValue().set(key, value, ttl, TimeUnit.SECONDS);
 // 防止重复下单
 public OrderVO createOrder(Long userId, CreateOrderRequest req) {
     String lockKey = "lock:order:create:" + userId;
-    
+
     // SET NX EX（原子操作）
     Boolean locked = redisTemplate.opsForValue()
         .setIfAbsent(lockKey, UUID.randomUUID().toString(), 30, TimeUnit.SECONDS);
-    
+
     if (!Boolean.TRUE.equals(locked)) {
         throw new BusinessException("操作太频繁，请稍后重试");
     }
-    
+
     try {
         // 业务逻辑...
         return doCreateOrder(userId, req);

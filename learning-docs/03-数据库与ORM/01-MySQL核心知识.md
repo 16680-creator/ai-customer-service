@@ -49,6 +49,7 @@ mysql:
 ```
 
 **关键点**：
+
 - `init.sql` 只在**第一次启动**（数据卷为空）时执行
 - 如果改了 init.sql，需要删除数据卷重新创建：`docker volume rm ai-customer-service_mysql-data`
 
@@ -110,12 +111,12 @@ CREATE TABLE IF NOT EXISTS `orders` (
 
 ### 4.2 索引类型
 
-| 类型 | 说明 | 示例 |
-|------|------|------|
-| PRIMARY KEY | 主键索引，唯一+非空 | `id` |
-| UNIQUE | 唯一索引 | `order_no` |
-| INDEX | 普通索引 | `idx_user_id` |
-| 联合索引 | 多列组合 | `idx_user_status(user_id, status)` |
+| 类型          | 说明         | 示例                                 |
+| ----------- | ---------- | ---------------------------------- |
+| PRIMARY KEY | 主键索引，唯一+非空 | `id`                               |
+| UNIQUE      | 唯一索引       | `order_no`                         |
+| INDEX       | 普通索引       | `idx_user_id`                      |
+| 联合索引        | 多列组合       | `idx_user_status(user_id, status)` |
 
 ### 4.3 联合索引的最左前缀原则
 
@@ -137,6 +138,7 @@ EXPLAIN SELECT * FROM orders WHERE user_id = 100 AND status = 1;
 ```
 
 关注字段：
+
 - `type`: ALL（全表扫描❌）→ index → range → ref → eq_ref → const（最好✅）
 - `rows`: 预估扫描行数（越少越好）
 - `Extra`: Using index（覆盖索引✅）、Using filesort（需要优化❌）
@@ -153,25 +155,25 @@ EXPLAIN SELECT * FROM orders WHERE user_id = 100 AND status = 1;
 public OrderVO createOrder(Long userId, List<Long> cartItemIds) {
     // 1. 扣减库存（product 服务）
     productClient.deductStock(productId, quantity);
-    
+
     // 2. 创建订单
     orderMapper.insert(order);
-    
+
     // 3. 清除购物车
     cartItemMapper.deleteBatchIds(cartItemIds);
-    
+
     // 如果任何一步抛异常 → 全部回滚
 }
 ```
 
 ### 5.2 隔离级别
 
-| 级别 | 脏读 | 不可重复读 | 幻读 | 性能 |
-|------|------|-----------|------|------|
-| READ UNCOMMITTED | ✓ | ✓ | ✓ | 最高 |
-| READ COMMITTED | ✗ | ✓ | ✓ | 高 |
-| **REPEATABLE READ** | ✗ | ✗ | ✓ | 中（MySQL默认） |
-| SERIALIZABLE | ✗ | ✗ | ✗ | 最低 |
+| 级别                  | 脏读  | 不可重复读 | 幻读  | 性能         |
+| ------------------- | --- | ----- | --- | ---------- |
+| READ UNCOMMITTED    | ✓   | ✓     | ✓   | 最高         |
+| READ COMMITTED      | ✗   | ✓     | ✓   | 高          |
+| **REPEATABLE READ** | ✗   | ✗     | ✓   | 中（MySQL默认） |
+| SERIALIZABLE        | ✗   | ✗     | ✗   | 最低         |
 
 MySQL 8.0 默认 **REPEATABLE READ**，通过 MVCC + 间隙锁解决大部分并发问题。
 

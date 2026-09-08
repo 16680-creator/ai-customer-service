@@ -28,13 +28,13 @@
 
 ## 一、核心概念：5 个词说清楚
 
-| 概念 | 类比 | 本项目实体 |
-|------|------|-----------|
-| Image 镜像 | 软件安装包（只读模板） | `ai-cs-chat:latest`、`mysql:8.0` |
-| Container 容器 | 运行中的程序（镜像的实例） | `docker ps` 里的 `aics-mysql`、`aics-chat-service` |
-| Dockerfile | 安装说明书（怎么造镜像） | `ai-cs-chat/Dockerfile` 等 9 个 |
-| Registry 仓库 | 应用商店（存镜像） | Docker Hub（中间件镜像）+ `192.168.56.12:5000`（本项目私有仓库，存自建镜像） |
-| Volume 数据卷 | 外接硬盘 | `mysql-data` 卷，容器删了数据还在 |
+| 概念           | 类比            | 本项目实体                                                  |
+| ------------ | ------------- | ------------------------------------------------------ |
+| Image 镜像     | 软件安装包（只读模板）   | `ai-cs-chat:latest`、`mysql:8.0`                        |
+| Container 容器 | 运行中的程序（镜像的实例） | `docker ps` 里的 `aics-mysql`、`aics-chat-service`        |
+| Dockerfile   | 安装说明书（怎么造镜像）  | `ai-cs-chat/Dockerfile` 等 9 个                          |
+| Registry 仓库  | 应用商店（存镜像）     | Docker Hub（中间件镜像）+ `192.168.56.12:5000`（本项目私有仓库，存自建镜像） |
+| Volume 数据卷   | 外接硬盘          | `mysql-data` 卷，容器删了数据还在                                |
 
 另外两个高频词，用本项目的例子记：
 
@@ -247,15 +247,15 @@ docker load -i chat.tar
 
 ## 六、Docker/Compose 概念 → K8s 概念对照（为下一篇铺路）
 
-| Compose 写法 | K8s 对应 | 说明 |
-|--------------|----------|------|
-| `services:` 下的一项 | Deployment + Service | K8s 把"运行"和"访问入口"拆成两个对象 |
-| `depends_on + healthcheck` | readinessProbe + 重试 | K8s 无依赖声明，靠探针+自愈达成同样效果 |
-| `restart: always` | 控制器自动重建 | Deployment 挂了拉起新 Pod（不是重启旧容器） |
-| named volume | PVC（volumeClaimTemplates） | K8s 有存储供应商（StorageClass）动态供盘 |
-| `.env` / environment | ConfigMap / Secret | 敏感值进 Secret |
-| `ports: "3306:3306"` | NodePort（集群内则是 ClusterIP） | K8s 网络分段更严格 |
-| 单机 | 多机集群 + 调度 | K8s 决定容器跑在哪台机器上 |
+| Compose 写法                 | K8s 对应                    | 说明                            |
+| -------------------------- | ------------------------- | ----------------------------- |
+| `services:` 下的一项           | Deployment + Service      | K8s 把"运行"和"访问入口"拆成两个对象        |
+| `depends_on + healthcheck` | readinessProbe + 重试       | K8s 无依赖声明，靠探针+自愈达成同样效果        |
+| `restart: always`          | 控制器自动重建                   | Deployment 挂了拉起新 Pod（不是重启旧容器） |
+| named volume               | PVC（volumeClaimTemplates） | K8s 有存储供应商（StorageClass）动态供盘  |
+| `.env` / environment       | ConfigMap / Secret        | 敏感值进 Secret                   |
+| `ports: "3306:3306"`       | NodePort（集群内则是 ClusterIP） | K8s 网络分段更严格                   |
+| 单机                         | 多机集群 + 调度                 | K8s 决定容器跑在哪台机器上               |
 
 看懂这张表，02 篇的 YAML 就不再陌生。
 

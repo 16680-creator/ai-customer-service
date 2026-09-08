@@ -53,6 +53,7 @@ nacos:
 ```
 
 **关键点**：
+
 - `MODE: standalone` → 单机模式（生产用 cluster）
 - 配置数据存在 MySQL 的 `nacos_config` 库中（重启不丢失）
 - 必须等 MySQL 健康后才启动（`depends_on` + `healthcheck`）
@@ -195,7 +196,7 @@ spring:
         file-extension: yml
         # 自动拉取: ${spring.application.name}.${file-extension}
         # 即: ai-cs-order.yml
-        
+
         # 共享配置
         shared-configs:
           - data-id: common-datasource.yml
@@ -250,6 +251,7 @@ Namespace: prod（生产）
 ### 5.2 创建命名空间
 
 Nacos 控制台 → 命名空间 → 新建：
+
 - 命名空间名：`aics`
 - 描述：AI 客服系统
 
@@ -263,14 +265,14 @@ Nacos 控制台 → 命名空间 → 新建：
 
 ### 常用操作
 
-| 功能 | 路径 | 说明 |
-|------|------|------|
-| 查看服务 | 服务管理 → 服务列表 | 看哪些服务在线 |
-| 查看实例 | 点击服务名 | 看 IP、端口、健康状态 |
-| 创建配置 | 配置管理 → 配置列表 → + | 新建 yml 配置 |
-| 修改配置 | 点击配置 → 编辑 | 修改后点"发布" |
-| 历史版本 | 配置详情 → 历史版本 | 可以回滚 |
-| 监听查询 | 配置管理 → 监听查询 | 看哪些服务在用这个配置 |
+| 功能   | 路径              | 说明           |
+| ---- | --------------- | ------------ |
+| 查看服务 | 服务管理 → 服务列表     | 看哪些服务在线      |
+| 查看实例 | 点击服务名           | 看 IP、端口、健康状态 |
+| 创建配置 | 配置管理 → 配置列表 → + | 新建 yml 配置    |
+| 修改配置 | 点击配置 → 编辑       | 修改后点"发布"     |
+| 历史版本 | 配置详情 → 历史版本     | 可以回滚         |
+| 监听查询 | 配置管理 → 监听查询     | 看哪些服务在用这个配置  |
 
 ---
 
@@ -348,10 +350,10 @@ spring-cloud-context 在 RefreshEvent 后执行 `ConfigurationPropertiesRebinder
 
 ### 项目落地
 
-| 位置 | 改造 |
-|---|---|
+| 位置                                                  | 改造                                                                                                                    |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | `ai-cs-gateway/.../config/RateLimitProperties.java` | 新增 `@ConfigurationProperties("aics.gateway.rate-limit")`，`RateLimitFilter` 的 5 个 `@Value` 全部迁入；Nacos 改限流阈值 10s 内生效不重启 |
-| GatewayApplication | `@ConfigurationPropertiesScan("com.aics.gateway.config")` 注册 |
+| GatewayApplication                                  | `@ConfigurationPropertiesScan("com.aics.gateway.config")` 注册                                                          |
 
 ---
 

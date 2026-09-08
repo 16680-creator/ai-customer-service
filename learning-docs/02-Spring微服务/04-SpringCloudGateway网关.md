@@ -143,10 +143,10 @@ management:
 
 两类过滤器的区别：
 
-| | GlobalFilter | GatewayFilter |
-|---|---|---|
-| 作用范围 | **所有路由** | **单条路由** |
-| 注册方式 | `@Component` | 路由定义里 `.filters(...)` |
+|       | GlobalFilter                                            | GatewayFilter                                             |
+| ----- | ------------------------------------------------------- | --------------------------------------------------------- |
+| 作用范围  | **所有路由**                                                | **单条路由**                                                  |
+| 注册方式  | `@Component`                                            | 路由定义里 `.filters(...)`                                     |
 | 本项目例子 | `AuthFilter`、`RateLimitFilter`、`InstanceInFlightFilter` | retry / circuitBreaker / requestRateLimiter / stripPrefix |
 
 ---
@@ -191,31 +191,29 @@ public RouteLocator customRouteLocator(RouteLocatorBuilder builder,
 
 ### 4.3 全量路由表（16 条）
 
-| 路由 id | 网关路径 | 目标服务 | 前缀处理 | 转发后路径 |
-|---|---|---|---|---|
-| ai-cs-user | /api/user/** | lb://ai-cs-user | stripPrefix(1) | /user/** |
-| ai-cs-knowledge | /api/knowledge/** | lb://ai-cs-knowledge | stripPrefix(1) | /knowledge/** |
-| ai-cs-rag | /api/rag/** | lb://ai-cs-chat | stripPrefix(1) | /rag/** |
-| ai-cs-chat | /api/chat/** | lb://ai-cs-chat | stripPrefix(1) | /chat/** |
-| ai-cs-observability | /api/observability/** | lb://ai-cs-chat | 透传 | /api/observability/** |
-| ai-cs-prompt | /api/prompts/** | lb://ai-cs-chat | 透传 | /api/prompts/** |
-| ai-cs-agent-chat | /api/agent/chat | lb://ai-cs-chat | rewritePath | /chat/agent |
-| ai-cs-agent | /api/agent/** | lb://ai-cs-chat | rewritePath | /chat/agent/** |
-| ai-cs-search | /api/search/** | lb://ai-cs-search | stripPrefix(1) | /search/** |
-| ai-cs-message | /api/message/** | lb://ai-cs-message | 透传 | /api/message/** |
-| ai-cs-notify | /api/notify/** | lb://ai-cs-notify | 透传 | /api/notify/** |
-| ai-cs-order | /api/order/** | lb://ai-cs-order | stripPrefix(1) | /order/** |
-| ai-cs-cart | /api/cart/** | lb://ai-cs-order | stripPrefix(1) | /cart/** |
-| ai-cs-pay | /api/pay/** | lb://ai-cs-pay | stripPrefix(1) | /pay/** |
-| ai-cs-mq | /api/mq/** | lb://ai-cs-mq | stripPrefix(1) | /mq/** |
-| ai-cs-product | /api/product/** | lb://ai-cs-product | stripPrefix(1) | /product/** |
+| 路由 id               | 网关路径                  | 目标服务                 | 前缀处理           | 转发后路径                 |
+| ------------------- | --------------------- | -------------------- | -------------- | --------------------- |
+| ai-cs-user          | /api/user/**          | lb://ai-cs-user      | stripPrefix(1) | /user/**              |
+| ai-cs-knowledge     | /api/knowledge/**     | lb://ai-cs-knowledge | stripPrefix(1) | /knowledge/**         |
+| ai-cs-rag           | /api/rag/**           | lb://ai-cs-chat      | stripPrefix(1) | /rag/**               |
+| ai-cs-chat          | /api/chat/**          | lb://ai-cs-chat      | stripPrefix(1) | /chat/**              |
+| ai-cs-observability | /api/observability/** | lb://ai-cs-chat      | 透传             | /api/observability/** |
+| ai-cs-prompt        | /api/prompts/**       | lb://ai-cs-chat      | 透传             | /api/prompts/**       |
+| ai-cs-agent-chat    | /api/agent/chat       | lb://ai-cs-chat      | rewritePath    | /chat/agent           |
+| ai-cs-agent         | /api/agent/**         | lb://ai-cs-chat      | rewritePath    | /chat/agent/**        |
+| ai-cs-search        | /api/search/**        | lb://ai-cs-search    | stripPrefix(1) | /search/**            |
+| ai-cs-message       | /api/message/**       | lb://ai-cs-message   | 透传             | /api/message/**       |
+| ai-cs-notify        | /api/notify/**        | lb://ai-cs-notify    | 透传             | /api/notify/**        |
+| ai-cs-order         | /api/order/**         | lb://ai-cs-order     | stripPrefix(1) | /order/**             |
+| ai-cs-cart          | /api/cart/**          | lb://ai-cs-order     | stripPrefix(1) | /cart/**              |
+| ai-cs-pay           | /api/pay/**           | lb://ai-cs-pay       | stripPrefix(1) | /pay/**               |
+| ai-cs-mq            | /api/mq/**            | lb://ai-cs-mq        | stripPrefix(1) | /mq/**                |
+| ai-cs-product       | /api/product/**       | lb://ai-cs-product   | stripPrefix(1) | /product/**           |
 
 学习点：**rag / cart 两条路由证明"路由 ≠ 服务"**——路径前缀按业务划分，目标服务按部署划分，
 一条路径前缀可以指向任意服务（RAG 归 chat 服务托管、购物车归 order 服务托管）。
 
 ### 4.4 每条路由的统一韧性：addResilience
-
-16 条路由都调用这个私有方法，一次叠加三层韧性过滤器——它是"路由内 filter 组合"的最佳样本，下面逐层拆开讲。
 
 ```java
 /** 给单条路由叠加三层韧性：GET 重试 → 断路器 → Redis 分布式限流。 */
@@ -248,93 +246,18 @@ public KeyResolver userKeyResolver() {
 }
 ```
 
-### 三层如何协作：执行顺序与 retryWhen 重新订阅
-
-前置处理按声明顺序执行，异常/后置处理反向传播：
-
-```
-请求 → ①Retry → ②CircuitBreaker → ③RequestRateLimiter → lb:// 转发下游
-          ▲                                             │
-          └──── 5xx 且 GET 时：重新订阅整条内层链（含②③）◄─┘
-```
-
-**为什么 Retry 放最外层**：SCG 的 Retry filter 实现是 `chain.filter(exchange).retryWhen(...)`——
-`retryWhen` 会**重新订阅**上游 Mono，即重新执行整条内层链。由此产生三个重要行为：
-
-- **重试请求也消耗限流配额**：重新订阅会再跑一次 Lua 扣令牌，限流计数包含重试流量；
-- **重试的失败也计入断路器**：连续失败会加速熔断打开（都失败说明下游真挂了，合理）；
-- 断路器按"每次真实尝试"统计，而不是把一次带重试的请求算成一笔——失败统计不失真。
-
-#### ① Retry：只对幂等 GET，只对瞬时错误
-
-| 配置 | 值 | 含义 |
-|---|---|---|
-| setRetries(2) | 2 | 最多**额外**重试 2 次（单请求最多 3 次尝试） |
-| setMethods(GET) | GET | 只有幂等请求可安全重试；POST/PUT 重复执行 = 重复下单/扣款 |
-| setStatuses(500, 502) | 500/502 | 只重试瞬时错误：500 下游内部错误、502 连不上下游 |
-
-状态码里**刻意不含 503**——本项目的 503 是断路器自己的降级响应（见②），
-对降级响应再重试只会放大流量。另外默认**无退避**（未配置 backoff），
-失败后立即重试，只适合瞬时抖动，不适合下游过载场景。
-
-#### ② CircuitBreaker：按路由命名 + forward 降级 + 默认 1s TimeLimiter（坑）
-
-```
-CLOSED（放行+统计失败率）──失败率超阈值──▶ OPEN（直接拒绝，不打下游）
-    ▲                                          │ 冷却 60s（默认）
-    └──── 试探成功 ◀── HALF_OPEN（放少量试探请求）◀──┘
-```
-
-- 断路器实例按 name 隔离（cb-user / cb-chat / ...），失败统计互不污染——
-  这就是 cbName 参数必须按路由传入的原因；
-- 触发 fallback（调用异常或 OPEN 拒绝）→ `forward:/gateway-fallback` →
-  网关**内部跳转**到 GatewayFallbackController 返回统一 503，不发新 HTTP 请求、不占下游资源；
-- ⚠️ **隐藏的第四层：默认 TimeLimiter（1 秒超时）**。Spring Cloud CircuitBreaker Resilience4j
-  的 `run()` 会给整条下游 Mono/Flux 套 `timeout(1s)`（resilience4j `TimeLimiterConfig`
-  默认值，`disableTimeLimiter` 默认 false）。**对 chat 路由是现实隐患**：LLM 同步对话
-  2~30s、SSE 流几十秒，超过 1 秒即被判超时 → 走降级 → 503。
-  超时职责本应属于下游（chat 服务 ResilientAiService 自带超时/熔断），网关层这 1s 是误伤。
-  修复（推荐方式一，直接禁用）：
-
-```yaml
-spring:
-  cloud:
-    circuitbreaker:
-      resilience4j:
-        disable-time-limiter: true   # 网关层不做时间限制，交由下游自控
-```
-
-#### ③ RequestRateLimiter：Redis + Lua 分布式令牌桶
-
-```java
-.requestRateLimiter(c -> {
-    c.setRateLimiter(redisRateLimiter);  // 自定义 Bean：replenish-rate=5 / burst-capacity=10
-    c.setKeyResolver(userKeyResolver);   // 键 = u:{可信userId} 或 ip:{客户端IP}
-})
-```
-
-- 语义：`replenish-rate=5`（每用户每秒补 5 个令牌 = 长期 QPS 上限），
-  `burst-capacity=10`（桶容量 = 允许的短时突发上限）；
-- 实现：每个键对应两个 Redis key（剩余令牌数 + 上次补充时间戳），请求到达时
-  Lua 脚本原子执行"按流逝时间补令牌 → 判断够不够扣 → 扣减"，网关多实例共享同一份计数；
-  超限返回 429 并携带 `X-RateLimit-*` 响应头；
-- **Redis 挂掉会发生什么（连锁反应）**：`isAllowed()` 连不上 Redis → 异常沿链上抛 →
-  被外层②断路器计为失败并触发 fallback → 所有路由 503。
-  这就是 8.1 里"Redis 不可用时切回内存限流兜底"开关（`aics.gateway.rate-limit.enabled=true`）
-  存在的意义——它是 Redis 故障时的逃生门。
-
 ---
 
 ## 五、全局过滤器：JWT + API Key 双凭证鉴权（AuthFilter）
 
 ### 5.1 为什么是"双凭证"？
 
-| | JWT（Bearer Token） | API Key（X-API-Key 头） |
-|---|---|---|
-| 面向对象 | **人**（浏览器会话） | **机器**（第三方系统、定时任务、内部脚本） |
-| 获取方式 | 登录后签发 | 预共享密钥（配置中心下发） |
-| 格式 | `Authorization: Bearer <token>` | `X-API-Key: <keyId>:<secret>` |
-| 透传身份 | JWT subject → X-User-Id | keyId → X-User-Id，角色固定 ROLE_SERVICE |
+|      | JWT（Bearer Token）               | API Key（X-API-Key 头）                |
+| ---- | ------------------------------- | ----------------------------------- |
+| 面向对象 | **人**（浏览器会话）                    | **机器**（第三方系统、定时任务、内部脚本）             |
+| 获取方式 | 登录后签发                           | 预共享密钥（配置中心下发）                       |
+| 格式   | `Authorization: Bearer <token>` | `X-API-Key: <keyId>:<secret>`       |
+| 透传身份 | JWT subject → X-User-Id         | keyId → X-User-Id，角色固定 ROLE_SERVICE |
 
 机器没有登录态，走预共享密钥；校验通过后同样注入 `X-User-Id`，
 下游的权限与限流逻辑对"人/机器"两种来源**完全无感知**。
@@ -543,8 +466,7 @@ LoadBalancer 为每个下游服务创建独立子上下文；内置 `RoundRobinL
 - 降级端点 `GatewayFallbackController` 返回统一 `Result` 结构的 503
   （`GATEWAY_SERVICE_UNAVAILABLE`）——前端拿到可识别的业务响应格式而非裸错误页；
   forward 是网关内部跳转，不占用下游资源；
-- 依赖：`spring-cloud-starter-circuitbreaker-reactor-resilience4j`；
-- ⚠️ 默认还叠加 1s TimeLimiter（长耗时路由会被误熔断转 503），修复方式见 4.4。
+- 依赖：`spring-cloud-starter-circuitbreaker-reactor-resilience4j`。
 
 ### 8.3 重试：只对幂等 GET
 
@@ -566,13 +488,13 @@ f.retry(c -> c.setRetries(2).setMethods(HttpMethod.GET)
 
 ## 九、Gateway vs Nginx
 
-| 对比 | Gateway | Nginx |
-|------|---------|-------|
-| 层级 | 应用层（Java） | 网络层（C） |
-| 性能 | 较高 | 极高 |
-| 动态路由 | 支持（从 Nacos 发现） | 需手动配置 |
-| 业务逻辑 | 可以写 Java 过滤器 | 只能用 Lua |
-| 适用场景 | 微服务内部网关 | 最外层反向代理 |
+| 对比   | Gateway        | Nginx   |
+| ---- | -------------- | ------- |
+| 层级   | 应用层（Java）      | 网络层（C）  |
+| 性能   | 较高             | 极高      |
+| 动态路由 | 支持（从 Nacos 发现） | 需手动配置   |
+| 业务逻辑 | 可以写 Java 过滤器   | 只能用 Lua |
+| 适用场景 | 微服务内部网关        | 最外层反向代理 |
 
 **生产架构**：Nginx（最外层）→ Gateway（微服务网关）→ 各服务
 
@@ -610,8 +532,6 @@ f.retry(c -> c.setRetries(2).setMethods(HttpMethod.GET)
 - [ ] 理解 `lb://` 负载均衡的含义，说得清轮询 vs 最少连接的适用场景（AI 对话耗时方差大）
 - [ ] 说得清本地内存限流 vs Redis 分布式限流的差异
 - [ ] 理解断路器按路由命名的必要性（失败统计隔离）
-- [ ] 知道断路器默认带 1s TimeLimiter，以及为什么网关层应禁用它
-- [ ] 说得出 addResilience 三层的执行顺序，以及重试为什么会重新扣限流令牌
 - [ ] 记住网关重试只对幂等 GET 的原因
 
 ---

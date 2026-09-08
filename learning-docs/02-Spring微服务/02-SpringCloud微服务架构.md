@@ -21,12 +21,12 @@
                                     └───────────┘
 ```
 
-| 对比项 | 单体 | 微服务 |
-|--------|------|--------|
-| 部署 | 整体部署，改一行重启全部 | 独立部署，互不影响 |
-| 开发 | 代码耦合，冲突多 | 各团队独立开发 |
-| 扩展 | 只能整体扩容 | 哪个服务压力大扩哪个 |
-| 复杂度 | 低 | 高（需要注册中心、网关等） |
+| 对比项 | 单体           | 微服务           |
+| --- | ------------ | ------------- |
+| 部署  | 整体部署，改一行重启全部 | 独立部署，互不影响     |
+| 开发  | 代码耦合，冲突多     | 各团队独立开发       |
+| 扩展  | 只能整体扩容       | 哪个服务压力大扩哪个    |
+| 复杂度 | 低            | 高（需要注册中心、网关等） |
 
 ---
 
@@ -62,6 +62,7 @@
 ### 3.1 是什么？
 
 Nacos 解决两个问题：
+
 1. **服务注册与发现**：服务启动时告诉 Nacos "我在哪"，调用方从 Nacos 查 "它在哪"
 2. **配置中心**：集中管理所有服务的配置，修改后实时推送
 
@@ -166,7 +167,7 @@ spring:
             - Path=/api/user/**         # 匹配路径
           filters:
             - StripPrefix=0             # 不剥离前缀
-            
+
         - id: chat-service
           uri: lb://ai-cs-chat
           predicates:
@@ -193,19 +194,19 @@ public class AuthGlobalFilter implements GlobalFilter, Ordered {
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         String path = exchange.getRequest().getPath().value();
-        
+
         // 白名单放行
         if (WHITE_LIST.stream().anyMatch(path::startsWith)) {
             return chain.filter(exchange);
         }
-        
+
         // 检查 Token
         String token = exchange.getRequest().getHeaders().getFirst("Authorization");
         if (token == null || !JwtUtil.validateToken(token.replace("Bearer ", ""))) {
             exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
             return exchange.getResponse().setComplete();
         }
-        
+
         return chain.filter(exchange);
     }
 
@@ -246,20 +247,20 @@ public interface ProductFeignClient {
 // 在 Service 中像调用本地方法一样使用
 @Service
 public class OrderServiceImpl implements OrderService {
-    
+
     @Autowired
     private ProductFeignClient productClient;
-    
+
     public OrderVO createOrder(Long userId, Long productId, int qty) {
         // 1. 查询商品（远程调用，但写起来像本地方法）
         Result<ProductVO> productResult = productClient.getProduct(productId);
         if (!productResult.isSuccess()) {
             throw new BusinessException("商品不存在");
         }
-        
+
         // 2. 扣减库存
         productClient.deductStock(productId, qty);
-        
+
         // 3. 创建订单
         // ...
     }
@@ -336,10 +337,10 @@ Nacos 控制台 (http://localhost:8848/nacos)
 @RestController
 @RefreshScope  // 配置变更时自动刷新这个 Bean
 public class ConfigController {
-    
+
     @Value("${ai.chat.max-tokens:2048}")
     private int maxTokens;  // Nacos 中修改后，不用重启就生效
-    
+
     @GetMapping("/config")
     public Result<Map<String, Object>> getConfig() {
         return Result.success(Map.of("maxTokens", maxTokens));

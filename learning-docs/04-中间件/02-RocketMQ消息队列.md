@@ -22,11 +22,11 @@
 
 ### 本项目的使用场景
 
-| 场景 | Topic | 说明 |
-|------|-------|------|
-| 订单超时取消 | ORDER_TIMEOUT | 下单后 30 分钟未支付 → 自动取消 |
-| 支付成功通知 | PAY_SUCCESS | 支付完成 → 通知发货、更新状态 |
-| 知识库更新 | KNOWLEDGE_UPDATE | 文档上传 → 异步向量化入库 |
+| 场景     | Topic            | 说明                  |
+| ------ | ---------------- | ------------------- |
+| 订单超时取消 | ORDER_TIMEOUT    | 下单后 30 分钟未支付 → 自动取消 |
+| 支付成功通知 | PAY_SUCCESS      | 支付完成 → 通知发货、更新状态    |
+| 知识库更新  | KNOWLEDGE_UPDATE | 文档上传 → 异步向量化入库      |
 
 ---
 
@@ -146,9 +146,9 @@ public class OrderServiceImpl implements OrderService {
 
 ### 5.2 延迟级别对照表
 
-| 级别 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | ... | 16 | 17 | 18 |
-|------|---|---|---|---|---|---|---|---|---|-----|----|----|-----|
-| 时间 | 1s | 5s | 10s | 30s | 1m | 2m | 3m | 4m | 5m | ... | 30m | 1h | 2h |
+| 级别  | 1   | 2   | 3   | 4   | 5   | 6   | 7   | 8   | 9   | ... | 16  | 17  | 18  |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 时间  | 1s  | 5s  | 10s | 30s | 1m  | 2m  | 3m  | 4m  | 5m  | ... | 30m | 1h  | 2h  |
 
 ---
 
@@ -185,10 +185,10 @@ public class OrderTimeoutListener implements RocketMQListener<String> {
         if (order.getStatus() == 0) {
             order.setStatus(4);  // 已取消
             orderMapper.updateById(order);
-            
+
             // 3. 恢复库存
             // productClient.restoreStock(order.getProductId(), order.getQuantity());
-            
+
             log.info("订单已自动取消: {}", orderNo);
         }
         // 如果已支付，忽略这条消息
@@ -219,12 +219,12 @@ public void onMessage(String orderNo) {
     // 幂等检查：用 Redis 记录已处理的消息
     String idempotentKey = "mq:consumed:ORDER_TIMEOUT:" + orderNo;
     Boolean isNew = redisTemplate.opsForValue().setIfAbsent(idempotentKey, "1", 24, TimeUnit.HOURS);
-    
+
     if (!Boolean.TRUE.equals(isNew)) {
         log.info("消息已处理过，跳过: {}", orderNo);
         return;
     }
-    
+
     // 正常业务逻辑...
 }
 ```

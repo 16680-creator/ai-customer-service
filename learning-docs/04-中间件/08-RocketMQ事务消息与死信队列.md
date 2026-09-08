@@ -39,6 +39,7 @@ ai-cs-order/.../listener/PaySuccessListener.java # 消费 → confirmPay（幂�
 ```
 
 **rocketmq-spring 2.3.0 API 变化（踩坑）**：
+
 - `@RocketMQTransactionListener` 的 `txProducerGroup` 属性已移除，监听器默认绑定主 `RocketMQTemplate`；
 - 发送签名变为 `sendMessageInTransaction(destination, message, arg)`，destination 即 topic；
 - 回查参数类型是 `MessageExt`（继承自 `Message`），消息体 JSON 反序列化取回 payload。

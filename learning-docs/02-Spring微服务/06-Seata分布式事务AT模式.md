@@ -2,7 +2,7 @@
 
 > 本文面向第一次接触 Seata 的读者。示例来自本项目的真实下单链路：
 > `ai-cs-order` 创建订单时调用 `ai-cs-product` 扣减库存。
->
+> 
 > 当前实现：Seata Server 1.7.1、AT 模式、file 注册/配置、order 发起全局事务、
 > product 参与分支事务。代码验证已经完成；依赖真实 MySQL + Seata Server 的故障注入验收
 > 需要 Docker 或可运行的基础设施环境。
@@ -65,12 +65,12 @@ sequenceDiagram
 
 ### 图中四个核心节点
 
-| 节点 | 职责 |
-|------|------|
-| `ai-cs-order` | 全局事务发起方，既是 TM，也是本地数据库 RM；`OrderServiceImpl.doCreateOrder` 上有 `@GlobalTransactional` |
-| `OpenFeign` | 业务 HTTP 调用工具；Seata 的 `SeataFeignRequestInterceptor` 将 order 线程中的 XID 注入 `TX_XID` 请求头 |
-| `ai-cs-product` | 分支事务参与方 RM；接收 `TX_XID`，执行扣库存本地事务，并通过数据源代理记录 undo_log |
-| `Seata Server` | TC 事务协调器；记录全局事务/分支事务，统一通知各 RM 提交或回滚 |
+| 节点              | 职责                                                                                   |
+| --------------- | ------------------------------------------------------------------------------------ |
+| `ai-cs-order`   | 全局事务发起方，既是 TM，也是本地数据库 RM；`OrderServiceImpl.doCreateOrder` 上有 `@GlobalTransactional`  |
+| `OpenFeign`     | 业务 HTTP 调用工具；Seata 的 `SeataFeignRequestInterceptor` 将 order 线程中的 XID 注入 `TX_XID` 请求头 |
+| `ai-cs-product` | 分支事务参与方 RM；接收 `TX_XID`，执行扣库存本地事务，并通过数据源代理记录 undo_log                                 |
+| `Seata Server`  | TC 事务协调器；记录全局事务/分支事务，统一通知各 RM 提交或回滚                                                  |
 
 ### 只看成功路径，可以简化为
 
@@ -168,11 +168,11 @@ Seata 是一个开源的分布式事务解决方案。它的核心目标是协�
 
 Seata 中有三个重要角色：
 
-| 角色 | 全称 | 作用 | 本项目对应 |
-|------|------|------|------------|
-| TC | Transaction Coordinator | 事务协调器，记录全局事务和分支事务，决定提交还是回滚 | Seata Server，8091 |
-| TM | Transaction Manager | 全局事务管理器，发起、提交、回滚全局事务 | order 服务的 `@GlobalTransactional` |
-| RM | Resource Manager | 管理本地数据库资源，向 TC 注册分支并执行提交/回滚 | order/product 的 Seata 数据源代理 |
+| 角色  | 全称                      | 作用                          | 本项目对应                            |
+| --- | ----------------------- | --------------------------- | -------------------------------- |
+| TC  | Transaction Coordinator | 事务协调器，记录全局事务和分支事务，决定提交还是回滚  | Seata Server，8091                |
+| TM  | Transaction Manager     | 全局事务管理器，发起、提交、回滚全局事务        | order 服务的 `@GlobalTransactional` |
+| RM  | Resource Manager        | 管理本地数据库资源，向 TC 注册分支并执行提交/回滚 | order/product 的 Seata 数据源代理      |
 
 可以把它理解为：
 
@@ -419,15 +419,15 @@ product 的 DataSource 被 Seata 代理，记录 undo_log 并注册 RM 分支
 
 ### 5.1 常见错误组合
 
-| 错误配置 | 表现 |
-|----------|------|
-| 只加 `@GlobalTransactional` | order 有 XID，但下游可能不参与 |
-| 使用裸 RestTemplate | product 收不到 `TX_XID` |
-| 缺少 `seata-http` | Boot 3 MVC 端可能没有 HTTP XID 绑定器 |
-| `enable-auto-data-source-proxy=false` | SQL 不生成 undo_log，无法 AT 回滚 |
-| product 数据库缺 `undo_log` | 分支提交或回滚时报表不存在 |
-| order/product 事务组不一致 | 客户端找不到对应 TC |
-| Seata Server 不可用 | 全局事务无法注册或完成协调 |
+| 错误配置                                  | 表现                            |
+| ------------------------------------- | ----------------------------- |
+| 只加 `@GlobalTransactional`             | order 有 XID，但下游可能不参与          |
+| 使用裸 RestTemplate                      | product 收不到 `TX_XID`          |
+| 缺少 `seata-http`                       | Boot 3 MVC 端可能没有 HTTP XID 绑定器 |
+| `enable-auto-data-source-proxy=false` | SQL 不生成 undo_log，无法 AT 回滚     |
+| product 数据库缺 `undo_log`               | 分支提交或回滚时报表不存在                 |
+| order/product 事务组不一致                  | 客户端找不到对应 TC                   |
+| Seata Server 不可用                      | 全局事务无法注册或完成协调                 |
 
 ---
 

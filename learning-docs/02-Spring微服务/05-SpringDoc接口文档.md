@@ -70,13 +70,13 @@ public class ChatController {
 
 ### 常用注解一览
 
-| 注解 | 作用 | 示例 |
-|------|------|------|
-| `@Tag` | 给 Controller 分组 | `@Tag(name = "AI对话")` |
-| `@Operation` | 描述接口用途 | `@Operation(summary = "发送对话消息")` |
-| `@Parameter` | 描述参数 | `@Parameter(description = "会话ID")` |
-| `@Schema` | 描述 DTO 字段 | `@Schema(description = "订单号")` |
-| `@ApiResponse` | 描述响应码 | `@ApiResponse(responseCode = "401", description = "未认证")` |
+| 注解             | 作用              | 示例                                                        |
+| -------------- | --------------- | --------------------------------------------------------- |
+| `@Tag`         | 给 Controller 分组 | `@Tag(name = "AI对话")`                                     |
+| `@Operation`   | 描述接口用途          | `@Operation(summary = "发送对话消息")`                          |
+| `@Parameter`   | 描述参数            | `@Parameter(description = "会话ID")`                        |
+| `@Schema`      | 描述 DTO 字段       | `@Schema(description = "订单号")`                            |
+| `@ApiResponse` | 描述响应码           | `@ApiResponse(responseCode = "401", description = "未认证")` |
 
 ### DTO 字段描述
 
@@ -97,12 +97,13 @@ public class OrderCreateDTO {
 
 启动任意服务后，访问：
 
-| 地址 | 说明 |
-|------|------|
-| `http://localhost:8083/swagger-ui.html` | Swagger UI 可视化界面 |
-| `http://localhost:8083/v3/api-docs` | OpenAPI JSON 原始数据 |
+| 地址                                      | 说明                |
+| --------------------------------------- | ----------------- |
+| `http://localhost:8083/swagger-ui.html` | Swagger UI 可视化界面  |
+| `http://localhost:8083/v3/api-docs`     | OpenAPI JSON 原始数据 |
 
 在 Swagger UI 上可以：
+
 1. 查看所有接口的分组、路径、参数、响应结构
 2. **直接在线调试**（点击 Try it out → 填参数 → Execute）
 3. 拷贝每个接口的 curl 命令
@@ -120,6 +121,7 @@ http://localhost:8080/api/chat/v3/api-docs
 ```
 
 注意：接口文档路径已加入网关鉴权白名单（见 AuthFilter 的 WHITE_LIST）：
+
 ```java
 private static final List<String> WHITE_LIST = List.of(
         "/doc.html",

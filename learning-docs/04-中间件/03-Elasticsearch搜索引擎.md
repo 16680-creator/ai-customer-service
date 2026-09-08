@@ -18,24 +18,24 @@ Elasticsearch 搜索：
 
 ### 本项目的使用场景
 
-| 场景 | 索引 | 说明 |
-|------|------|------|
-| 商品搜索 | product_index | 按名称、描述、分类搜索商品 |
+| 场景    | 索引              | 说明                |
+| ----- | --------------- | ----------------- |
+| 商品搜索  | product_index   | 按名称、描述、分类搜索商品     |
 | 知识库检索 | knowledge_index | AI 对话时检索相关文档（RAG） |
-| 搜索建议 | suggest_index | 输入联想、热门搜索 |
+| 搜索建议  | suggest_index   | 输入联想、热门搜索         |
 
 ---
 
 ## 二、核心概念对照
 
-| MySQL | Elasticsearch | 说明 |
-|-------|--------------|------|
-| Database | Index（索引） | 数据的容器 |
-| Table | Type（7.x 后废弃） | — |
-| Row | Document（文档） | 一条数据（JSON） |
-| Column | Field（字段） | 一个属性 |
-| Schema | Mapping（映射） | 字段类型定义 |
-| SQL | DSL（Query DSL） | 查询语言 |
+| MySQL    | Elasticsearch  | 说明         |
+| -------- | -------------- | ---------- |
+| Database | Index（索引）      | 数据的容器      |
+| Table    | Type（7.x 后废弃）  | —          |
+| Row      | Document（文档）   | 一条数据（JSON） |
+| Column   | Field（字段）      | 一个属性       |
+| Schema   | Mapping（映射）    | 字段类型定义     |
+| SQL      | DSL（Query DSL） | 查询语言       |
 
 ---
 
@@ -104,13 +104,13 @@ curl -X PUT "localhost:9200/product_index" -H 'Content-Type: application/json' -
 
 ### 4.2 字段类型说明
 
-| 类型 | 用途 | 是否分词 |
-|------|------|---------|
-| `text` | 全文搜索（商品名、描述） | 是 |
-| `keyword` | 精确匹配（分类、状态） | 否 |
-| `long/integer/double` | 数值 | 否 |
-| `date` | 日期 | 否 |
-| `boolean` | 布尔 | 否 |
+| 类型                    | 用途           | 是否分词 |
+| --------------------- | ------------ | ---- |
+| `text`                | 全文搜索（商品名、描述） | 是    |
+| `keyword`             | 精确匹配（分类、状态）  | 否    |
+| `long/integer/double` | 数值           | 否    |
+| `date`                | 日期           | 否    |
+| `boolean`             | 布尔           | 否    |
 
 ### 4.3 文档 CRUD
 
@@ -213,11 +213,11 @@ public class ElasticsearchConfig {
         RestClient restClient = RestClient.builder(
             new HttpHost("localhost", 9200, "http")
         ).build();
-        
+
         ElasticsearchTransport transport = new RestClientTransport(
             restClient, new JacksonJsonpMapper()
         );
-        
+
         return new ElasticsearchClient(transport);
     }
 }
