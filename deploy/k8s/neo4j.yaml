@@ -1,30 +1,40 @@
+# ============================================================
+# Neo4j 图数据库部署（社区版）
+# ------------------------------------------------------------
+# 用途：知识图谱存储（实体/关系），AI 客服可用它做知识关联推理
+# 部署顺序：先 apply middleware-secrets（neo4j-secret），再 apply 本文件
+# 访问方式：浏览器开 http://<节点IP>:7474（管理界面）
+# ============================================================
+
+# ---------- 第一部分：Service（集群内访问入口） ----------
 apiVersion: v1
 kind: Service
 metadata:
-  name: neo4j
+  name: neo4j                   # Service 名，容器内用 neo4j:7687（Bolt）连接
   namespace: ai-customer-service
 spec:
   selector:
-    app: neo4j
+    app: neo4j                  # 流量转发给带 app=neo4j 标签的 Pod
   ports:
     - name: http
-      port: 7474
+      port: 7474                # 7474：HTTP 端口（Web 管理界面）
       targetPort: 7474
     - name: bolt
-      port: 7687
+      port: 7687                # 7687：Bolt 协议端口（驱动程序连接数据库用这个）
       targetPort: 7687
 ---
+# ---------- 第二部分：StatefulSet（有状态部署） ----------
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: neo4j
   namespace: ai-customer-service
 spec:
-  serviceName: neo4j
-  replicas: 1
+  serviceName: neo4j            # 关联上面同名的 Service
+  replicas: 1                   # 单副本（社区版本身也不支持集群）
   selector:
     matchLabels:
-      app: neo4j
+      app: neo4j                # 与 template 的标签保持一致，StatefulSet 靠它找 Pod
   template:
     metadata:
       labels:
@@ -32,43 +42,43 @@ spec:
     spec:
       containers:
         - name: neo4j
-          image: neo4j:5-community
+          image: neo4j:5-community        # Neo4j 5.x 社区版（免费，无集群/高级安全功能）
           ports:
-            - containerPort: 7474
-            - containerPort: 7687
+            - containerPort: 7474         # HTTP 管理端口
+            - containerPort: 7687         # Bolt 数据端口
           env:
-            - name: NEO4J_AUTH
+            - name: NEO4J_AUTH            # 认证配置，格式“用户名/密码”
               valueFrom:
-                secretKeyRef:
-                  name: neo4j-secret
-                  key: auth
+                secretKeyRef:             # 不把密码明文写在清单里，从 Secret 取
+                  name: neo4j-secret      # Secret 名（见 middleware-secrets.example.yaml）
+                  key: auth               # 取该 Secret 中 key=auth 的值
           volumeMounts:
             - name: data
-              mountPath: /data
-          readinessProbe:
+              mountPath: /data            # Neo4j 数据目录（图数据、事务日志）
+          readinessProbe:                 # 就绪探测：通过后才接入 Service 流量
             httpGet:
-              path: /
+              path: /                     # Neo4j HTTP 根路径可访问即视为就绪
               port: 7474
             initialDelaySeconds: 30
             periodSeconds: 10
-          livenessProbe:
-            tcpSocket:
+          livenessProbe:                  # 存活探测：连续失败则重启容器
+            tcpSocket:                    # 只测 Bolt 端口 TCP 是否可连（轻量）
               port: 7687
-            initialDelaySeconds: 60
+            initialDelaySeconds: 60       # Neo4j 启动慢，等 60 秒再开始探测
             periodSeconds: 20
           resources:
-            requests:
-              cpu: "250m"
+            requests:                     # 调度时的最低资源承诺
+              cpu: "250m"                 # 0.25 核
               memory: "512Mi"
-            limits:
-              cpu: "1"
-              memory: "2Gi"
-  volumeClaimTemplates:
+            limits:                       # 资源硬上限
+              cpu: "1"                    # 1 核
+              memory: "2Gi"               # Neo4j 建议给足内存（堆+页缓存）
+  volumeClaimTemplates:                   # 每个 Pod 自动创建 PVC，持久化图数据
     - metadata:
-        name: data
+        name: data                        # 对应 volumeMounts 的 name
       spec:
-        accessModes: ["ReadWriteOnce"]
-        storageClassName: local-path
+        accessModes: ["ReadWriteOnce"]    # 单节点读写
+        storageClassName: local-path      # 本地路径存储（学习环境）
         resources:
           requests:
-            storage: 20Gi
+            storage: 20Gi                 # 20GB 图数据空间

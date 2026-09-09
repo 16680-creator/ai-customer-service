@@ -1,12 +1,28 @@
+# ============================================================
+# 商品服务（product-service）部署
+# ------------------------------------------------------------
+# 职责：商品/类目/库存管理；数据库 product_db
+# ⚠️ 注意：本文件与其他服务清单“不是一套风格”，存在多处待确认项
+#    （见下方行内 ⚠️ 注释），直接 apply 大概率跑不起来，仅作参考模板：
+#    1. namespace 用的是 aics —— 但 namespace.yaml 只创建了
+#       ai-customer-service，且其他服务都不在 aics 里
+#    2. 引用 mysql-secret —— middleware-secrets.example.yaml 里没有定义它
+#    3. 连的是 mysql-svc / redis-svc / nacos-svc —— 本目录的 Service
+#       实际叫 mysql(-master/-slave) / redis / nacos
+#    4. 镜像 aics/ai-cs-product:latest 没有私有仓库前缀，集群拉不到
+# ============================================================
+
+# ---------- 第一部分：Deployment（注意：本文件 Deployment 写在 Service 前面） ----------
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: product-service
-  namespace: aics
+  namespace: aics               # ⚠️ 与其他服务（ai-customer-service）不一致；若未创建
+                                #    aics 命名空间，apply 会直接报 NotFound 错误
   labels:
     app: product-service
 spec:
-  replicas: 2
+  replicas: 2                   # 2 副本（唯一一个多副本的业务服务，可体验负载均衡）
   selector:
     matchLabels:
       app: product-service
@@ -17,58 +33,64 @@ spec:
     spec:
       containers:
         - name: product-service
-          image: aics/ai-cs-product:latest
+          image: aics/ai-cs-product:latest    # ⚠️ 无私仓前缀；其他服务都是
+                                              #    192.168.56.12:5000/aics/xxx:latest
           ports:
-            - containerPort: 8088
-          env:
+            - containerPort: 8088             # 商品服务端口（不在 8081~8086 规划内）
+          env:                  # ---- 注意：这里用的是“完整 Spring 属性名”直接覆盖配置 ----
             - name: SPRING_DATASOURCE_URL
               value: "jdbc:mysql://mysql-svc:3306/product_db?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai"
+              # ⚠️ mysql-svc 不存在，应为 mysql-master；参数含义：
+              #    useUnicode/characterEncoding —— 中文支持
+              #    useSSL=false —— 学习环境关掉连接加密
+              #    serverTimezone —— 时区，避免时间差 8 小时
             - name: SPRING_DATASOURCE_USERNAME
               valueFrom:
-                secretKeyRef:
-                  name: mysql-secret
+                secretKeyRef:   # 用户名从 Secret 取（比明文写安全）
+                  name: mysql-secret   # ⚠️ 该 Secret 未在本目录任何文件中定义
                   key: username
             - name: SPRING_DATASOURCE_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: mysql-secret
+                  name: mysql-secret   # ⚠️ 同上，需要先自行创建这个 Secret
                   key: password
             - name: SPRING_DATA_REDIS_HOST
-              value: "redis-svc"
+              value: "redis-svc"       # ⚠️ 本目录的 Redis Service 叫 redis
             - name: SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR
-              value: "nacos-svc:8848"
+              value: "nacos-svc:8848"  # ⚠️ 本目录的 Nacos Service 叫 nacos
           resources:
-            requests:
+            requests:         # 调度承诺值
               memory: "256Mi"
               cpu: "250m"
-            limits:
+            limits:           # 硬上限
               memory: "512Mi"
               cpu: "500m"
-          readinessProbe:
-            httpGet:
-              path: /actuator/health
+          readinessProbe:     # 就绪探测：这里用 HTTP 健康端点（比 TCP 探测更准确）
+            httpGet:          # actuator/health 返回 UP 才接流量（要求应用引入
+              path: /actuator/health   # spring-boot-starter-actuator）
               port: 8088
             initialDelaySeconds: 30
             periodSeconds: 10
-          livenessProbe:
+          livenessProbe:      # 存活探测：失败重启容器
             httpGet:
               path: /actuator/health
               port: 8088
             initialDelaySeconds: 60
             periodSeconds: 20
 ---
+# ---------- 第二部分：Service（集群内访问入口） ----------
 apiVersion: v1
 kind: Service
 metadata:
   name: product-service
-  namespace: aics
+  namespace: aics               # ⚠️ 与 Deployment 的 namespace 必须一致才选得到 Pod
   labels:
     app: product-service
 spec:
   selector:
-    app: product-service
+    app: product-service        # 转发给带此标签的 Pod
   ports:
-    - port: 8088
-      targetPort: 8088
+    - port: 8088                # Service 端口
+      targetPort: 8088          # 容器端口
       protocol: TCP
-  type: ClusterIP
+  type: ClusterIP               # 仅集群内访问

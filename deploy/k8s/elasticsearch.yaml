@@ -1,23 +1,33 @@
-# Elasticsearch 部署 - StatefulSet 单节点
+# ============================================================
+# Elasticsearch 部署（单节点 StatefulSet）
+# ------------------------------------------------------------
+# 用途：知识库全文检索、日志存储；search-service 通过 9200 端口查询
+# 部署命令：kubectl apply -f deploy/k8s/elasticsearch.yaml
+# 验证：kubectl exec 后 curl http://localhost:9200/_cluster/health
+# ============================================================
+
+# ---------- 第一部分：Service（集群内访问入口） ----------
 apiVersion: v1
 kind: Service
 metadata:
-  name: elasticsearch
+  name: elasticsearch           # search-service 的 ELASTICSEARCH_URIS 指向它
   namespace: ai-customer-service
   labels:
     app: elasticsearch
 spec:
   type: ClusterIP
   ports:
-    - port: 9200
+    - port: 9200                # 9200：HTTP REST API 端口（程序/浏览器访问这个）
       targetPort: 9200
       name: http
-    - port: 9300
+    - port: 9300                # 9300：节点间通信 TCP 端口（集群内部用）
       targetPort: 9300
       name: transport
   selector:
     app: elasticsearch
 ---
+# ---------- 第二部分：StatefulSet（有状态部署） ----------
+# ES 数据必须持久化，所以用 StatefulSet + PVC
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -26,8 +36,8 @@ metadata:
   labels:
     app: elasticsearch
 spec:
-  serviceName: elasticsearch
-  replicas: 1
+  serviceName: elasticsearch    # 关联同名 Service
+  replicas: 1                   # 单节点（通过环境变量 discovery.type 声明）
   selector:
     matchLabels:
       app: elasticsearch
@@ -38,51 +48,51 @@ spec:
     spec:
       containers:
         - name: elasticsearch
-          image: elasticsearch:8.12.0
+          image: elasticsearch:8.12.0     # ES 8.12 官方镜像
           ports:
             - containerPort: 9200
               name: http
             - containerPort: 9300
               name: transport
-          env:
+          env:                            # ---- ES 官方镜像的环境变量约定 ----
             - name: discovery.type
-              value: "single-node"
+              value: "single-node"        # 单节点模式：跳过选主，自己就是整个集群
             - name: xpack.security.enabled
-              value: "false"
+              value: "false"              # 关闭安全认证（学习环境简化；生产必须开启！）
             - name: xpack.security.http.ssl.enabled
-              value: "false"
+              value: "false"              # 关闭 HTTPS（学习环境用明文 HTTP）
             - name: ES_JAVA_OPTS
-              value: "-Xms512m -Xmx512m"
+              value: "-Xms512m -Xmx512m"  # JVM 堆固定 512MB；Xms=Xmx 避免运行时扩容抖动
           volumeMounts:
             - name: es-data
-              mountPath: /usr/share/elasticsearch/data
+              mountPath: /usr/share/elasticsearch/data  # ES 索引数据目录
           resources:
-            requests:
+            requests:                     # ES 比较吃资源，requests 给大一点保证调度
               cpu: "500m"
               memory: "1Gi"
             limits:
               cpu: "2000m"
-              memory: "2Gi"
-          livenessProbe:
+              memory: "2Gi"               # 注意：容器内存需大于 JVM 堆+堆外内存
+          livenessProbe:                  # 存活探测：集群健康接口
             httpGet:
               path: /_cluster/health
               port: 9200
-            initialDelaySeconds: 60
+            initialDelaySeconds: 60       # ES 启动慢，等 60 秒再探测
             periodSeconds: 15
             timeoutSeconds: 10
-          readinessProbe:
+          readinessProbe:                 # 就绪探测：同一接口，通过才接流量
             httpGet:
               path: /_cluster/health
               port: 9200
             initialDelaySeconds: 30
             periodSeconds: 10
             timeoutSeconds: 5
-  volumeClaimTemplates:
+  volumeClaimTemplates:                   # 自动创建 PVC 持久化索引数据
     - metadata:
-        name: es-data
+        name: es-data                     # 对应 volumeMounts 的 name
       spec:
         accessModes: ["ReadWriteOnce"]
         storageClassName: local-path
         resources:
           requests:
-            storage: 20Gi
+            storage: 20Gi                 # 20GB：放知识库索引比较充裕

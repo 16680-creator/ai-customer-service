@@ -1,49 +1,85 @@
-# MySQL 主从部署 - StatefulSet
-# 1主2从架构，通过ConfigMap区分主从配置
+# ============================================================
+# MySQL 主从部署（1 主 2 从，StatefulSet）
+# ------------------------------------------------------------
+# 架构说明：
+#   主库（master）：负责所有“写”（INSERT/UPDATE/DELETE），写操作记录进 binlog
+#   从库（slave） ：把主库的 binlog 拉回本地重放（relay-log），实现数据同步，负责“读”
+# 本文件包含 6 个资源（用 --- 分隔）：
+#   1. ConfigMap 主库配置   2. ConfigMap 从库配置
+#   3. Service 主库         4. Service 从库
+#   5. StatefulSet 主库     6. StatefulSet 从库（2 副本）
+# 部署命令：kubectl apply -f deploy/k8s/mysql.yaml
+# 注意：主从复制关系（CHANGE MASTER TO）需要部署后手动/脚本初始化，
+#       参考 deploy/mysql/master.cnf、slave.cnf 与 scripts/k8s-init-mysql.sh
+# ============================================================
+
+# ---------- 资源 1：主库 ConfigMap（MySQL 配置文件） ----------
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: mysql-master-config
+  name: mysql-master-config     # 主库 StatefulSet 按此名挂载
   namespace: ai-customer-service
 data:
+  # 注意：多行块里的注释也是配置文件内容的一部分；
+  # MySQL 的 cnf 支持行尾注释，但这里统一用“整行注释”更稳妥
   master.cnf: |
     [mysqld]
+    # 复制集群内唯一 ID：主库=1（从库必须不同）
     server-id=1
+    # 开启二进制日志：所有写操作记录到 mysql-bin 文件，主从同步的数据源
     log-bin=mysql-bin
+    # binlog 记录“行级变更”（而非 SQL 语句），主从一致性最好
     binlog-format=ROW
+    # 事务未提交时 binlog 的内存缓存大小
     binlog-cache-size=1M
+    # 单个 binlog 文件最大 500MB，超过就切新文件
     max-binlog-size=500M
+    # binlog 保留 7 天，过期自动清理（防磁盘爆满）
     expire-logs-days=7
+    # 服务端默认字符集：utf8mb4 支持中文和 emoji
     character-set-server=utf8mb4
+    # 排序规则（与字符集配套）
     collation-server=utf8mb4_unicode_ci
+    # 表名不区分大小写（Windows 习惯，跨平台迁移少踩坑）
     lower-case-table-names=1
 ---
+# ---------- 资源 2：从库 ConfigMap（MySQL 配置文件） ----------
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: mysql-slave-config
+  name: mysql-slave-config      # 从库 StatefulSet 按此名挂载
   namespace: ai-customer-service
 data:
   slave.cnf: |
     [mysqld]
+    # 从库 ID（必须与主库不同；同组的两个从库副本共用此配置）
     server-id=2
+    # 中继日志：从库把主库 binlog 拉回来先写 relay-log 再重放
     relay-log=relay-bin
+    # relay-log 的索引文件
     relay-log-index=relay-bin.index
+    # 从库强制只读：普通用户不能写，写请求必须走主库
     read-only=1
+    # 未开启“超级只读”（管理员也禁写）；=1 则更严格
     super-read-only=0
+    # 只复制 user_db 库（学习环境按需过滤）
     replicate-do-db=user_db
+    # 只复制 knowledge_db 库
     replicate-do-db=knowledge_db
+    # 只复制 chat_db 库
     replicate-do-db=chat_db
+    # 只复制 nacos_config 库
     replicate-do-db=nacos_config
     character-set-server=utf8mb4
     collation-server=utf8mb4_unicode_ci
     lower-case-table-names=1
 ---
-# MySQL 主库 Service
+# ---------- 资源 3：主库 Service（写流量入口） ----------
+# 业务服务写数据时 MYSQL_HOST 填 mysql-master
 apiVersion: v1
 kind: Service
 metadata:
-  name: mysql-master
+  name: mysql-master            # Service 名 = 集群内 DNS 名
   namespace: ai-customer-service
   labels:
     app: mysql-master
@@ -54,10 +90,11 @@ spec:
       targetPort: 3306
       name: mysql
   selector:
-    app: mysql
+    app: mysql                  # 选中同时带 app=mysql + role=master 标签的 Pod
     role: master
 ---
-# MySQL 从库 Service
+# ---------- 资源 4：从库 Service（读流量入口） ----------
+# 只读查询、报表类请求可以指向 mysql-slave，它会负载均衡到 2 个从库副本
 apiVersion: v1
 kind: Service
 metadata:
@@ -73,9 +110,9 @@ spec:
       name: mysql
   selector:
     app: mysql
-    role: slave
+    role: slave                 # 选中 role=slave 的 Pod（2 个副本自动负载均衡）
 ---
-# MySQL 主库 StatefulSet
+# ---------- 资源 5：主库 StatefulSet ----------
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -85,35 +122,35 @@ metadata:
     app: mysql
     role: master
 spec:
-  serviceName: mysql-master
-  replicas: 1
+  serviceName: mysql-master     # 关联主库 Service
+  replicas: 1                   # 主库只能 1 个
   selector:
     matchLabels:
       app: mysql
-      role: master
+      role: master              # 只管理 role=master 的 Pod
   template:
     metadata:
       labels:
-        app: mysql
+        app: mysql              # 标签与 Service 的 selector 对应
         role: master
     spec:
       containers:
         - name: mysql
-          image: mysql:8.0
+          image: mysql:8.0      # MySQL 8.0 官方镜像
           ports:
             - containerPort: 3306
               name: mysql
           env:
             - name: MYSQL_ROOT_PASSWORD
-              value: "root"
+              value: "root"     # root 密码（学习环境；生产应改用 Secret）
             - name: TZ
-              value: "Asia/Shanghai"
+              value: "Asia/Shanghai"  # 时区，避免时间字段差 8 小时
           volumeMounts:
             - name: mysql-master-data
-              mountPath: /var/lib/mysql
+              mountPath: /var/lib/mysql   # 数据目录挂持久卷
             - name: master-config
-              mountPath: /etc/mysql/conf.d/master.cnf
-              subPath: master.cnf
+              mountPath: /etc/mysql/conf.d/master.cnf   # 自定义配置挂到 MySQL 配置目录
+              subPath: master.cnf           # 只挂这一个文件，不覆盖 conf.d 整个目录
           resources:
             requests:
               cpu: "250m"
@@ -121,7 +158,7 @@ spec:
             limits:
               cpu: "1000m"
               memory: "1Gi"
-          livenessProbe:
+          livenessProbe:          # 存活探测：mysqladmin ping 失败则重启容器
             exec:
               command:
                 - mysqladmin
@@ -129,11 +166,11 @@ spec:
                 - -h
                 - localhost
                 - -uroot
-                - -proot
+                - -proot          # 探测用的账号密码（-p 和密码之间不能有空格）
             initialDelaySeconds: 30
             periodSeconds: 10
             timeoutSeconds: 5
-          readinessProbe:
+          readinessProbe:         # 就绪探测：通过才接业务流量
             exec:
               command:
                 - mysqladmin
@@ -146,10 +183,10 @@ spec:
             periodSeconds: 5
             timeoutSeconds: 3
       volumes:
-        - name: master-config
+        - name: master-config     # 把资源 1 的 ConfigMap 挂进来
           configMap:
             name: mysql-master-config
-  volumeClaimTemplates:
+  volumeClaimTemplates:           # 每个 Pod 自动创建 PVC
     - metadata:
         name: mysql-master-data
       spec:
@@ -157,9 +194,9 @@ spec:
         storageClassName: local-path
         resources:
           requests:
-            storage: 10Gi
+            storage: 10Gi         # 10GB 数据空间
 ---
-# MySQL 从库 StatefulSet
+# ---------- 资源 6：从库 StatefulSet（2 副本） ----------
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -169,8 +206,8 @@ metadata:
     app: mysql
     role: slave
 spec:
-  serviceName: mysql-slave
-  replicas: 2
+  serviceName: mysql-slave       # 关联从库 Service
+  replicas: 2                    # 2 个从库副本：Pod 名为 mysql-slave-0 / mysql-slave-1
   selector:
     matchLabels:
       app: mysql
@@ -189,7 +226,7 @@ spec:
               name: mysql
           env:
             - name: MYSQL_ROOT_PASSWORD
-              value: "root"
+              value: "root"      # 密码必须与主库一致（复制账号用它登录主库拉 binlog）
             - name: TZ
               value: "Asia/Shanghai"
           volumeMounts:
@@ -230,10 +267,10 @@ spec:
             periodSeconds: 5
             timeoutSeconds: 3
       volumes:
-        - name: slave-config
+        - name: slave-config      # 把资源 2 的 ConfigMap 挂进来
           configMap:
             name: mysql-slave-config
-  volumeClaimTemplates:
+  volumeClaimTemplates:           # 每个从库副本各自拥有独立的 10GB PVC
     - metadata:
         name: mysql-slave-data
       spec:

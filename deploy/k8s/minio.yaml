@@ -1,23 +1,32 @@
-# MinIO 对象存储，本地学习环境使用单节点部署
+# ============================================================
+# MinIO 对象存储部署（单节点）—— 本地学习环境使用单节点部署
+# ------------------------------------------------------------
+# 用途：存知识库原始文档（PDF/Word/图片等文件），S3 兼容 API
+# 部署命令：kubectl apply -f deploy/k8s/minio.yaml
+# 访问方式：9000=API 端口（程序用），9001=Web 控制台（浏览器管理用）
+# ============================================================
+
+# ---------- 第一部分：Service（集群内访问入口） ----------
 apiVersion: v1
 kind: Service
 metadata:
-  name: minio
+  name: minio                   # knowledge-service 的 MINIO_ENDPOINT=minio:9000 指向它
   namespace: ai-customer-service
   labels:
     app: minio
 spec:
-  type: ClusterIP
+  type: ClusterIP               # 仅集群内；想浏览器打开控制台需临时 port-forward 或改 NodePort
   ports:
-    - port: 9000
+    - port: 9000                # 9000：S3 兼容 API 端口
       targetPort: 9000
       name: api
-    - port: 9001
+    - port: 9001                # 9001：Web 管理控制台端口
       targetPort: 9001
       name: console
   selector:
     app: minio
 ---
+# ---------- 第二部分：StatefulSet（有状态部署） ----------
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -27,7 +36,7 @@ metadata:
     app: minio
 spec:
   serviceName: minio
-  replicas: 1
+  replicas: 1                   # 单节点单盘模式（学习环境）
   selector:
     matchLabels:
       app: minio
@@ -39,10 +48,10 @@ spec:
       containers:
         - name: minio
           image: minio/minio:latest
-          args:
+          args:                 # args 追加在镜像 ENTRYPOINT 后：启动 server 模式
             - server
-            - /data
-            - --console-address
+            - /data             # 数据目录
+            - --console-address # 指定控制台监听地址
             - ":9001"
           ports:
             - containerPort: 9000
@@ -51,12 +60,12 @@ spec:
               name: console
           env:
             - name: MINIO_ROOT_USER
-              value: "minioadmin"
+              value: "minioadmin"     # 管理员账号（默认值，学习环境；生产务必改掉）
             - name: MINIO_ROOT_PASSWORD
-              value: "minioadmin"
+              value: "minioadmin"     # 管理员密码（至少 8 位；生产应改用 Secret）
           volumeMounts:
             - name: minio-data
-              mountPath: /data
+              mountPath: /data        # 所有上传的文件都存到这个持久卷
           resources:
             requests:
               cpu: "100m"
@@ -64,19 +73,19 @@ spec:
             limits:
               cpu: "500m"
               memory: "512Mi"
-          livenessProbe:
+          livenessProbe:              # 存活探测：MinIO 官方存活接口
             httpGet:
               path: /minio/health/live
               port: 9000
             initialDelaySeconds: 30
             periodSeconds: 10
-          readinessProbe:
+          readinessProbe:             # 就绪探测：官方就绪接口
             httpGet:
               path: /minio/health/ready
               port: 9000
             initialDelaySeconds: 15
             periodSeconds: 5
-  volumeClaimTemplates:
+  volumeClaimTemplates:               # 持久卷：Pod 重建后文件不丢
     - metadata:
         name: minio-data
       spec:
@@ -84,4 +93,4 @@ spec:
         storageClassName: local-path
         resources:
           requests:
-            storage: 10Gi
+            storage: 10Gi             # 10GB 存储文档

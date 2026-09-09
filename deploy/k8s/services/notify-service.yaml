@@ -1,4 +1,13 @@
-# 通知服务部署
+# ============================================================
+# 通知服务（notify-service）部署
+# ------------------------------------------------------------
+# 职责：消费 RocketMQ 事件，发送站内信/短信/邮件等通知
+# 依赖：RocketMQ（事件来源），无数据库直连
+# 部署命令：kubectl apply -f deploy/k8s/services/notify-service.yaml
+# 集群内访问：http://notify-service:8086
+# ============================================================
+
+# ---------- 第一部分：Service（集群内访问入口） ----------
 apiVersion: v1
 kind: Service
 metadata:
@@ -7,14 +16,15 @@ metadata:
   labels:
     app: notify-service
 spec:
-  type: ClusterIP
+  type: ClusterIP               # 仅集群内，外部流量走网关
   ports:
-    - port: 8086
-      targetPort: 8086
+    - port: 8086                # Service 端口
+      targetPort: 8086          # 容器端口
       name: http
   selector:
-    app: notify-service
+    app: notify-service         # 后端 Pod 标签
 ---
+# ---------- 第二部分：Deployment ----------
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -23,7 +33,7 @@ metadata:
   labels:
     app: notify-service
 spec:
-  replicas: 1
+  replicas: 1                   # 单副本
   selector:
     matchLabels:
       app: notify-service
@@ -35,19 +45,20 @@ spec:
       containers:
         - name: notify-service
           image: 192.168.56.12:5000/aics/notify-service:latest
-          imagePullPolicy: IfNotPresent
+          # ↑ 私有镜像仓库（192.168.56.12:5000），构建推送见 k8s-build-push.sh
+          imagePullPolicy: IfNotPresent   # 本地有镜像就不重新拉取
           ports:
             - containerPort: 8086
               name: http
           env:
             - name: NACOS_ADDR
-              value: "nacos:8848"
+              value: "nacos:8848"          # 注册/配置中心
             - name: NACOS_NAMESPACE
-              value: ""
+              value: ""                    # Nacos 命名空间（空=public）
             - name: ROCKETMQ_NAMESRV
-              value: "rocketmq-namesrv:9876"
+              value: "rocketmq-namesrv:9876"   # NameServer：从这里发现 Broker 消费消息
             - name: JAVA_OPTS
-              value: "-Xms256m -Xmx256m"
+              value: "-Xms256m -Xmx256m"   # JVM 堆 256MB
           resources:
             requests:
               cpu: "100m"
@@ -55,13 +66,13 @@ spec:
             limits:
               cpu: "500m"
               memory: "512Mi"
-          livenessProbe:
+          livenessProbe:          # 存活探测
             tcpSocket:
               port: 8086
             initialDelaySeconds: 60
             periodSeconds: 15
             timeoutSeconds: 5
-          readinessProbe:
+          readinessProbe:         # 就绪探测
             tcpSocket:
               port: 8086
             initialDelaySeconds: 30

@@ -1,4 +1,12 @@
-# 用户服务部署
+# ============================================================
+# 用户服务（user-service）部署
+# ------------------------------------------------------------
+# 职责：用户注册/登录（JWT）、用户信息管理；数据库 user_db
+# 部署命令：kubectl apply -f deploy/k8s/services/user-service.yaml
+# 集群内访问：http://user-service:8081（外部走网关 30080 转发）
+# ============================================================
+
+# ---------- 第一部分：Service（集群内访问入口） ----------
 apiVersion: v1
 kind: Service
 metadata:
@@ -7,14 +15,15 @@ metadata:
   labels:
     app: user-service
 spec:
-  type: ClusterIP
+  type: ClusterIP               # 仅集群内访问：外部请求必须经过网关，不能直连
   ports:
-    - port: 8081
-      targetPort: 8081
+    - port: 8081                # Service 端口（各服务端口规划：8081~8086）
+      targetPort: 8081          # 容器端口
       name: http
   selector:
-    app: user-service
+    app: user-service           # 后端 Pod 标签
 ---
+# ---------- 第二部分：Deployment ----------
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -23,7 +32,7 @@ metadata:
   labels:
     app: user-service
 spec:
-  replicas: 1
+  replicas: 1                   # 单副本
   selector:
     matchLabels:
       app: user-service
@@ -35,27 +44,30 @@ spec:
       containers:
         - name: user-service
           image: 192.168.56.12:5000/aics/user-service:latest
-          imagePullPolicy: IfNotPresent
+          # ↑ 私有镜像仓库地址（192.168.56.12:5000），构建推送见 deploy/scripts/k8s-build-push.sh
+          imagePullPolicy: IfNotPresent   # 本地有镜像就不重新拉取
           ports:
             - containerPort: 8081
               name: http
-          env:
+          env:                  # ---- 环境变量：Spring Boot 的 application.yml 会引用它们 ----
             - name: NACOS_ADDR
-              value: "nacos:8848"
+              value: "nacos:8848"          # 注册/配置中心：服务注册与发现
             - name: NACOS_NAMESPACE
-              value: ""
+              value: ""                    # Nacos 命名空间（空=public）
             - name: MYSQL_HOST
-              value: "mysql"
+              value: "mysql"               # MySQL 地址
+              # 注意：k8s/mysql.yaml 里创建的 Service 叫 mysql-master / mysql-slave，
+              # 并没有叫 “mysql” 的 Service。若连接失败，把它改成 mysql-master
             - name: MYSQL_PORT
               value: "3306"
             - name: MYSQL_DB
-              value: "user_db"
+              value: "user_db"             # 用户库（建库脚本 deploy/mysql/user-*.sql）
             - name: MYSQL_USER
               value: "root"
             - name: MYSQL_PASSWORD
-              value: "root"
+              value: "root"                # 学习环境明文；生产应改用 secretKeyRef
             - name: JAVA_OPTS
-              value: "-Xms256m -Xmx256m"
+              value: "-Xms256m -Xmx256m"   # JVM 堆 256MB
           resources:
             requests:
               cpu: "100m"
@@ -63,13 +75,13 @@ spec:
             limits:
               cpu: "500m"
               memory: "512Mi"
-          livenessProbe:
+          livenessProbe:          # 存活探测：TCP 端口连通即可
             tcpSocket:
               port: 8081
-            initialDelaySeconds: 60
+            initialDelaySeconds: 60   # 给 Spring Boot 启动留时间
             periodSeconds: 15
             timeoutSeconds: 5
-          readinessProbe:
+          readinessProbe:         # 就绪探测：通过才接 Service 流量
             tcpSocket:
               port: 8081
             initialDelaySeconds: 30

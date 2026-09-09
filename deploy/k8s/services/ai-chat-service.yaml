@@ -1,4 +1,13 @@
-# AI对话服务部署
+# ============================================================
+# AI 对话服务（ai-chat-service）部署 —— 核心的大模型对话/客服服务
+# ------------------------------------------------------------
+# 职责：接收用户消息 → 检索知识库（RAG）→ 调用大模型生成回答
+# 依赖：MySQL(chat_db) 存会话/消息，Redis 存缓存，大模型 API 走外网
+# 部署命令：kubectl apply -f deploy/k8s/services/ai-chat-service.yaml
+# 集群内访问：http://ai-chat-service:8083
+# ============================================================
+
+# ---------- 第一部分：Service（集群内访问入口） ----------
 apiVersion: v1
 kind: Service
 metadata:
@@ -7,14 +16,15 @@ metadata:
   labels:
     app: ai-chat-service
 spec:
-  type: ClusterIP
+  type: ClusterIP               # 仅集群内，外部流量走网关
   ports:
-    - port: 8083
-      targetPort: 8083
+    - port: 8083                # Service 端口
+      targetPort: 8083          # 容器端口
       name: http
   selector:
-    app: ai-chat-service
+    app: ai-chat-service        # 后端 Pod 标签
 ---
+# ---------- 第二部分：Deployment ----------
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -23,7 +33,7 @@ metadata:
   labels:
     app: ai-chat-service
 spec:
-  replicas: 1
+  replicas: 1                   # 单副本
   selector:
     matchLabels:
       app: ai-chat-service
@@ -35,62 +45,65 @@ spec:
       containers:
         - name: ai-chat-service
           image: 192.168.56.12:5000/aics/ai-chat-service:latest
-          imagePullPolicy: IfNotPresent
+          # ↑ 私有镜像仓库（192.168.56.12:5000），构建推送见 k8s-build-push.sh
+          imagePullPolicy: IfNotPresent   # 本地有镜像就不重新拉取
           ports:
             - containerPort: 8083
               name: http
           env:
             - name: NACOS_ADDR
-              value: "nacos:8848"
+              value: "nacos:8848"          # 注册/配置中心
             - name: NACOS_NAMESPACE
-              value: ""
+              value: ""                    # Nacos 命名空间（空=public）
             - name: MYSQL_HOST
-              value: "mysql"
+              value: "mysql"               # MySQL 地址
+              # 注意：本目录创建的 Service 名是 mysql-master / mysql-slave，
+              # 没有 “mysql”。若连接失败改成 mysql-master
             - name: MYSQL_PORT
               value: "3306"
             - name: MYSQL_DB
-              value: "chat_db"
+              value: "chat_db"             # 会话/消息库
             - name: MYSQL_USER
               value: "root"
             - name: MYSQL_PASSWORD
-              value: "root"
+              value: "root"                # 学习环境明文；生产应改用 secretKeyRef
             - name: REDIS_HOST
-              value: "redis"
+              value: "redis"               # Redis：会话缓存/上下文
             - name: REDIS_PORT
               value: "6379"
-            - name: OPENAI_API_KEY
+            - name: OPENAI_API_KEY         # 大模型 API Key（对话能力凭证）
               valueFrom:
-                secretKeyRef:
-                  name: aics-secrets
+                secretKeyRef:              # 敏感信息从 Secret 引用，不写明文
+                  name: aics-secrets       # Secret 名（需提前创建，见部署文档）
                   key: openai-api-key
-            - name: OPENAI_BASE_URL
+            - name: OPENAI_BASE_URL        # 大模型 API 地址（兼容 OpenAI 协议的任意厂商）
               valueFrom:
                 secretKeyRef:
                   name: aics-secrets
                   key: openai-base-url
-                  optional: true
-            - name: OPENAI_MODEL
+                  optional: true           # 该 key 可不存在（走代码里的默认值）
+            - name: OPENAI_MODEL           # 模型名（如 MiniMax-M3）
               valueFrom:
                 secretKeyRef:
                   name: aics-secrets
                   key: openai-model
                   optional: true
             - name: JAVA_OPTS
-              value: "-Xms512m -Xmx512m"
+              value: "-Xms512m -Xmx512m"   # JVM 堆 512MB（AI 服务计算较多，给大一点）
           resources:
-            requests:
+            requests:             # 调度承诺值
               cpu: "200m"
               memory: "512Mi"
-            limits:
+            limits:               # 硬上限：AI 服务比普通服务配额高
               cpu: "1000m"
               memory: "1Gi"
-          livenessProbe:
+          livenessProbe:          # 存活探测
             tcpSocket:
               port: 8083
             initialDelaySeconds: 60
             periodSeconds: 15
             timeoutSeconds: 5
-          readinessProbe:
+          readinessProbe:         # 就绪探测
             tcpSocket:
               port: 8083
             initialDelaySeconds: 30

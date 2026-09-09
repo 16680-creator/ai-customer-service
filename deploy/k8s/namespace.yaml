@@ -1,7 +1,15 @@
-apiVersion: v1
-kind: Namespace
+# ============================================================
+# Namespace（命名空间）——整个项目在 K8s 里的“资源分组/隔离单元”
+# ------------------------------------------------------------
+# 作用：后面所有的 Deployment、Service、StatefulSet 都部署在这个
+#       命名空间里，互不干扰，也方便一键清理：
+#       kubectl delete namespace ai-customer-service
+# 部署命令：kubectl apply -f deploy/k8s/namespace.yaml
+# ============================================================
+apiVersion: v1                # 核心对象（Namespace/Service/Pod）的 API 版本固定为 v1
+kind: Namespace               # 资源类型：命名空间
 metadata:
-  name: ai-customer-service
+  name: ai-customer-service   # 命名空间名称，其他 YAML 里的 `namespace: ai-customer-service` 指的就是它
   labels:
-    name: ai-customer-service
-    environment: production
+    name: ai-customer-service # 标签：可用 kubectl get ns -l name=ai-customer-service 筛选
+    environment: production   # 标签：标记该命名空间的用途环境

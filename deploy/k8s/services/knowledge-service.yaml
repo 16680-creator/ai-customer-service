@@ -1,4 +1,13 @@
-# 知识库服务部署
+# ============================================================
+# 知识库服务（knowledge-service）部署
+# ------------------------------------------------------------
+# 职责：知识文档上传/解析/入库（RAG 数据准备）；数据库 knowledge_db，
+#       文件存 MinIO；检索链路还依赖 Elasticsearch（索引）与 Chroma（向量）
+# 部署命令：kubectl apply -f deploy/k8s/services/knowledge-service.yaml
+# 集群内访问：http://knowledge-service:8082
+# ============================================================
+
+# ---------- 第一部分：Service（集群内访问入口） ----------
 apiVersion: v1
 kind: Service
 metadata:
@@ -7,14 +16,15 @@ metadata:
   labels:
     app: knowledge-service
 spec:
-  type: ClusterIP
+  type: ClusterIP               # 仅集群内，外部流量走网关
   ports:
-    - port: 8082
-      targetPort: 8082
+    - port: 8082                # Service 端口
+      targetPort: 8082          # 容器端口
       name: http
   selector:
-    app: knowledge-service
+    app: knowledge-service      # 后端 Pod 标签
 ---
+# ---------- 第二部分：Deployment ----------
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -23,7 +33,7 @@ metadata:
   labels:
     app: knowledge-service
 spec:
-  replicas: 1
+  replicas: 1                   # 单副本
   selector:
     matchLabels:
       app: knowledge-service
@@ -35,33 +45,36 @@ spec:
       containers:
         - name: knowledge-service
           image: 192.168.56.12:5000/aics/knowledge-service:latest
-          imagePullPolicy: IfNotPresent
+          # ↑ 私有镜像仓库（192.168.56.12:5000），构建推送见 k8s-build-push.sh
+          imagePullPolicy: IfNotPresent   # 本地有镜像就不重新拉取
           ports:
             - containerPort: 8082
               name: http
           env:
             - name: NACOS_ADDR
-              value: "nacos:8848"
+              value: "nacos:8848"          # 注册/配置中心
             - name: NACOS_NAMESPACE
-              value: ""
+              value: ""                    # Nacos 命名空间（空=public）
             - name: MYSQL_HOST
-              value: "mysql"
+              value: "mysql"               # MySQL 地址
+              # 注意：本目录创建的 Service 名是 mysql-master / mysql-slave，
+              # 没有 “mysql”。若连接失败改成 mysql-master
             - name: MYSQL_PORT
               value: "3306"
             - name: MYSQL_DB
-              value: "knowledge_db"
+              value: "knowledge_db"        # 知识库元数据库
             - name: MYSQL_USER
               value: "root"
             - name: MYSQL_PASSWORD
-              value: "root"
+              value: "root"                # 学习环境明文；生产应改用 secretKeyRef
             - name: MINIO_ENDPOINT
-              value: "minio:9000"
+              value: "minio:9000"          # MinIO 的 S3 API 地址（存原始文档）
             - name: MINIO_ACCESS_KEY
-              value: "minioadmin"
+              value: "minioadmin"          # MinIO 账号（与 k8s/minio.yaml 里的配置对应）
             - name: MINIO_SECRET_KEY
-              value: "minioadmin"
+              value: "minioadmin"          # MinIO 密码；生产应改用 secretKeyRef
             - name: JAVA_OPTS
-              value: "-Xms256m -Xmx256m"
+              value: "-Xms256m -Xmx256m"   # JVM 堆 256MB
           resources:
             requests:
               cpu: "100m"
@@ -69,13 +82,13 @@ spec:
             limits:
               cpu: "500m"
               memory: "512Mi"
-          livenessProbe:
+          livenessProbe:          # 存活探测
             tcpSocket:
               port: 8082
             initialDelaySeconds: 60
             periodSeconds: 15
             timeoutSeconds: 5
-          readinessProbe:
+          readinessProbe:         # 就绪探测
             tcpSocket:
               port: 8082
             initialDelaySeconds: 30

@@ -1,23 +1,35 @@
+# ============================================================
+# XXL-Job 调度中心部署 —— 分布式定时任务平台
+# ------------------------------------------------------------
+# 作用：统一管理各服务的定时任务（如订单超时关闭、数据同步），
+#       业务服务作为“执行器”注册到 admin，由 admin 触发调度
+# 部署顺序：① MySQL 已就绪并初始化 xxl_job 库（deploy/mysql/xxl-job-init.sql）
+#           ② 先 apply middleware-secrets（xxl-job-admin-config），再 apply 本文件
+# 部署命令：kubectl apply -f deploy/k8s/xxl-job.yaml
+# ============================================================
+
+# ---------- 第一部分：Service（集群内访问入口） ----------
 apiVersion: v1
 kind: Service
 metadata:
-  name: xxl-job-admin
+  name: xxl-job-admin           # 执行器回调/注册时用这个名字访问
   namespace: ai-customer-service
 spec:
   selector:
     app: xxl-job-admin
   ports:
     - name: http
-      port: 8080
-      targetPort: 8080
+      port: 8080                # Service 端口
+      targetPort: 8080          # admin 默认监听 8080
 ---
+# ---------- 第二部分：Deployment（无状态部署） ----------
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: xxl-job-admin
   namespace: ai-customer-service
 spec:
-  replicas: 1
+  replicas: 1                   # 单副本（admin 数据在 MySQL，多副本需注意调度一致性）
   selector:
     matchLabels:
       app: xxl-job-admin
@@ -28,26 +40,26 @@ spec:
     spec:
       containers:
         - name: xxl-job-admin
-          image: xuxueli/xxl-job-admin:2.4.1
+          image: xuxueli/xxl-job-admin:2.4.1   # XXL-Job 官方 admin 镜像 2.4.1
           ports:
             - containerPort: 8080
           env:
-            - name: PARAMS
+            - name: PARAMS      # 镜像约定：PARAMS 的值会作为 JVM 启动参数传入
               valueFrom:
-                secretKeyRef:
-                  name: xxl-job-admin-config
-                  key: params
-          readinessProbe:
+                secretKeyRef:   # 参数里含数据库密码，从 Secret 引用（不写明文）
+                  name: xxl-job-admin-config   # Secret 名（见 middleware-secrets.example.yaml）
+                  key: params   # 内容 = 数据源 URL + 用户名 + 密码 + accessToken
+          readinessProbe:       # 就绪探测：admin 首页可访问即就绪
             httpGet:
               path: /xxl-job-admin/
               port: 8080
             initialDelaySeconds: 30
             periodSeconds: 10
-          livenessProbe:
+          livenessProbe:        # 存活探测：失败重启容器
             httpGet:
               path: /xxl-job-admin/
               port: 8080
-            initialDelaySeconds: 60
+            initialDelaySeconds: 60   # Spring Boot 启动较慢，等 60 秒
             periodSeconds: 20
           resources:
             requests:

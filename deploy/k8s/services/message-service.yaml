@@ -1,4 +1,13 @@
-# 消息服务部署
+# ============================================================
+# 消息服务（message-service）部署
+# ------------------------------------------------------------
+# 职责：会话消息的收发/存储/推送；消费 RocketMQ 里的消息事件
+# 依赖：MySQL(chat_db) + RocketMQ(事件流转) + Redis(缓存)
+# 部署命令：kubectl apply -f deploy/k8s/services/message-service.yaml
+# 集群内访问：http://message-service:8085
+# ============================================================
+
+# ---------- 第一部分：Service（集群内访问入口） ----------
 apiVersion: v1
 kind: Service
 metadata:
@@ -7,14 +16,15 @@ metadata:
   labels:
     app: message-service
 spec:
-  type: ClusterIP
+  type: ClusterIP               # 仅集群内，外部流量走网关
   ports:
-    - port: 8085
-      targetPort: 8085
+    - port: 8085                # Service 端口
+      targetPort: 8085          # 容器端口
       name: http
   selector:
-    app: message-service
+    app: message-service        # 后端 Pod 标签
 ---
+# ---------- 第二部分：Deployment ----------
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -23,7 +33,7 @@ metadata:
   labels:
     app: message-service
 spec:
-  replicas: 1
+  replicas: 1                   # 单副本
   selector:
     matchLabels:
       app: message-service
@@ -35,33 +45,35 @@ spec:
       containers:
         - name: message-service
           image: 192.168.56.12:5000/aics/message-service:latest
-          imagePullPolicy: IfNotPresent
+          # ↑ 私有镜像仓库（192.168.56.12:5000），构建推送见 k8s-build-push.sh
+          imagePullPolicy: IfNotPresent   # 本地有镜像就不重新拉取
           ports:
             - containerPort: 8085
               name: http
           env:
             - name: NACOS_ADDR
-              value: "nacos:8848"
+              value: "nacos:8848"          # 注册/配置中心
             - name: NACOS_NAMESPACE
-              value: ""
+              value: ""                    # Nacos 命名空间（空=public）
             - name: MYSQL_HOST
-              value: "mysql-master"
+              value: "mysql-master"        # 直连主库（消息写入频繁，读写主库避免复制延迟）
+              # ↑ 本目录少数“名字正确”的写法：k8s/mysql.yaml 里确实创建了 mysql-master
             - name: MYSQL_PORT
               value: "3306"
             - name: MYSQL_DB
-              value: "chat_db"
+              value: "chat_db"             # 与 ai-chat-service 共用会话/消息库
             - name: MYSQL_USER
               value: "root"
             - name: MYSQL_PASSWORD
-              value: "root"
+              value: "root"                # 学习环境明文；生产应改用 secretKeyRef
             - name: ROCKETMQ_NAMESRV
-              value: "rocketmq-namesrv:9876"
+              value: "rocketmq-namesrv:9876"   # NameServer 地址（收发消息先问它要 Broker）
             - name: REDIS_HOST
-              value: "redis"
+              value: "redis"               # Redis：消息缓存/在线状态
             - name: REDIS_PORT
               value: "6379"
             - name: JAVA_OPTS
-              value: "-Xms256m -Xmx256m"
+              value: "-Xms256m -Xmx256m"   # JVM 堆 256MB
           resources:
             requests:
               cpu: "100m"
@@ -69,13 +81,13 @@ spec:
             limits:
               cpu: "500m"
               memory: "512Mi"
-          livenessProbe:
+          livenessProbe:          # 存活探测
             tcpSocket:
               port: 8085
             initialDelaySeconds: 60
             periodSeconds: 15
             timeoutSeconds: 5
-          readinessProbe:
+          readinessProbe:         # 就绪探测
             tcpSocket:
               port: 8085
             initialDelaySeconds: 30

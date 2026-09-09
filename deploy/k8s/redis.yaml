@@ -1,38 +1,85 @@
-# Redis 单节点部署，本地 Kubernetes 学习环境优先保证可用性
+# ============================================================
+# Redis 部署（单节点）—— 缓存 / 会话 / 分布式锁
+# ------------------------------------------------------------
+# 结构：ConfigMap(配置) + Service(访问入口) + headless Service + StatefulSet(Pod)
+# 原则：本地 Kubernetes 学习环境优先保证可用性
+# 部署命令：kubectl apply -f deploy/k8s/redis.yaml
+# ============================================================
+
+# ---------- 第一部分：ConfigMap（Redis 配置文件） ----------
+# 把 redis.conf 作为配置对象存进 K8s，Pod 挂载后即成为容器里的配置文件
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: redis-config
+  name: redis-config            # ConfigMap 名，StatefulSet 里按这个名字挂载
   namespace: ai-customer-service
 data:
+  # 注意：Redis 配置文件只支持“整行注释”（# 必须在行首），
+  # 不支持行尾注释，所以注释统一写在配置行的上一行；
+  # `|` 表示保留多行文本原样（整个 Redis 配置文件）
   redis.conf: |
+    # 监听所有网卡；容器场景必须放开，否则 Pod 网络外无法连接
     bind 0.0.0.0
+    # Redis 默认端口
     port 6379
+    # 不启用 Cluster 集群模式（学习环境单节点即可）
     cluster-enabled no
+    # 集群模式下的节点信息文件（当前未启用，备用）
     cluster-config-file nodes.conf
+    # 集群模式下节点失联 15 秒判定下线（当前未启用，备用）
     cluster-node-timeout 15000
+    # 开启 AOF 持久化：把每条写命令追加到日志文件，防重启丢数据
     appendonly yes
+    # AOF 持久化文件名
     appendfilename "appendonly.aof"
+    # AOF 刷盘策略：每秒刷一次（性能与安全的折中，最多丢 1 秒数据）
     appendfsync everysec
+    # RDB 快照规则，格式 save <秒> <写次数>，三条任一满足就生成快照
     save 900 1
     save 300 10
     save 60 10000
+    # Redis 最大可用内存 256MB，超过后触发淘汰策略
     maxmemory 256mb
+    # 内存满时的淘汰策略：删除最久未被使用的 key（缓存典型用法）
     maxmemory-policy allkeys-lru
+    # 日志级别：notice 为默认，记录一般运行信息
     loglevel notice
+    # 最大客户端连接数 1 万
     maxclients 10000
+    # TCP 保活探测间隔 300 秒，及时清理死连接
     tcp-keepalive 300
+    # 空闲连接永不主动断开（0=禁用超时）
     timeout 0
 ---
+# ---------- 第二部分：Service（集群内访问入口） ----------
+# 微服务通过 redis:6379 连接 Redis
 apiVersion: v1
 kind: Service
 metadata:
-  name: redis
+  name: redis                   # Service 名，环境变量 REDIS_HOST=redis 指向它
   namespace: ai-customer-service
   labels:
     app: redis
 spec:
-  type: ClusterIP
+  type: ClusterIP               # 仅集群内部可访问，不对外暴露
+  ports:
+    - port: 6379                # Service 暴露端口
+      targetPort: 6379          # 转发到容器端口
+      name: redis
+  selector:
+    app: redis                  # 后端 Pod 的标签
+---
+# ---------- 第三部分：headless Service（无头服务） ----------
+# clusterIP: None 表示不分配虚拟 IP；StatefulSet 用它给 Pod 提供稳定的 DNS 名
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-headless          # StatefulSet 的 spec.serviceName 必须填它
+  namespace: ai-customer-service
+  labels:
+    app: redis
+spec:
+  clusterIP: None               # 关键：无头模式，DNS 直接解析到 Pod IP
   ports:
     - port: 6379
       targetPort: 6379
@@ -40,23 +87,8 @@ spec:
   selector:
     app: redis
 ---
-# Redis 无头服务，用于 StatefulSet 网络标识
-apiVersion: v1
-kind: Service
-metadata:
-  name: redis-headless
-  namespace: ai-customer-service
-  labels:
-    app: redis
-spec:
-  clusterIP: None
-  ports:
-    - port: 6379
-      targetPort: 6379
-      name: redis
-  selector:
-    app: redis
----
+# ---------- 第四部分：StatefulSet（有状态部署） ----------
+# 数据库/缓存类组件选 StatefulSet：Pod 有固定名字（redis-0）+ 挂持久卷
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -65,11 +97,11 @@ metadata:
   labels:
     app: redis
 spec:
-  serviceName: redis-headless
-  replicas: 1
+  serviceName: redis-headless   # 关联上面的无头 Service
+  replicas: 1                   # 单副本（Redis 主从/哨兵可在学习进阶后扩展）
   selector:
     matchLabels:
-      app: redis
+      app: redis                # 与模板标签一致
   template:
     metadata:
       labels:
@@ -77,32 +109,33 @@ spec:
     spec:
       containers:
         - name: redis
-          image: redis:7
+          image: redis:7        # Redis 7 官方镜像
           ports:
             - containerPort: 6379
               name: redis
           command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+          # ↑ 覆盖镜像默认启动命令：用我们挂载进去的配置文件启动
           volumeMounts:
             - name: redis-data
-              mountPath: /data
+              mountPath: /data   # 数据目录（RDB/AOF 文件落在这里，持久化）
             - name: redis-config
-              mountPath: /usr/local/etc/redis/redis.conf
-              subPath: redis.conf
+              mountPath: /usr/local/etc/redis/redis.conf  # 配置文件挂载位置
+              subPath: redis.conf # subPath：只挂 ConfigMap 里的这一个文件，不覆盖整个目录
           resources:
-            requests:
+            requests:             # 调度承诺值
               cpu: "100m"
               memory: "128Mi"
-            limits:
+            limits:               # 硬上限（注意 limits.memory 要大于 maxmemory+开销）
               cpu: "500m"
               memory: "512Mi"
-          livenessProbe:
+          livenessProbe:          # 存活探测：redis-cli ping 无响应则重启容器
             exec:
               command:
                 - redis-cli
-                - ping
+                - ping            # 返回 PONG 即健康
             initialDelaySeconds: 15
             periodSeconds: 10
-          readinessProbe:
+          readinessProbe:         # 就绪探测：未就绪不接流量
             exec:
               command:
                 - redis-cli
@@ -110,12 +143,12 @@ spec:
             initialDelaySeconds: 5
             periodSeconds: 5
       volumes:
-        - name: redis-config
+        - name: redis-config      # 把第一部分的 ConfigMap 挂进来
           configMap:
             name: redis-config
-  volumeClaimTemplates:
+  volumeClaimTemplates:           # 持久卷申请模板：自动为 Pod 创建 5Gi 的 PVC
     - metadata:
-        name: redis-data
+        name: redis-data          # 对应 volumeMounts 的 redis-data
       spec:
         accessModes: ["ReadWriteOnce"]
         storageClassName: local-path

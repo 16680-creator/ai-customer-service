@@ -1,65 +1,77 @@
-apiVersion: v1
-kind: Service
+# ============================================================
+# Chroma 向量数据库部署 —— RAG 知识库的向量存储
+# ------------------------------------------------------------
+# 用途：知识库文档切块后做 Embedding（向量化），存进 Chroma，
+#       AI 回答前先在这里做相似度检索（“语义搜索”）
+# 部署命令：kubectl apply -f deploy/k8s/chroma.yaml
+# ============================================================
+
+# ---------- 第一部分：Service（集群内访问入口） ----------
+apiVersion: v1                  # 核心对象的 API 版本
+kind: Service                   # 资源类型：Service（虚拟 IP + 负载均衡）
 metadata:
-  name: chroma
+  name: chroma                  # Service 名，其他容器用 http://chroma:8000 访问
   namespace: ai-customer-service
 spec:
   selector:
-    app: chroma
+    app: chroma                 # 把流量转发给带 app=chroma 标签的 Pod
   ports:
     - name: http
-      port: 8000
-      targetPort: 8000
+      port: 8000                # Service 对集群内暴露的端口
+      targetPort: 8000          # 转发到容器内的端口（Chroma 默认 8000）
 ---
-apiVersion: apps/v1
+# ---------- 第二部分：StatefulSet（有状态部署） ----------
+# 选 StatefulSet 而不是 Deployment 的原因：
+#   需要挂载持久化存储（volumeClaimTemplates），Pod 重建后向量数据不丢
+apiVersion: apps/v1             # apps 组 API，Deployment/StatefulSet 用它
 kind: StatefulSet
 metadata:
   name: chroma
   namespace: ai-customer-service
 spec:
-  serviceName: chroma
-  replicas: 1
+  serviceName: chroma           # 关联的 Service（若用 headless Service 可获得稳定 DNS）
+  replicas: 1                   # 单副本：学习环境，数据一致性简单
   selector:
     matchLabels:
-      app: chroma
-  template:
+      app: chroma               # 管理带此标签的 Pod，必须与 template 里的 labels 一致
+  template:                     # ---- Pod 模板：由此“印”出实际的 Pod ----
     metadata:
       labels:
-        app: chroma
+        app: chroma             # Pod 标签，Service/StatefulSet 都靠它认亲
     spec:
       containers:
         - name: chroma
-          image: chromadb/chroma:0.5.20
+          image: chromadb/chroma:0.5.20   # 固定版本号，避免 latest 导致行为漂移
           ports:
-            - containerPort: 8000
+            - containerPort: 8000         # 容器监听的端口（仅声明，供查阅/工具识别）
           volumeMounts:
             - name: data
-              mountPath: /chroma/chroma
-          readinessProbe:
+              mountPath: /chroma/chroma   # Chroma 数据目录，挂到持久卷上
+          readinessProbe:                 # 就绪探测：不通过就不接流量（重启/滚动更新安全）
+            httpGet:
+              path: /api/v1/heartbeat     # Chroma 的心跳接口，返回即代表服务可用
+              port: 8000
+            initialDelaySeconds: 10       # 启动后等 10 秒才开始探测（给启动留时间）
+            periodSeconds: 10             # 每 10 秒探测一次
+          livenessProbe:                  # 存活探测：失败会重启容器（卡死自愈）
             httpGet:
               path: /api/v1/heartbeat
               port: 8000
-            initialDelaySeconds: 10
-            periodSeconds: 10
-          livenessProbe:
-            httpGet:
-              path: /api/v1/heartbeat
-              port: 8000
-            initialDelaySeconds: 30
+            initialDelaySeconds: 30       # 活性探测等更久，避免误杀慢启动的进程
             periodSeconds: 15
-          resources:
-            requests:
-              cpu: "100m"
+          resources:                      # 资源配额，防止把节点内存吃光
+            requests:                     # 调度承诺值：节点至少要留这么多
+              cpu: "100m"                 # 100m = 0.1 核
               memory: "256Mi"
-            limits:
+            limits:                       # 硬上限：超了会被限流（CPU）或 OOMKill（内存）
               cpu: "500m"
               memory: "1Gi"
-  volumeClaimTemplates:
+  volumeClaimTemplates:                   # ---- 持久卷申请模板：每个 Pod 自动创建一个 PVC ----
     - metadata:
-        name: data
+        name: data                        # 与 volumeMounts 的 name 对应
       spec:
-        accessModes: ["ReadWriteOnce"]
-        storageClassName: local-path
+        accessModes: ["ReadWriteOnce"]    # RWO：一个节点读写（数据库类存储的标准选择）
+        storageClassName: local-path      # 本地路径 StorageClass（学习环境，数据存节点磁盘）
         resources:
           requests:
-            storage: 10Gi
+            storage: 10Gi                 # 申请 10GB 存储空间

@@ -1,4 +1,13 @@
-# API网关服务部署
+# ============================================================
+# API 网关（Spring Cloud Gateway）部署 —— 所有外部流量的统一入口
+# ------------------------------------------------------------
+# 作用：前端/外部请求先打到网关，由它做路由转发、鉴权、限流，
+#       再转给集群内的各个微服务
+# 部署命令：kubectl apply -f deploy/k8s/services/api-gateway.yaml
+# 对外访问：http://<任一节点IP>:30080  （NodePort 方式）
+# ============================================================
+
+# ---------- 第一部分：Service（对外暴露入口） ----------
 apiVersion: v1
 kind: Service
 metadata:
@@ -7,15 +16,17 @@ metadata:
   labels:
     app: api-gateway
 spec:
-  type: NodePort
+  type: NodePort                # 关键区别：NodePort 会在每个节点上开端口，外部可直接访问
   ports:
-    - port: 8080
-      targetPort: 8080
-      nodePort: 30080
+    - port: 8080                # 集群内访问端口（其他 Pod 用 http://api-gateway:8080）
+      targetPort: 8080          # 转发到容器端口
+      nodePort: 30080           # 对外端口：浏览器访问 http://<节点IP>:30080
+                                # （NodePort 范围默认 30000-32767）
       name: http
   selector:
-    app: api-gateway
+    app: api-gateway            # 转发给带此标签的 Pod
 ---
+# ---------- 第二部分：Deployment ----------
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -24,10 +35,10 @@ metadata:
   labels:
     app: api-gateway
 spec:
-  replicas: 1
+  replicas: 1                   # 单副本（学习环境）
   selector:
     matchLabels:
-      app: api-gateway
+      app: api-gateway          # 必须与模板标签一致，Deployment 靠它管理 Pod
   template:
     metadata:
       labels:
@@ -36,31 +47,33 @@ spec:
       containers:
         - name: api-gateway
           image: 192.168.56.12:5000/aics/api-gateway:latest
-          imagePullPolicy: IfNotPresent
+          # ↑ 镜像地址：192.168.56.12 是本地私有 Harbor/Registry（见 k8s-build-push.sh），
+          #   Jenkins/脚本构建后推到这里，集群从这里拉取
+          imagePullPolicy: IfNotPresent   # 本地已有该 tag 就不重新拉（学习环境加速启动）
           ports:
-            - containerPort: 8080
+            - containerPort: 8080          # 容器监听端口
               name: http
           env:
             - name: NACOS_ADDR
-              value: "nacos:8848"
+              value: "nacos:8848"          # 注册中心地址：网关从 Nacos 发现下游服务
             - name: NACOS_NAMESPACE
-              value: ""
+              value: ""                    # Nacos 命名空间（空=public 公共空间）
             - name: JAVA_OPTS
-              value: "-Xms256m -Xmx256m"
+              value: "-Xms256m -Xmx256m"   # JVM 堆 256MB（网关轻量转发，不需要大内存）
           resources:
-            requests:
+            requests:             # 调度承诺值
               cpu: "100m"
               memory: "256Mi"
-            limits:
+            limits:               # 硬上限
               cpu: "500m"
               memory: "512Mi"
-          livenessProbe:
+          livenessProbe:          # 存活探测：TCP 通即可（网关可能没有暴露健康端点）
             tcpSocket:
               port: 8080
-            initialDelaySeconds: 60
+            initialDelaySeconds: 60   # Spring Boot 启动慢，等 60 秒再开始探测
             periodSeconds: 15
             timeoutSeconds: 5
-          readinessProbe:
+          readinessProbe:         # 就绪探测：未就绪时不把 Service 流量打过来
             tcpSocket:
               port: 8080
             initialDelaySeconds: 30

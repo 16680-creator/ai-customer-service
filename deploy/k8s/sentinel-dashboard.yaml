@@ -1,23 +1,35 @@
+# ============================================================
+# Sentinel Dashboard 部署 —— 流控/熔断可视化控制台
+# ------------------------------------------------------------
+# 作用：微服务接入 Sentinel 后，运行指标会上报到这个控制台，
+#       在页面上可以配置限流规则、熔断降级策略
+# 注意：控制台只存内存，规则重启即失（生产要接入 Nacos 持久化规则）
+# 部署命令：kubectl apply -f deploy/k8s/sentinel-dashboard.yaml
+# 访问方式：集群内 http://sentinel-dashboard:8858（账号/密码默认 sentinel/sentinel）
+# ============================================================
+
+# ---------- 第一部分：Service（集群内访问入口） ----------
 apiVersion: v1
 kind: Service
 metadata:
-  name: sentinel-dashboard
+  name: sentinel-dashboard      # 微服务上报指标时用这个名字
   namespace: ai-customer-service
 spec:
   selector:
     app: sentinel-dashboard
   ports:
     - name: http
-      port: 8858
-      targetPort: 8858
+      port: 8858                # 对外暴露 8858
+      targetPort: 8858          # 容器内也是 8858（由 JAVA_OPTS 里的 -Dserver.port 指定）
 ---
+# ---------- 第二部分：Deployment ----------
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: sentinel-dashboard
   namespace: ai-customer-service
 spec:
-  replicas: 1
+  replicas: 1                   # 控制台单副本即可（只看监控、下发规则）
   selector:
     matchLabels:
       app: sentinel-dashboard
@@ -28,19 +40,22 @@ spec:
     spec:
       containers:
         - name: sentinel-dashboard
-          image: bladex/sentinel-dashboard:1.8.6
+          image: bladex/sentinel-dashboard:1.8.6   # 第三方打包的 Sentinel 1.8.6 镜像
           ports:
             - containerPort: 8858
           env:
-            - name: JAVA_OPTS
+            - name: JAVA_OPTS   # 容器启动时传给 JVM 的系统属性
               value: "-Dserver.port=8858 -Dcsp.sentinel.dashboard.server=sentinel-dashboard:8858 -Dproject.name=sentinel-dashboard"
-          readinessProbe:
+              # -Dserver.port=8858                 控制台自身监听端口
+              # -Dcsp.sentinel.dashboard.server=…  控制台自己的地址（让它也能被监控）
+              # -Dproject.name=sentinel-dashboard  上报时显示的应用名
+          readinessProbe:       # 就绪探测：首页 200 即就绪
             httpGet:
               path: /
               port: 8858
             initialDelaySeconds: 20
             periodSeconds: 10
-          livenessProbe:
+          livenessProbe:        # 存活探测：失败重启
             httpGet:
               path: /
               port: 8858
