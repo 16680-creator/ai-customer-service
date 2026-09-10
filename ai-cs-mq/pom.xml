@@ -42,6 +42,12 @@
             <artifactId>rocketmq-spring-boot-starter</artifactId>
             <version>${rocketmq-spring.version}</version>
         </dependency>
+        <!-- Kafka 消息（双栈演示：aics.mq.type=kafka + SPRING_PROFILES_ACTIVE=kafka 时接管；
+             版本由 Spring Boot BOM 管理） -->
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+        </dependency>
         <!-- MyBatis-Plus（工单与失败记录持久化） -->
         <dependency>
             <groupId>com.baomidou</groupId>

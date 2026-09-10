@@ -71,7 +71,7 @@
 | 序号 | 文件夹 | 内容 | 对应项目代码 |
 |------|--------|------|-------------|
 | 3 | [03-数据库与ORM](../03-数据库与ORM/) | MySQL、MyBatis-Plus | `ai-cs-order`、`ai-cs-product` |
-| 4 | [04-中间件](../04-中间件/) | Redis、RocketMQ、ES、MinIO、SSE、WebSocket | `docker-compose.yml`、`ai-cs-notify` |
+| 4 | [04-中间件](../04-中间件/) | Redis、RocketMQ、ES、MinIO、SSE、WebSocket、MongoDB、Canal、Kafka（双栈开关） | `docker-compose.yml`、`ai-cs-notify`、`ai-cs-mq` |
 
 ### 第三阶段：AI 能力（1-2 周）
 
@@ -199,6 +199,7 @@ docker compose -f deploy/docker-compose/docker-compose-observability.yml up -d
 | Sentinel 入口限流（WarmUp + QPS） | [04-中间件/06-Sentinel限流与熔断降级.md](../04-中间件/06-Sentinel限流与熔断降级.md) | 限流熔断 |
 | Redisson 分布式锁（看门狗/可重入） | [04-中间件/07-Redisson分布式锁.md](../04-中间件/07-Redisson分布式锁.md) | 分布式协调 |
 | RocketMQ 事务消息 + 死信队列 | [04-中间件/08-RocketMQ事务消息与死信队列.md](../04-中间件/08-RocketMQ事务消息与死信队列.md) | 消息一致性 |
+| Kafka 与 RocketMQ 双栈切换（消息抽象层 + 开关） | [04-中间件/12-Kafka与RocketMQ双栈切换.md](../04-中间件/12-Kafka与RocketMQ双栈切换.md) | 消息中间件抽象 |
 | Seata AT 分布式事务 | [02-Spring微服务/06-Seata分布式事务AT模式.md](../02-Spring微服务/06-Seata分布式事务AT模式.md) | 分布式事务 |
 | Prometheus/Grafana/Tempo 可观测性 | [07-运维部署/04-Prometheus可观测性.md](../07-运维部署/04-Prometheus可观测性.md) | 运维监控 |
 | XXL-Job 分布式调度 | [07-运维部署/05-XXL-Job分布式调度.md](../07-运维部署/05-XXL-Job分布式调度.md) | 任务调度 |

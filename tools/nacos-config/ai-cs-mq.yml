@@ -11,6 +11,14 @@ spring:
       max-lifetime: 1500000
       connection-timeout: 30000
 
+# ===== 消息中间件开关（4-中间件/12） =====
+# 默认走 RocketMQ。切换 Kafka 时用 SPRING_PROFILES_ACTIVE=kafka 启动，
+# 由本地 application-kafka.yml 排除 RocketMQ 自动装配并覆盖 aics.mq.type=kafka；
+# 不要再往 Nacos 下发 aics.mq.type，避免与 profile 配置双写造成"以为切了其实没切"。
+aics:
+  mq:
+    type: rocketmq
+
 # ===== RocketMQ（工单消息闭环演示：work-order-topic 生产/消费/死信） =====
 rocketmq:
   name-server: 127.0.0.1:9876

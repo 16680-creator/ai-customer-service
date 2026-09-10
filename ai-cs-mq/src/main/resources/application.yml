@@ -29,6 +29,14 @@ spring:
     password: ${DB_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
+# ===== 消息中间件开关（4-中间件/12） =====
+# rocketmq：默认，工单闭环走 RocketMQ 生产/消费/死信
+# kafka   ：需同时激活 kafka profile（SPRING_PROFILES_ACTIVE=kafka），
+#           见 application-kafka.yml，它会排除 RocketMQ 自动装配避免空连接告警
+aics:
+  mq:
+    type: ${MQ_TYPE:rocketmq}
+
 # ===== RocketMQ（工单消息闭环演示：work-order-topic 生产/消费/死信） =====
 rocketmq:
   name-server: ${ROCKETMQ_ADDR:127.0.0.1:9876}

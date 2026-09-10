@@ -1,0 +1,54 @@
+# ==========================================================================
+# Kafka 模式配置（消息中间件双栈开关的 Kafka 分支）
+#
+# 使用方式（两种等价写法）：
+#   java -jar ai-cs-mq.jar --spring.profiles.active=kafka
+#   SPRING_PROFILES_ACTIVE=kafka java -jar ai-cs-mq.jar
+#
+# 未激活该 profile 时走 RocketMQ，行为与改造前完全一致。
+# 详见 learning-docs/04-中间件/12-Kafka与RocketMQ多消息中间件切换实战.md
+# ==========================================================================
+
+spring:
+  # ① 排除 RocketMQ 自动装配。
+  #    ai-cs-mq 同时保留了 rocketmq starter（双栈演示），不排除的话
+  #    RocketMQTemplate 仍会创建 DefaultMQProducer 并周期性尝试连接 NameServer，
+  #    在 Kafka 模式下产生无意义的连接告警日志。
+  autoconfigure:
+    exclude:
+      - org.apache.rocketmq.spring.autoconfigure.RocketMQAutoConfiguration
+
+  # ② Kafka 连接与序列化配置（Boot 据此自动装配 ProducerFactory/ConsumerFactory/KafkaTemplate）
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:127.0.0.1:9092}
+
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      # JsonSerializer 会同时写入 __TypeId__ 头，消费端据此还原成原类型
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      # acks=all + 幂等：对齐 RocketMQ 同步发送的可靠性预期
+      acks: all
+      retries: 3
+      properties:
+        enable.idempotence: true
+
+    consumer:
+      group-id: work-order-consumer-group
+      # 本地演示：新消费组从头开始消费，便于观察历史消息
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        # 反序列化白名单：JsonDeserializer 默认拒绝未知包，必须显式放开业务 DTO 包
+        spring.json.trusted.packages: com.aics.mq.dto
+
+    # 启动阶段 broker 不可用时不阻断应用启动（KafkaAdmin 也不建连：
+    # 项目未声明 NewTopic Bean，KafkaAdmin 会直接跳过 initialize）
+    admin:
+      fail-fast: false
+
+# ③ 打开消息中间件开关的 Kafka 分支
+aics:
+  mq:
+    type: kafka
+    send-timeout-millis: 5000

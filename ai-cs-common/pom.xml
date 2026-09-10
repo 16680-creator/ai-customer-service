@@ -81,6 +81,19 @@
             <optional>true</optional>
         </dependency>
 
+        <!-- 消息中间件抽象层（optional：由各服务自带的 MQ starter 提供实现类，
+             没引 MQ 的服务自动跳过装配；4-中间件/12 有开关设计说明） -->
+        <dependency>
+            <groupId>org.apache.rocketmq</groupId>
+            <artifactId>rocketmq-spring-boot-starter</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+            <optional>true</optional>
+        </dependency>
+
         <!-- Jackson (for JSON processing) -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>

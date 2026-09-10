@@ -13,12 +13,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.rocketmq.common.message.MessageExt;
 import org.apache.rocketmq.spring.annotation.RocketMQMessageListener;
 import org.apache.rocketmq.spring.core.RocketMQListener;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
 
 /**
- * 死信队列消费者：把重试耗尽的工单消息落库为失败记录。
+ * 死信队列消费者（RocketMQ 分支）：把重试耗尽的工单消息落库为失败记录。
  * <p>
  * RocketMQ 消费重试 {@code maxReconsumeTimes} 次仍失败后，消息进入死信主题
  * {@code %DLQ%<consumerGroup>}；本监听器消费死信，把消息体写入
@@ -28,6 +29,7 @@ import java.nio.charset.StandardCharsets;
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@ConditionalOnProperty(prefix = "aics.mq", name = "type", havingValue = "rocketmq", matchIfMissing = true)
 @RocketMQMessageListener(
         topic = "%DLQ%work-order-consumer-group",
         consumerGroup = "work-order-dlq-consumer-group"

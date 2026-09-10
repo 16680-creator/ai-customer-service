@@ -2,6 +2,9 @@ version: '3.8'
 
 # AI客服系统 - 单机版基础设施编排
 # 包含: MySQL单节点、Redis单节点、Nacos、Elasticsearch、RocketMQ、MinIO
+# 可选(Kafka 双栈开关, 见 learning-docs/04-中间件/12):
+#   docker compose --profile kafka up -d kafka kafka-init
+#   配合 ai-cs-mq 以 SPRING_PROFILES_ACTIVE=kafka 启动
 
 services:
   # ==================== MySQL 单节点 ====================
@@ -270,6 +273,74 @@ services:
     networks:
       - aics-network
 
+  # ==================== Kafka（可选双栈开关，profile=kafka 时启动） ====================
+  # KRaft 单节点模式，不需要 ZooKeeper（Kafka 3.3+ 生产可用，4.0 起唯一模式）
+  # 默认不启动：只有 docker compose --profile kafka up -d 才会拉起
+  kafka:
+    image: apache/kafka:3.7.1
+    container_name: aics-kafka
+    restart: always
+    profiles:
+      - kafka
+    ports:
+      # PLAINTEXT 监听器：宿主机/IDE 里的服务用 localhost:9092
+      - "9092:9092"
+    environment:
+      # --- KRaft 角色与仲裁 ---
+      CLUSTER_ID: aics-kafka-cluster-0001
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      # --- 三套监听器：外部(宿主)/控制器/容器内互访 ---
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,INTERNAL://:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,INTERNAL://kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,INTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      # --- 单节点副本因子必须为 1，否则创建 topic 会报 replica 不满足 ---
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    volumes:
+      # 没有这个卷：Kafka 重启后消息与 offset 全部丢失
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 40s
+    networks:
+      - aics-network
+
+  # 一次性任务：预创建工单主题与死信主题
+  # Kafka 与 RocketMQ 的一个重要差异——Topic 通常需要预先创建并规划分区数，
+  # 而不是像 RocketMQ 那样默认由发送方自动创建
+  kafka-init:
+    image: apache/kafka:3.7.1
+    container_name: aics-kafka-init
+    profiles:
+      - kafka
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        BOOTSTRAP=kafka:29092
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server $$BOOTSTRAP --create --if-not-exists \
+          --topic work-order-topic --partitions 3 --replication-factor 1
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server $$BOOTSTRAP --create --if-not-exists \
+          --topic work-order-topic-dlt --partitions 3 --replication-factor 1
+        echo "--- topic 列表 ---"
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server $$BOOTSTRAP --list
+    networks:
+      - aics-network
+
 # ==================== 数据卷 ====================
 volumes:
   mysql-data:
@@ -279,6 +350,7 @@ volumes:
   chroma-data:
   neo4j-data:
   neo4j-logs:
+  kafka-data:
 
 # ==================== 网络 ====================
 networks:
