@@ -8,6 +8,10 @@
 
 ---
 
+> **可升级至 2.0（2026-09 标注）**：本文涉及 **Spring AI 1.1.4**；官方 **Spring AI 2.0.0 GA** 已于 2026-06-12 发布（地基为 Spring Boot 4 / Spring Framework 7）。
+> 本文相关变化：Advisor 体系调整：RAG Advisor 模块改名 `spring-ai-advisors-vector-store` → `spring-ai-vector-store-advisor`；`Advisor.DEFAULT_CHAT_MEMORY_PRECEDENCE_ORDER` 默认值 +1000 → +200（影响自定义 advisor 的排序）。
+> 完整破坏性改动清单与迁移路径见 [12-SpringAI-2.0升级评估与迁移指南](12-SpringAI-2.0升级评估与迁移指南.md)。
+
 ## 一、功能概述
 
 在项目已能调用真实业务服务（订单、售后、NL2SQL）之后，安全优先级高于继续堆叠模型能力。本功能用 **BDD + AI** 全流程落地 7 项安全能力：

@@ -4,6 +4,10 @@
 
 ---
 
+> **可升级至 2.0（2026-09 标注）**：本文涉及 **Spring AI 1.1.4**；官方 **Spring AI 2.0.0 GA** 已于 2026-06-12 发布（地基为 Spring Boot 4 / Spring Framework 7）。
+> 本文相关变化：向量库篇考点需补：`AbstractFilterExpressionConverter.doSingleValue` 变抽象方法、OpenSearch 客户端升 3.x（走 VectorStore 接口则透明）。
+> 完整破坏性改动清单与迁移路径见 [12-SpringAI-2.0升级评估与迁移指南](../01-SpringAI框架集成/12-SpringAI-2.0升级评估与迁移指南.md)。
+
 ## 4.1 Embedding（文本向量化）
 
 ### Q1：什么是 Embedding？文本 Embedding 的原理是什么？★★★★★

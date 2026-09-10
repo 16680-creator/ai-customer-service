@@ -4,6 +4,10 @@
 
 ---
 
+> **可升级至 2.0（2026-09 标注）**：本文涉及 **Spring AI 1.1.4**；官方 **Spring AI 2.0.0 GA** 已于 2026-06-12 发布（地基为 Spring Boot 4 / Spring Framework 7）。
+> 本文相关变化：Guardrails 涉及的 Advisor 机制有变：自定义 advisor 排序默认值调整（+1000 → +200），新增 `ToolAdvisor` / `MemoryAdvisor` 标记接口。
+> 完整破坏性改动清单与迁移路径见 [12-SpringAI-2.0升级评估与迁移指南](../01-SpringAI框架集成/12-SpringAI-2.0升级评估与迁移指南.md)。
+
 ## 7.1 AI 安全威胁
 
 ### Q1：AI 应用面临哪些安全威胁？请分类说明。★★★★★

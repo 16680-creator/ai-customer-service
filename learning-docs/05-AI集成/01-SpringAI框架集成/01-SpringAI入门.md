@@ -5,6 +5,10 @@
 
 ---
 
+> **可升级至 2.0（2026-09 标注）**：本文涉及 **Spring AI 1.1.4**；官方 **Spring AI 2.0.0 GA** 已于 2026-06-12 发布（地基为 Spring Boot 4 / Spring Framework 7）。
+> 本文相关变化：POM 的 Spring AI BOM 升 2.0；2.0 硬性要求 Spring Boot 4 / Framework 7，且配置属性扁平化（`spring.ai.openai.embedding.options.model` → 去掉 `.options` 段）。
+> 完整破坏性改动清单与迁移路径见 [12-SpringAI-2.0升级评估与迁移指南](12-SpringAI-2.0升级评估与迁移指南.md)。
+
 ## 一、Spring AI 是什么？
 
 ```

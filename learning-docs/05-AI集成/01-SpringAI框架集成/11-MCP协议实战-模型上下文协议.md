@@ -6,6 +6,10 @@
 
 ---
 
+> **可升级至 2.0（2026-09 标注）**：本文锚定 **MCP Java SDK 0.14+**；官方 **MCP Java SDK 2.0.0 GA** 已发布（首个 major 版本，与 Spring AI 2.0 同期）。
+> 本文相关变化：**MCP Java SDK 0.14+ → 2.0.0**：`@McpTool` 注解从 `org.springaicommunity.mcp.*` 收编进 `org.springframework.ai.mcp.annotation.*`；mcp-spring-webflux/webmvc 传输模块归属 Spring AI（groupId 变更）；`McpSyncClientCustomizer` / `McpAsyncClientCustomizer` 合并为 `McpClientCustomizer<B>`；服务端默认开启入参 schema 校验。
+> 详细评估见 [12-SpringAI-2.0升级评估与迁移指南](12-SpringAI-2.0升级评估与迁移指南.md) §3.5。
+
 ## 一、MCP 是什么：给 AI 装"USB-C 接口"
 
 用一句人话说：

@@ -5,6 +5,10 @@
 
 ---
 
+> **可升级至 2.0（2026-09 标注）**：本文涉及 **Spring AI 1.1.4**；官方 **Spring AI 2.0.0 GA** 已于 2026-06-12 发布（地基为 Spring Boot 4 / Spring Framework 7）。
+> 本文相关变化：本篇的 RAG 六件套基于 Spring AI 1.1.x，2.0 的 Advisor 模块改名与工具调用重构会影响相关实现。
+> 完整破坏性改动清单与迁移路径见 [12-SpringAI-2.0升级评估与迁移指南](../01-SpringAI框架集成/12-SpringAI-2.0升级评估与迁移指南.md)。
+
 ## 一、背景与目标
 
 项目 `ai-customer-service` 已具备基础 RAG（向量 + Rerank + 引用溯源 + 搜索侧混合检索 + NL2SQL），

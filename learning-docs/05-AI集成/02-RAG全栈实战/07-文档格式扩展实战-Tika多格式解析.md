@@ -8,6 +8,10 @@
 
 ---
 
+> **可升级至 2.0（2026-09 标注）**：本文涉及 **Spring AI 1.1.4**；官方 **Spring AI 2.0.0 GA** 已于 2026-06-12 发布（地基为 Spring Boot 4 / Spring Framework 7）。
+> 本文相关变化：`DocumentReader` / `TokenTextSplitter` 需编译期验证签名（`MethodToolCallbackProvider` 的异常类型 IllegalState → IllegalArgument，本项目无 catch 点）。
+> 完整破坏性改动清单与迁移路径见 [12-SpringAI-2.0升级评估与迁移指南](../01-SpringAI框架集成/12-SpringAI-2.0升级评估与迁移指南.md)。
+
 ## 一、实战背景：为什么需要 Tika？
 
 客服知识库的资料远不止 PDF/TXT：

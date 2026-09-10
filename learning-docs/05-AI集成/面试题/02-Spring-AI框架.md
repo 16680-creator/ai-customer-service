@@ -4,6 +4,10 @@
 
 ---
 
+> **可升级至 2.0（2026-09 标注）**：本文涉及 **Spring AI 1.1.4**；官方 **Spring AI 2.0.0 GA** 已于 2026-06-12 发布（地基为 Spring Boot 4 / Spring Framework 7）。
+> 本文相关变化：面试考点需补 2.0 新体系：Tool Calling 上移到 Advisor 层、`ToolCallingAdvisor` 接管工具循环、ChatMemory conversationId 必填、多个模块改名与移除。
+> 完整破坏性改动清单与迁移路径见 [12-SpringAI-2.0升级评估与迁移指南](../01-SpringAI框架集成/12-SpringAI-2.0升级评估与迁移指南.md)。
+
 ## 2.1 Spring AI 核心架构
 
 ### Q1：Spring AI 的核心抽象层有哪些？请画出整体架构。★★★★★

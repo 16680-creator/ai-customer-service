@@ -8,6 +8,10 @@
 
 ---
 
+> **可升级至 2.0（2026-09 标注）**：本文涉及 **Spring AI 1.1.4**；官方 **Spring AI 2.0.0 GA** 已于 2026-06-12 发布（地基为 Spring Boot 4 / Spring Framework 7）。
+> 本文相关变化：**工具调用是 2.0 改动重灾区**：ChatModel 内部工具循环移除、`defaultToolCallbacks` 废弃 → `defaultTools`、`ToolCallAdvisor` 改名 `ToolCallingAdvisor`、工具调用新增默认上限（每工具 40 次 / 总计 150 次）。
+> 完整破坏性改动清单与迁移路径见 [12-SpringAI-2.0升级评估与迁移指南](12-SpringAI-2.0升级评估与迁移指南.md)。
+
 ## 一、功能概述
 
 在已有 RAG、订单工具、消息、通知、用户与订单微服务之上，补齐**可靠的业务编排层**：
