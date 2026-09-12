@@ -68,3 +68,7 @@ tools/seata/
 
 # Personal docs excluded from repo
 learning-docs/财务/
+
+# Python bytecode caches
+__pycache__/
+*.pyc
