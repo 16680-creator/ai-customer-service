@@ -1,0 +1,2036 @@
+[
+ {
+  "path": "learning-docs/18-银行金融开发",
+  "name": "18-银行金融开发",
+  "token": "QhSqfAe5plRE38dyMmWcXghznLe",
+  "type": "folder",
+  "created": "1789060770",
+  "modified": "1789060863",
+  "url": "https://asiainfo-sec.feishu.cn/drive/folder/QhSqfAe5plRE38dyMmWcXghznLe"
+ },
+ {
+  "path": "learning-docs/04-中间件",
+  "name": "04-中间件",
+  "token": "MaEtfWhrLlRgt2dtA3GcMLjUnph",
+  "type": "folder",
+  "created": "1788015351",
+  "modified": "1789060809",
+  "url": "https://asiainfo-sec.feishu.cn/drive/folder/MaEtfWhrLlRgt2dtA3GcMLjUnph"
+ },
+ {
+  "path": "learning-docs/05-AI集成",
+  "name": "05-AI集成",
+  "token": "LVXlfWSJvlYkkqdp3nKcmn7Mnfc",
+  "type": "folder",
+  "created": "1788015358",
+  "modified": "1789060769",
+  "url": "https://asiainfo-sec.feishu.cn/drive/folder/LVXlfWSJvlYkkqdp3nKcmn7Mnfc"
+ },
+ {
+  "path": "learning-docs/17-研发效能与工程实践",
+  "name": "17-研发效能与工程实践",
+  "token": "YGsAfeYz3lh1h4dNT47c6X2Cn0b",
+  "type": "folder",
+  "created": "1788454529",
+  "modified": "1788454731",
+  "url": "https://asiainfo-sec.feishu.cn/drive/folder/YGsAfeYz3lh1h4dNT47c6X2Cn0b"
+ },
+ {
+  "path": "learning-docs/16-云原生与GitOps",
+  "name": "16-云原生与GitOps",
+  "token": "HyCyf8TrQlcGz5dHWFUcCnIunWo",
+  "type": "folder",
+  "created": "1788454528",
+  "modified": "1788454715",
+  "url": "https://asiainfo-sec.feishu.cn/drive/folder/HyCyf8TrQlcGz5dHWFUcCnIunWo"
+ },
+ {
+  "path": "learning-docs/15-计算机基础",
+  "name": "15-计算机基础",
+  "token": "NL1wfC1eblTPpFdivp9cPgxon0e",
+  "type": "folder",
+  "created": "1788454523",
+  "modified": "1788454699",
+  "url": "https://asiainfo-sec.feishu.cn/drive/folder/NL1wfC1eblTPpFdivp9cPgxon0e"
+ },
+ {
+  "path": "learning-docs/14-数据工程与OLAP",
+  "name": "14-数据工程与OLAP",
+  "token": "RsqDfTs0glzzNjdGjCXc4UxTnEd",
+  "type": "folder",
+  "created": "1788454522",
+  "modified": "1788454682",
+  "url": "https://asiainfo-sec.feishu.cn/drive/folder/RsqDfTs0glzzNjdGjCXc4UxTnEd"
+ },
+ {
+  "path": "learning-docs/13-稳定性工程",
+  "name": "13-稳定性工程",
+  "token": "FvZyfn93ilAOPAdvugWc1G19nrH",
+  "type": "folder",
+  "created": "1788454520",
+  "modified": "1788454666",
+  "url": "https://asiainfo-sec.feishu.cn/drive/folder/FvZyfn93ilAOPAdvugWc1G19nrH"
+ },
+ {
+  "path": "learning-docs/12-性能工程",
+  "name": "12-性能工程",
+  "token": "DKjff6o1wleAaudA82RcRObhnbd",
+  "type": "folder",
+  "created": "1788454515",
+  "modified": "1788454648",
+  "url": "https://asiainfo-sec.feishu.cn/drive/folder/DKjff6o1wleAaudA82RcRObhnbd"
+ },
+ {
+  "path": "learning-docs/11-数据结构与算法",
+  "name": "11-数据结构与算法",
+  "token": "KWVVf0ZW4ljmymdzaMMcE5kCnQd",
+  "type": "folder",
+  "created": "1788454514",
+  "modified": "1788454631",
+  "url": "https://asiainfo-sec.feishu.cn/drive/folder/KWVVf0ZW4ljmymdzaMMcE5kCnQd"
+ },
+ {
+  "path": "learning-docs/10-Python服务",
+  "name": "10-Python服务",
+  "token": "ELt9fIKM7lc1Etdz6M9cAvfIn9d",
+  "type": "folder",
+  "created": "1788454512",
+  "modified": "1788454608",
+  "url": "https://asiainfo-sec.feishu.cn/drive/folder/ELt9fIKM7lc1Etdz6M9cAvfIn9d"
+ },
+ {
+  "path": "learning-docs/09-安全与设计模式",
+  "name": "09-安全与设计模式",
+  "token": "VDq9fIcW0lDW1Ddde6UcsroNnNg",
+  "type": "folder",
+  "created": "1788015367",
+  "modified": "1788454606",
+  "url": "https://asiainfo-sec.feishu.cn/drive/folder/VDq9fIcW0lDW1Ddde6UcsroNnNg"
+ },
+ {
+  "path": "learning-docs/08-测试",
+  "name": "08-测试",
+  "token": "Kkc8fSew9lVsHpdBfUuc2Y66nRy",
+  "type": "folder",
+  "created": "1788015366",
+  "modified": "1788454605",
+  "url": "https://asiainfo-sec.feishu.cn/drive/folder/Kkc8fSew9lVsHpdBfUuc2Y66nRy"
+ },
+ {
+  "path": "learning-docs/07-运维部署",
+  "name": "07-运维部署",
+  "token": "N5imfQLCTlJI2Xdq2yQc3xkGnxb",
+  "type": "folder",
+  "created": "1788015361",
+  "modified": "1788454601",
+  "url": "https://asiainfo-sec.feishu.cn/drive/folder/N5imfQLCTlJI2Xdq2yQc3xkGnxb"
+ },
+ {
+  "path": "learning-docs/06-前端开发",
+  "name": "06-前端开发",
+  "token": "KOPFfm3YxlngL8dzajHc1Z6tnkg",
+  "type": "folder",
+  "created": "1788015359",
+  "modified": "1788454599",
+  "url": "https://asiainfo-sec.feishu.cn/drive/folder/KOPFfm3YxlngL8dzajHc1Z6tnkg"
+ },
+ {
+  "path": "learning-docs/03-数据库与ORM",
+  "name": "03-数据库与ORM",
+  "token": "O3mtfaryalg0awd0BZsc6Y1Mnmd",
+  "type": "folder",
+  "created": "1788015350",
+  "modified": "1788454597",
+  "url": "https://asiainfo-sec.feishu.cn/drive/folder/O3mtfaryalg0awd0BZsc6Y1Mnmd"
+ },
+ {
+  "path": "learning-docs/02-Spring微服务",
+  "name": "02-Spring微服务",
+  "token": "EAoKf6Cd4ldMySdzqDycAuz1ncf",
+  "type": "folder",
+  "created": "1788015349",
+  "modified": "1788454595",
+  "url": "https://asiainfo-sec.feishu.cn/drive/folder/EAoKf6Cd4ldMySdzqDycAuz1ncf"
+ },
+ {
+  "path": "learning-docs/01-Java基础",
+  "name": "01-Java基础",
+  "token": "JNSVfyV6clt2KhdU0IVcltwZn8c",
+  "type": "folder",
+  "created": "1788015343",
+  "modified": "1788454592",
+  "url": "https://asiainfo-sec.feishu.cn/drive/folder/JNSVfyV6clt2KhdU0IVcltwZn8c"
+ },
+ {
+  "path": "learning-docs/00-学习路线总览",
+  "name": "00-学习路线总览",
+  "token": "UxVif9XqIl2y9DdEJ3nchPX1nOe",
+  "type": "folder",
+  "created": "1788015341",
+  "modified": "1788454580",
+  "url": "https://asiainfo-sec.feishu.cn/drive/folder/UxVif9XqIl2y9DdEJ3nchPX1nOe"
+ },
+ {
+  "path": "learning-docs/18-银行金融开发/README.md",
+  "name": "README.md",
+  "token": "GEdnbaIStoYwEexkKpQct0DrnHc",
+  "type": "file",
+  "created": "1789060861",
+  "modified": "1789060861",
+  "url": "https://asiainfo-sec.feishu.cn/file/GEdnbaIStoYwEexkKpQct0DrnHc"
+ },
+ {
+  "path": "learning-docs/18-银行金融开发/16-国产中间件与Java运行时适配.md",
+  "name": "16-国产中间件与Java运行时适配.md",
+  "token": "Bq01bgMH0ohOd6xAMuEcmmh0n6f",
+  "type": "file",
+  "created": "1789060859",
+  "modified": "1789060859",
+  "url": "https://asiainfo-sec.feishu.cn/file/Bq01bgMH0ohOd6xAMuEcmmh0n6f"
+ },
+ {
+  "path": "learning-docs/18-银行金融开发/15-国产数据库选型与迁移.md",
+  "name": "15-国产数据库选型与迁移.md",
+  "token": "PMPibJZ0JotnS3xIBm5cBriJnLg",
+  "type": "file",
+  "created": "1789060857",
+  "modified": "1789060857",
+  "url": "https://asiainfo-sec.feishu.cn/file/PMPibJZ0JotnS3xIBm5cBriJnLg"
+ },
+ {
+  "path": "learning-docs/18-银行金融开发/14-国产操作系统与虚拟化容器适配.md",
+  "name": "14-国产操作系统与虚拟化容器适配.md",
+  "token": "Eonkb1jI9oOROmxj14gcGa9Jnkb",
+  "type": "file",
+  "created": "1789060855",
+  "modified": "1789060855",
+  "url": "https://asiainfo-sec.feishu.cn/file/Eonkb1jI9oOROmxj14gcGa9Jnkb"
+ },
+ {
+  "path": "learning-docs/18-银行金融开发/13-国产芯片与服务器选型.md",
+  "name": "13-国产芯片与服务器选型.md",
+  "token": "J1uxbIq0XoCznuxQbDQciaFTnMd",
+  "type": "file",
+  "created": "1789060853",
+  "modified": "1789060853",
+  "url": "https://asiainfo-sec.feishu.cn/file/J1uxbIq0XoCznuxQbDQciaFTnMd"
+ },
+ {
+  "path": "learning-docs/18-银行金融开发/12-信创全景与银行替换路线.md",
+  "name": "12-信创全景与银行替换路线.md",
+  "token": "JNc5bRdosoyvSMxarUDc7H5nnnD",
+  "type": "file",
+  "created": "1789060850",
+  "modified": "1789060850",
+  "url": "https://asiainfo-sec.feishu.cn/file/JNc5bRdosoyvSMxarUDc7H5nnnD"
+ },
+ {
+  "path": "learning-docs/18-银行金融开发/11-银行岗面试题库与简历映射.md",
+  "name": "11-银行岗面试题库与简历映射.md",
+  "token": "VD6FbQMLkooTnHxFz07cJlw1n6d",
+  "type": "file",
+  "created": "1789060848",
+  "modified": "1789060848",
+  "url": "https://asiainfo-sec.feishu.cn/file/VD6FbQMLkooTnHxFz07cJlw1n6d"
+ },
+ {
+  "path": "learning-docs/18-银行金融开发/10-银行研发运维流程与投产管控.md",
+  "name": "10-银行研发运维流程与投产管控.md",
+  "token": "HgkUbRZLFoBjuexvv0Tc91ttn4b",
+  "type": "file",
+  "created": "1789060846",
+  "modified": "1789060846",
+  "url": "https://asiainfo-sec.feishu.cn/file/HgkUbRZLFoBjuexvv0Tc91ttn4b"
+ },
+ {
+  "path": "learning-docs/18-银行金融开发/09-金融级一致性与对账实战.md",
+  "name": "09-金融级一致性与对账实战.md",
+  "token": "Igq8bGWrwoOVQFx7I4pckicgnEb",
+  "type": "file",
+  "created": "1789060844",
+  "modified": "1789060844",
+  "url": "https://asiainfo-sec.feishu.cn/file/Igq8bGWrwoOVQFx7I4pckicgnEb"
+ },
+ {
+  "path": "learning-docs/18-银行金融开发/08-反洗钱账户管理与监管合规.md",
+  "name": "08-反洗钱账户管理与监管合规.md",
+  "token": "Jw3zbUEMyoCqzhxVJMFc37wOn2f",
+  "type": "file",
+  "created": "1789060842",
+  "modified": "1789060843",
+  "url": "https://asiainfo-sec.feishu.cn/file/Jw3zbUEMyoCqzhxVJMFc37wOn2f"
+ },
+ {
+  "path": "learning-docs/18-银行金融开发/07-银行业信息安全管理规范.md",
+  "name": "07-银行业信息安全管理规范.md",
+  "token": "Vq31bdhJZoG0ulx3HZEcgNOjnwI",
+  "type": "file",
+  "created": "1789060840",
+  "modified": "1789060841",
+  "url": "https://asiainfo-sec.feishu.cn/file/Vq31bdhJZoG0ulx3HZEcgNOjnwI"
+ },
+ {
+  "path": "learning-docs/18-银行金融开发/06-网络金融与电子渠道.md",
+  "name": "06-网络金融与电子渠道.md",
+  "token": "CLlVbJOUDodwcNxWmmfcQh2Tn1g",
+  "type": "file",
+  "created": "1789060838",
+  "modified": "1789060838",
+  "url": "https://asiainfo-sec.feishu.cn/file/CLlVbJOUDodwcNxWmmfcQh2Tn1g"
+ },
+ {
+  "path": "learning-docs/18-银行金融开发/05-现金管理与资金头寸.md",
+  "name": "05-现金管理与资金头寸.md",
+  "token": "We17bxL5nojKFyxAsfZcYbPCnag",
+  "type": "file",
+  "created": "1789060836",
+  "modified": "1789060837",
+  "url": "https://asiainfo-sec.feishu.cn/file/We17bxL5nojKFyxAsfZcYbPCnag"
+ },
+ {
+  "path": "learning-docs/18-银行金融开发/04-支付清算体系与报文.md",
+  "name": "04-支付清算体系与报文.md",
+  "token": "B1XlbO37OoPha9xqbQvcxCagn38",
+  "type": "file",
+  "created": "1789060834",
+  "modified": "1789060834",
+  "url": "https://asiainfo-sec.feishu.cn/file/B1XlbO37OoPha9xqbQvcxCagn38"
+ },
+ {
+  "path": "learning-docs/18-银行金融开发/03-柜面系统与集中作业.md",
+  "name": "03-柜面系统与集中作业.md",
+  "token": "PDhTba2eOoSTK8xeN6CcqgYpnKd",
+  "type": "file",
+  "created": "1789060832",
+  "modified": "1789060833",
+  "url": "https://asiainfo-sec.feishu.cn/file/PDhTba2eOoSTK8xeN6CcqgYpnKd"
+ },
+ {
+  "path": "learning-docs/18-银行金融开发/02-核心系统与会计账务引擎.md",
+  "name": "02-核心系统与会计账务引擎.md",
+  "token": "EVyJbIoaboyvFBx1HThcxRLonNc",
+  "type": "file",
+  "created": "1789060830",
+  "modified": "1789060831",
+  "url": "https://asiainfo-sec.feishu.cn/file/EVyJbIoaboyvFBx1HThcxRLonNc"
+ },
+ {
+  "path": "learning-docs/18-银行金融开发/01-银行IT体系与岗位全景.md",
+  "name": "01-银行IT体系与岗位全景.md",
+  "token": "F7RqbqiRFoLwqbxLcMIc90T8n6c",
+  "type": "file",
+  "created": "1789060828",
+  "modified": "1789060828",
+  "url": "https://asiainfo-sec.feishu.cn/file/F7RqbqiRFoLwqbxLcMIc90T8n6c"
+ },
+ {
+  "path": "learning-docs/04-中间件/11-CanalCDC商品索引同步.md",
+  "name": "11-CanalCDC商品索引同步.md",
+  "token": "JoRubNo2qoF0mMxA7SycY06dnug",
+  "type": "file",
+  "created": "1788190061",
+  "modified": "1789060886",
+  "url": "https://asiainfo-sec.feishu.cn/file/JoRubNo2qoF0mMxA7SycY06dnug"
+ },
+ {
+  "path": "learning-docs/04-中间件/10-MongoDB对话审计归档.md",
+  "name": "10-MongoDB对话审计归档.md",
+  "token": "Pb7XbbQynopG32xAfjNcrBgxnld",
+  "type": "file",
+  "created": "1788190053",
+  "modified": "1789060885",
+  "url": "https://asiainfo-sec.feishu.cn/file/Pb7XbbQynopG32xAfjNcrBgxnld"
+ },
+ {
+  "path": "learning-docs/04-中间件/09-AI与治理中间件部署.md",
+  "name": "09-AI与治理中间件部署.md",
+  "token": "IHvLbTpT7omDLtxHV33cQnY1nJc",
+  "type": "file",
+  "created": "1788190051",
+  "modified": "1789060884",
+  "url": "https://asiainfo-sec.feishu.cn/file/IHvLbTpT7omDLtxHV33cQnY1nJc"
+ },
+ {
+  "path": "learning-docs/04-中间件/08-RocketMQ事务消息与死信队列.md",
+  "name": "08-RocketMQ事务消息与死信队列.md",
+  "token": "R0Odblh9sopdTfxMwIsc9fxvnGd",
+  "type": "file",
+  "created": "1788049421",
+  "modified": "1789060883",
+  "url": "https://asiainfo-sec.feishu.cn/file/R0Odblh9sopdTfxMwIsc9fxvnGd"
+ },
+ {
+  "path": "learning-docs/04-中间件/07-Redisson分布式锁.md",
+  "name": "07-Redisson分布式锁.md",
+  "token": "WyGGbbIMroaJokxmvzncGn9cnOm",
+  "type": "file",
+  "created": "1788049419",
+  "modified": "1789060882",
+  "url": "https://asiainfo-sec.feishu.cn/file/WyGGbbIMroaJokxmvzncGn9cnOm"
+ },
+ {
+  "path": "learning-docs/04-中间件/06-Sentinel限流与熔断降级.md",
+  "name": "06-Sentinel限流与熔断降级.md",
+  "token": "KdJSbd0UhoQJnMx9Djjck9xonxf",
+  "type": "file",
+  "created": "1788049411",
+  "modified": "1789060880",
+  "url": "https://asiainfo-sec.feishu.cn/file/KdJSbd0UhoQJnMx9Djjck9xonxf"
+ },
+ {
+  "path": "learning-docs/04-中间件/05-SSE与WebSocket实时通信.md",
+  "name": "05-SSE与WebSocket实时通信.md",
+  "token": "ZUrxbHJMToT2DxxUrXucKHTSn9b",
+  "type": "file",
+  "created": "1788015501",
+  "modified": "1789060879",
+  "url": "https://asiainfo-sec.feishu.cn/file/ZUrxbHJMToT2DxxUrXucKHTSn9b"
+ },
+ {
+  "path": "learning-docs/04-中间件/04-MinIO对象存储.md",
+  "name": "04-MinIO对象存储.md",
+  "token": "H9REbkSjqorqQExl5uKcE2GYn2e",
+  "type": "file",
+  "created": "1788015499",
+  "modified": "1789060878",
+  "url": "https://asiainfo-sec.feishu.cn/file/H9REbkSjqorqQExl5uKcE2GYn2e"
+ },
+ {
+  "path": "learning-docs/04-中间件/03-Elasticsearch搜索引擎.md",
+  "name": "03-Elasticsearch搜索引擎.md",
+  "token": "UeYCbQ4cfoPzyDx1QI8cRAMJn8c",
+  "type": "file",
+  "created": "1788015497",
+  "modified": "1789060877",
+  "url": "https://asiainfo-sec.feishu.cn/file/UeYCbQ4cfoPzyDx1QI8cRAMJn8c"
+ },
+ {
+  "path": "learning-docs/04-中间件/02-RocketMQ消息队列.md",
+  "name": "02-RocketMQ消息队列.md",
+  "token": "Bd5zbmUXTov6htxtztBcHxxPncc",
+  "type": "file",
+  "created": "1788015495",
+  "modified": "1789060876",
+  "url": "https://asiainfo-sec.feishu.cn/file/Bd5zbmUXTov6htxtztBcHxxPncc"
+ },
+ {
+  "path": "learning-docs/04-中间件/01-Redis缓存实战.md",
+  "name": "01-Redis缓存实战.md",
+  "token": "I5wkbo9EPopUiQxAyj2c3BlonIh",
+  "type": "file",
+  "created": "1788015493",
+  "modified": "1789060874",
+  "url": "https://asiainfo-sec.feishu.cn/file/I5wkbo9EPopUiQxAyj2c3BlonIh"
+ },
+ {
+  "path": "learning-docs/04-中间件/12-Kafka与RocketMQ双栈切换.md",
+  "name": "12-Kafka与RocketMQ双栈切换.md",
+  "token": "Qe4ZbdVcYos3VBxOxRVc8fFyn2e",
+  "type": "file",
+  "created": "1789060808",
+  "modified": "1789060808",
+  "url": "https://asiainfo-sec.feishu.cn/file/Qe4ZbdVcYos3VBxOxRVc8fFyn2e"
+ },
+ {
+  "path": "learning-docs/05-AI集成/05-向量数据库",
+  "name": "05-向量数据库",
+  "token": "TB9BfTuCDl1o2qdZIPlcwU7enHe",
+  "type": "folder",
+  "created": "1789060769",
+  "modified": "1789060828",
+  "url": "https://asiainfo-sec.feishu.cn/drive/folder/TB9BfTuCDl1o2qdZIPlcwU7enHe"
+ },
+ {
+  "path": "learning-docs/05-AI集成/02-RAG全栈实战",
+  "name": "02-RAG全栈实战",
+  "token": "Rp71fKncFlVF06dDrvecpy5Jnwb",
+  "type": "folder",
+  "created": "1788015376",
+  "modified": "1789060815",
+  "url": "https://asiainfo-sec.feishu.cn/drive/folder/Rp71fKncFlVF06dDrvecpy5Jnwb"
+ },
+ {
+  "path": "learning-docs/05-AI集成/01-SpringAI框架集成",
+  "name": "01-SpringAI框架集成",
+  "token": "EuW5fJ8XulUoeod3MNjclnrMnsc",
+  "type": "folder",
+  "created": "1788015375",
+  "modified": "1789060813",
+  "url": "https://asiainfo-sec.feishu.cn/drive/folder/EuW5fJ8XulUoeod3MNjclnrMnsc"
+ },
+ {
+  "path": "learning-docs/05-AI集成/面试题",
+  "name": "面试题",
+  "token": "HwzPfZujSljFueddaMRc1N6KnQf",
+  "type": "folder",
+  "created": "1788015385",
+  "modified": "1788015588",
+  "url": "https://asiainfo-sec.feishu.cn/drive/folder/HwzPfZujSljFueddaMRc1N6KnQf"
+ },
+ {
+  "path": "learning-docs/05-AI集成/04-规格驱动工具",
+  "name": "04-规格驱动工具",
+  "token": "QoOKfYmO0l1lZwdrRHocI5IHnpg",
+  "type": "folder",
+  "created": "1788015383",
+  "modified": "1788015563",
+  "url": "https://asiainfo-sec.feishu.cn/drive/folder/QoOKfYmO0l1lZwdrRHocI5IHnpg"
+ },
+ {
+  "path": "learning-docs/05-AI集成/03-AI编码方法论",
+  "name": "03-AI编码方法论",
+  "token": "S6pufSII4lKrJpdMVTBcn4q8ndb",
+  "type": "folder",
+  "created": "1788015378",
+  "modified": "1788015554",
+  "url": "https://asiainfo-sec.feishu.cn/drive/folder/S6pufSII4lKrJpdMVTBcn4q8ndb"
+ },
+ {
+  "path": "learning-docs/05-AI集成/代码注释与知识点解析.md",
+  "name": "代码注释与知识点解析.md",
+  "token": "NfMWbM1t9oxRquxPEQlcvD7Bned",
+  "type": "file",
+  "created": "1788015563",
+  "modified": "1789060913",
+  "url": "https://asiainfo-sec.feishu.cn/file/NfMWbM1t9oxRquxPEQlcvD7Bned"
+ },
+ {
+  "path": "learning-docs/17-研发效能与工程实践/README.md",
+  "name": "README.md",
+  "token": "RgCMbwA4IoVkE7xKUN5cWJwonLf",
+  "type": "file",
+  "created": "1788454730",
+  "modified": "1788454730",
+  "url": "https://asiainfo-sec.feishu.cn/file/RgCMbwA4IoVkE7xKUN5cWJwonLf"
+ },
+ {
+  "path": "learning-docs/17-研发效能与工程实践/08-质量门禁与自动化.md",
+  "name": "08-质量门禁与自动化.md",
+  "token": "AlCqbNlhVofAD5x8AZNcOyPPnSd",
+  "type": "file",
+  "created": "1788454728",
+  "modified": "1788454728",
+  "url": "https://asiainfo-sec.feishu.cn/file/AlCqbNlhVofAD5x8AZNcOyPPnSd"
+ },
+ {
+  "path": "learning-docs/17-研发效能与工程实践/07-本地环境与脚本自动化.md",
+  "name": "07-本地环境与脚本自动化.md",
+  "token": "GgSobeGjlodHZIxFrKsc5hxjnuZ",
+  "type": "file",
+  "created": "1788454726",
+  "modified": "1788454726",
+  "url": "https://asiainfo-sec.feishu.cn/file/GgSobeGjlodHZIxFrKsc5hxjnuZ"
+ },
+ {
+  "path": "learning-docs/17-研发效能与工程实践/06-技术文档写作.md",
+  "name": "06-技术文档写作.md",
+  "token": "DPoubOUuxoE1MvxJ3rDc4Xm7nXH",
+  "type": "file",
+  "created": "1788454724",
+  "modified": "1788454725",
+  "url": "https://asiainfo-sec.feishu.cn/file/DPoubOUuxoE1MvxJ3rDc4Xm7nXH"
+ },
+ {
+  "path": "learning-docs/17-研发效能与工程实践/05-需求拆解与估时.md",
+  "name": "05-需求拆解与估时.md",
+  "token": "DyPHbr7AdoBs2Wxc73zctc7gnEc",
+  "type": "file",
+  "created": "1788454722",
+  "modified": "1788454723",
+  "url": "https://asiainfo-sec.feishu.cn/file/DyPHbr7AdoBs2Wxc73zctc7gnEc"
+ },
+ {
+  "path": "learning-docs/17-研发效能与工程实践/04-CodeReview实战.md",
+  "name": "04-CodeReview实战.md",
+  "token": "QGFbbZaQpoUeHAxqcNqcR6vonPf",
+  "type": "file",
+  "created": "1788454721",
+  "modified": "1788454721",
+  "url": "https://asiainfo-sec.feishu.cn/file/QGFbbZaQpoUeHAxqcNqcR6vonPf"
+ },
+ {
+  "path": "learning-docs/17-研发效能与工程实践/03-提交规范与变更日志.md",
+  "name": "03-提交规范与变更日志.md",
+  "token": "EgmTbZOoboGWrhx7bxrcUrdwn9b",
+  "type": "file",
+  "created": "1788454719",
+  "modified": "1788454719",
+  "url": "https://asiainfo-sec.feishu.cn/file/EgmTbZOoboGWrhx7bxrcUrdwn9b"
+ },
+ {
+  "path": "learning-docs/17-研发效能与工程实践/02-Git进阶与误操作恢复.md",
+  "name": "02-Git进阶与误操作恢复.md",
+  "token": "E37HboyjBo2pimxKjN2caJQfnkb",
+  "type": "file",
+  "created": "1788454717",
+  "modified": "1788454717",
+  "url": "https://asiainfo-sec.feishu.cn/file/E37HboyjBo2pimxKjN2caJQfnkb"
+ },
+ {
+  "path": "learning-docs/17-研发效能与工程实践/01-Git工作流与分支模型.md",
+  "name": "01-Git工作流与分支模型.md",
+  "token": "EA0NbPL2zoA7C2x0PsUcmhyunPg",
+  "type": "file",
+  "created": "1788454716",
+  "modified": "1788454716",
+  "url": "https://asiainfo-sec.feishu.cn/file/EA0NbPL2zoA7C2x0PsUcmhyunPg"
+ },
+ {
+  "path": "learning-docs/16-云原生与GitOps/README.md",
+  "name": "README.md",
+  "token": "Hy91bF8GGonR16x7yA4cB6wMnfd",
+  "type": "file",
+  "created": "1788454714",
+  "modified": "1788454714",
+  "url": "https://asiainfo-sec.feishu.cn/file/Hy91bF8GGonR16x7yA4cB6wMnfd"
+ },
+ {
+  "path": "learning-docs/16-云原生与GitOps/08-补全order-pay-mq的K8s清单.md",
+  "name": "08-补全order-pay-mq的K8s清单.md",
+  "token": "OlM9bYXkcoMK2Sx2rpocSis2nBf",
+  "type": "file",
+  "created": "1788454712",
+  "modified": "1788454712",
+  "url": "https://asiainfo-sec.feishu.cn/file/OlM9bYXkcoMK2Sx2rpocSis2nBf"
+ },
+ {
+  "path": "learning-docs/16-云原生与GitOps/07-多环境配置与漂移治理.md",
+  "name": "07-多环境配置与漂移治理.md",
+  "token": "ZCEPbkiO8o4cCbxPaSyccQlSnAc",
+  "type": "file",
+  "created": "1788454710",
+  "modified": "1788454710",
+  "url": "https://asiainfo-sec.feishu.cn/file/ZCEPbkiO8o4cCbxPaSyccQlSnAc"
+ },
+ {
+  "path": "learning-docs/16-云原生与GitOps/06-镜像构建优化与安全扫描.md",
+  "name": "06-镜像构建优化与安全扫描.md",
+  "token": "L5r8bbChYocdiyxAt06cyzQFn0d",
+  "type": "file",
+  "created": "1788454708",
+  "modified": "1788454708",
+  "url": "https://asiainfo-sec.feishu.cn/file/L5r8bbChYocdiyxAt06cyzQFn0d"
+ },
+ {
+  "path": "learning-docs/16-云原生与GitOps/05-ServiceMesh与Istio边界.md",
+  "name": "05-ServiceMesh与Istio边界.md",
+  "token": "Ng7mbhL2goQrhkx35cfckAl9nTg",
+  "type": "file",
+  "created": "1788454706",
+  "modified": "1788454706",
+  "url": "https://asiainfo-sec.feishu.cn/file/Ng7mbhL2goQrhkx35cfckAl9nTg"
+ },
+ {
+  "path": "learning-docs/16-云原生与GitOps/04-K8s网络模型与Service.md",
+  "name": "04-K8s网络模型与Service.md",
+  "token": "I5sBbLz2Oo4Mf9xwpWGcBR6mnUh",
+  "type": "file",
+  "created": "1788454704",
+  "modified": "1788454705",
+  "url": "https://asiainfo-sec.feishu.cn/file/I5sBbLz2Oo4Mf9xwpWGcBR6mnUh"
+ },
+ {
+  "path": "learning-docs/16-云原生与GitOps/03-GitOps与ArgoCD.md",
+  "name": "03-GitOps与ArgoCD.md",
+  "token": "DtfybUi1FoKyUaxAv8RcmufVnSe",
+  "type": "file",
+  "created": "1788454703",
+  "modified": "1788454703",
+  "url": "https://asiainfo-sec.feishu.cn/file/DtfybUi1FoKyUaxAv8RcmufVnSe"
+ },
+ {
+  "path": "learning-docs/16-云原生与GitOps/02-K8s资源治理与弹性伸缩.md",
+  "name": "02-K8s资源治理与弹性伸缩.md",
+  "token": "N3QUb4CM4oNk1pxdZSCc0bgAnhb",
+  "type": "file",
+  "created": "1788454701",
+  "modified": "1788454701",
+  "url": "https://asiainfo-sec.feishu.cn/file/N3QUb4CM4oNk1pxdZSCc0bgAnhb"
+ },
+ {
+  "path": "learning-docs/16-云原生与GitOps/01-Helm从零到参数化.md",
+  "name": "01-Helm从零到参数化.md",
+  "token": "M5NsbzrFJo7OFrxvrnFcJaQZnug",
+  "type": "file",
+  "created": "1788454699",
+  "modified": "1788454699",
+  "url": "https://asiainfo-sec.feishu.cn/file/M5NsbzrFJo7OFrxvrnFcJaQZnug"
+ },
+ {
+  "path": "learning-docs/15-计算机基础/README.md",
+  "name": "README.md",
+  "token": "YiW8bZBzloYKGkx9C9zcIOHOnsc",
+  "type": "file",
+  "created": "1788454697",
+  "modified": "1788454697",
+  "url": "https://asiainfo-sec.feishu.cn/file/YiW8bZBzloYKGkx9C9zcIOHOnsc"
+ },
+ {
+  "path": "learning-docs/15-计算机基础/08-CPU缓存与内存序.md",
+  "name": "08-CPU缓存与内存序.md",
+  "token": "QvFtbgDobor05VxVAxkcK9Pxn0M",
+  "type": "file",
+  "created": "1788454696",
+  "modified": "1788454696",
+  "url": "https://asiainfo-sec.feishu.cn/file/QvFtbgDobor05VxVAxkcK9Pxn0M"
+ },
+ {
+  "path": "learning-docs/15-计算机基础/07-字符编码与时区.md",
+  "name": "07-字符编码与时区.md",
+  "token": "V3AgbpngMo6GKsxCe97cm5PCnsc",
+  "type": "file",
+  "created": "1788454694",
+  "modified": "1788454694",
+  "url": "https://asiainfo-sec.feishu.cn/file/V3AgbpngMo6GKsxCe97cm5PCnsc"
+ },
+ {
+  "path": "learning-docs/15-计算机基础/06-容器隔离原理-namespace与cgroup.md",
+  "name": "06-容器隔离原理-namespace与cgroup.md",
+  "token": "SrOwbniIpokja4xyuaDcATLmn1f",
+  "type": "file",
+  "created": "1788454692",
+  "modified": "1788454692",
+  "url": "https://asiainfo-sec.feishu.cn/file/SrOwbniIpokja4xyuaDcATLmn1f"
+ },
+ {
+  "path": "learning-docs/15-计算机基础/05-HTTP与TLS.md",
+  "name": "05-HTTP与TLS.md",
+  "token": "ZUzbb8gJUoz44AxMw6VchgANnkf",
+  "type": "file",
+  "created": "1788454691",
+  "modified": "1788454691",
+  "url": "https://asiainfo-sec.feishu.cn/file/ZUzbb8gJUoz44AxMw6VchgANnkf"
+ },
+ {
+  "path": "learning-docs/15-计算机基础/04-TCP协议实战.md",
+  "name": "04-TCP协议实战.md",
+  "token": "GRydb7VrnolGYqxbyNichaOSnWc",
+  "type": "file",
+  "created": "1788454689",
+  "modified": "1788454689",
+  "url": "https://asiainfo-sec.feishu.cn/file/GRydb7VrnolGYqxbyNichaOSnWc"
+ },
+ {
+  "path": "learning-docs/15-计算机基础/03-文件系统与IO多路复用.md",
+  "name": "03-文件系统与IO多路复用.md",
+  "token": "NeWTbsc8HoQwndxqzzOccWzSnVf",
+  "type": "file",
+  "created": "1788454687",
+  "modified": "1788454687",
+  "url": "https://asiainfo-sec.feishu.cn/file/NeWTbsc8HoQwndxqzzOccWzSnVf"
+ },
+ {
+  "path": "learning-docs/15-计算机基础/02-内存管理与虚拟内存.md",
+  "name": "02-内存管理与虚拟内存.md",
+  "token": "VVR5bHkrdo6AynxUCnic7gtLnzb",
+  "type": "file",
+  "created": "1788454685",
+  "modified": "1788454685",
+  "url": "https://asiainfo-sec.feishu.cn/file/VVR5bHkrdo6AynxUCnic7gtLnzb"
+ },
+ {
+  "path": "learning-docs/15-计算机基础/01-进程线程与调度.md",
+  "name": "01-进程线程与调度.md",
+  "token": "Fi33bMifko3X8HxFcaic505mn1g",
+  "type": "file",
+  "created": "1788454683",
+  "modified": "1788454683",
+  "url": "https://asiainfo-sec.feishu.cn/file/Fi33bMifko3X8HxFcaic505mn1g"
+ },
+ {
+  "path": "learning-docs/14-数据工程与OLAP/README.md",
+  "name": "README.md",
+  "token": "PaDxbhdmeo5xOixJ1Qcc9epsnde",
+  "type": "file",
+  "created": "1788454681",
+  "modified": "1788454681",
+  "url": "https://asiainfo-sec.feishu.cn/file/PaDxbhdmeo5xOixJ1Qcc9epsnde"
+ },
+ {
+  "path": "learning-docs/14-数据工程与OLAP/08-数据质量与对账.md",
+  "name": "08-数据质量与对账.md",
+  "token": "THU9bVdc6oNAWDxGYJycuTrxnie",
+  "type": "file",
+  "created": "1788454679",
+  "modified": "1788454679",
+  "url": "https://asiainfo-sec.feishu.cn/file/THU9bVdc6oNAWDxGYJycuTrxnie"
+ },
+ {
+  "path": "learning-docs/14-数据工程与OLAP/07-LLM用量计量与成本分析.md",
+  "name": "07-LLM用量计量与成本分析.md",
+  "token": "IU9Mbj1C4ojH69x9XCccTbEgn8c",
+  "type": "file",
+  "created": "1788454677",
+  "modified": "1788454678",
+  "url": "https://asiainfo-sec.feishu.cn/file/IU9Mbj1C4ojH69x9XCccTbEgn8c"
+ },
+ {
+  "path": "learning-docs/14-数据工程与OLAP/06-BI看板与ECharts可视化.md",
+  "name": "06-BI看板与ECharts可视化.md",
+  "token": "BLPGbuvXxomihcxEKeYc0636nAd",
+  "type": "file",
+  "created": "1788454676",
+  "modified": "1788454676",
+  "url": "https://asiainfo-sec.feishu.cn/file/BLPGbuvXxomihcxEKeYc0636nAd"
+ },
+ {
+  "path": "learning-docs/14-数据工程与OLAP/05-批处理与调度编排.md",
+  "name": "05-批处理与调度编排.md",
+  "token": "BwX5bpGajoTYgrx39zqcMGnmnih",
+  "type": "file",
+  "created": "1788454674",
+  "modified": "1788454674",
+  "url": "https://asiainfo-sec.feishu.cn/file/BwX5bpGajoTYgrx39zqcMGnmnih"
+ },
+ {
+  "path": "learning-docs/14-数据工程与OLAP/04-CDC与实时同步链路.md",
+  "name": "04-CDC与实时同步链路.md",
+  "token": "JdKmb09hAonjSdxQUBdcUaKenQc",
+  "type": "file",
+  "created": "1788454672",
+  "modified": "1788454672",
+  "url": "https://asiainfo-sec.feishu.cn/file/JdKmb09hAonjSdxQUBdcUaKenQc"
+ },
+ {
+  "path": "learning-docs/14-数据工程与OLAP/03-数仓分层与指标口径.md",
+  "name": "03-数仓分层与指标口径.md",
+  "token": "A7ivbwq4lo9Vlrxur4ucw7Bqnae",
+  "type": "file",
+  "created": "1788454670",
+  "modified": "1788454671",
+  "url": "https://asiainfo-sec.feishu.cn/file/A7ivbwq4lo9Vlrxur4ucw7Bqnae"
+ },
+ {
+  "path": "learning-docs/14-数据工程与OLAP/02-ClickHouse实战.md",
+  "name": "02-ClickHouse实战.md",
+  "token": "AiZEbXwEYoy3h8x2rvkclSL2nBc",
+  "type": "file",
+  "created": "1788454669",
+  "modified": "1788454669",
+  "url": "https://asiainfo-sec.feishu.cn/file/AiZEbXwEYoy3h8x2rvkclSL2nBc"
+ },
+ {
+  "path": "learning-docs/14-数据工程与OLAP/01-OLAP与列式存储原理.md",
+  "name": "01-OLAP与列式存储原理.md",
+  "token": "MPITbm4gtowzIxxxQt7cV80ynLd",
+  "type": "file",
+  "created": "1788454667",
+  "modified": "1788454667",
+  "url": "https://asiainfo-sec.feishu.cn/file/MPITbm4gtowzIxxxQt7cV80ynLd"
+ },
+ {
+  "path": "learning-docs/13-稳定性工程/README.md",
+  "name": "README.md",
+  "token": "GUD5b3CpHoeE4mxKJUucb6XBnJh",
+  "type": "file",
+  "created": "1788454664",
+  "modified": "1788454665",
+  "url": "https://asiainfo-sec.feishu.cn/file/GUD5b3CpHoeE4mxKJUucb6XBnJh"
+ },
+ {
+  "path": "learning-docs/13-稳定性工程/08-oncall手册与故障响应.md",
+  "name": "08-oncall手册与故障响应.md",
+  "token": "RAWibc1XRoR968xod3gcHUxpnof",
+  "type": "file",
+  "created": "1788454662",
+  "modified": "1788454663",
+  "url": "https://asiainfo-sec.feishu.cn/file/RAWibc1XRoR968xod3gcHUxpnof"
+ },
+ {
+  "path": "learning-docs/13-稳定性工程/07-告警治理.md",
+  "name": "07-告警治理.md",
+  "token": "Fyu2bxH2Mo2tiBxMnvccTOrdnWe",
+  "type": "file",
+  "created": "1788454660",
+  "modified": "1788454660",
+  "url": "https://asiainfo-sec.feishu.cn/file/Fyu2bxH2Mo2tiBxMnvccTOrdnWe"
+ },
+ {
+  "path": "learning-docs/13-稳定性工程/06-RCA根因分析与复盘.md",
+  "name": "06-RCA根因分析与复盘.md",
+  "token": "NKQPbUoDJoWJvxxoLM7cnQqXnbc",
+  "type": "file",
+  "created": "1788454658",
+  "modified": "1788454658",
+  "url": "https://asiainfo-sec.feishu.cn/file/NKQPbUoDJoWJvxxoLM7cnQqXnbc"
+ },
+ {
+  "path": "learning-docs/13-稳定性工程/05-降级预案与开关治理.md",
+  "name": "05-降级预案与开关治理.md",
+  "token": "V3vwbBSZwotnWTxepsTc8ZYGnRf",
+  "type": "file",
+  "created": "1788454656",
+  "modified": "1788454657",
+  "url": "https://asiainfo-sec.feishu.cn/file/V3vwbBSZwotnWTxepsTc8ZYGnRf"
+ },
+ {
+  "path": "learning-docs/13-稳定性工程/04-高可用架构模式.md",
+  "name": "04-高可用架构模式.md",
+  "token": "MVKRbntRmozQz5x10EFcz0G1nug",
+  "type": "file",
+  "created": "1788454655",
+  "modified": "1788454655",
+  "url": "https://asiainfo-sec.feishu.cn/file/MVKRbntRmozQz5x10EFcz0G1nug"
+ },
+ {
+  "path": "learning-docs/13-稳定性工程/03-故障演练与混沌工程.md",
+  "name": "03-故障演练与混沌工程.md",
+  "token": "Xj0LbP03wohcPFxcN57cJkH6ntb",
+  "type": "file",
+  "created": "1788454653",
+  "modified": "1788454653",
+  "url": "https://asiainfo-sec.feishu.cn/file/Xj0LbP03wohcPFxcN57cJkH6ntb"
+ },
+ {
+  "path": "learning-docs/13-稳定性工程/02-容量规划与性能预算.md",
+  "name": "02-容量规划与性能预算.md",
+  "token": "OYdlbzqeHoTeKMxVK3Ccw9yvn2d",
+  "type": "file",
+  "created": "1788454651",
+  "modified": "1788454651",
+  "url": "https://asiainfo-sec.feishu.cn/file/OYdlbzqeHoTeKMxVK3Ccw9yvn2d"
+ },
+ {
+  "path": "learning-docs/13-稳定性工程/01-SLI-SLO与错误预算.md",
+  "name": "01-SLI-SLO与错误预算.md",
+  "token": "QJ6Rb6qUcouuoZx8Tk2cIMcAnvg",
+  "type": "file",
+  "created": "1788454649",
+  "modified": "1788454649",
+  "url": "https://asiainfo-sec.feishu.cn/file/QJ6Rb6qUcouuoZx8Tk2cIMcAnvg"
+ },
+ {
+  "path": "learning-docs/12-性能工程/README.md",
+  "name": "README.md",
+  "token": "Vzd4bYodooHZlhx8exgcydeWngf",
+  "type": "file",
+  "created": "1788454647",
+  "modified": "1788454647",
+  "url": "https://asiainfo-sec.feishu.cn/file/Vzd4bYodooHZlhx8exgcydeWngf"
+ },
+ {
+  "path": "learning-docs/12-性能工程/08-性能问题定位方法论.md",
+  "name": "08-性能问题定位方法论.md",
+  "token": "KxQ1b8pZfo3ACNx9HCCcRQj5nvh",
+  "type": "file",
+  "created": "1788454645",
+  "modified": "1788454645",
+  "url": "https://asiainfo-sec.feishu.cn/file/KxQ1b8pZfo3ACNx9HCCcRQj5nvh"
+ },
+ {
+  "path": "learning-docs/12-性能工程/07-线程池调优与背压.md",
+  "name": "07-线程池调优与背压.md",
+  "token": "WMjdbJLY7oUX4mx6JcBc8r5cnAc",
+  "type": "file",
+  "created": "1788454643",
+  "modified": "1788454643",
+  "url": "https://asiainfo-sec.feishu.cn/file/WMjdbJLY7oUX4mx6JcBc8r5cnAc"
+ },
+ {
+  "path": "learning-docs/12-性能工程/06-接口性能优化实战.md",
+  "name": "06-接口性能优化实战.md",
+  "token": "LIFgbUPylox38dxUTCGcE9eenzg",
+  "type": "file",
+  "created": "1788454641",
+  "modified": "1788454641",
+  "url": "https://asiainfo-sec.feishu.cn/file/LIFgbUPylox38dxUTCGcE9eenzg"
+ },
+ {
+  "path": "learning-docs/12-性能工程/05-SQL调优与执行计划.md",
+  "name": "05-SQL调优与执行计划.md",
+  "token": "HrElbWTJ9ofdsrxAhnMcx1zCnrc",
+  "type": "file",
+  "created": "1788454639",
+  "modified": "1788454639",
+  "url": "https://asiainfo-sec.feishu.cn/file/HrElbWTJ9ofdsrxAhnMcx1zCnrc"
+ },
+ {
+  "path": "learning-docs/12-性能工程/04-内存泄漏排查实战.md",
+  "name": "04-内存泄漏排查实战.md",
+  "token": "XSRqbyTmTolq78xsxaXcWF1Fnvg",
+  "type": "file",
+  "created": "1788454637",
+  "modified": "1788454637",
+  "url": "https://asiainfo-sec.feishu.cn/file/XSRqbyTmTolq78xsxaXcWF1Fnvg"
+ },
+ {
+  "path": "learning-docs/12-性能工程/03-火焰图与性能剖析.md",
+  "name": "03-火焰图与性能剖析.md",
+  "token": "X5vAbLR4gowCdhxfw9ac1Asbnqg",
+  "type": "file",
+  "created": "1788454635",
+  "modified": "1788454636",
+  "url": "https://asiainfo-sec.feishu.cn/file/X5vAbLR4gowCdhxfw9ac1Asbnqg"
+ },
+ {
+  "path": "learning-docs/12-性能工程/02-GC日志与停顿分析.md",
+  "name": "02-GC日志与停顿分析.md",
+  "token": "H4dsb2fHRooEfKxkCkpc4Uxrnu8",
+  "type": "file",
+  "created": "1788454634",
+  "modified": "1788454634",
+  "url": "https://asiainfo-sec.feishu.cn/file/H4dsb2fHRooEfKxkCkpc4Uxrnu8"
+ },
+ {
+  "path": "learning-docs/12-性能工程/01-JVM参数与GC选型.md",
+  "name": "01-JVM参数与GC选型.md",
+  "token": "NGowb6mCIo2KjUxHTG1cI30CnQY",
+  "type": "file",
+  "created": "1788454632",
+  "modified": "1788454632",
+  "url": "https://asiainfo-sec.feishu.cn/file/NGowb6mCIo2KjUxHTG1cI30CnQY"
+ },
+ {
+  "path": "learning-docs/11-数据结构与算法/README.md",
+  "name": "README.md",
+  "token": "VB5HbwqL4ox3l0xieoScEcdXnP7",
+  "type": "file",
+  "created": "1788454630",
+  "modified": "1789060941",
+  "url": "https://asiainfo-sec.feishu.cn/file/VB5HbwqL4ox3l0xieoScEcdXnP7"
+ },
+ {
+  "path": "learning-docs/11-数据结构与算法/11-高频面试题清单.md",
+  "name": "11-高频面试题清单.md",
+  "token": "OYlPbY0UToIZR2xHGmkc7siwn9b",
+  "type": "file",
+  "created": "1788454628",
+  "modified": "1789060940",
+  "url": "https://asiainfo-sec.feishu.cn/file/OYlPbY0UToIZR2xHGmkc7siwn9b"
+ },
+ {
+  "path": "learning-docs/11-数据结构与算法/10-限流算法-四大算法与网关实现.md",
+  "name": "10-限流算法-四大算法与网关实现.md",
+  "token": "L8OYbSKwboSYD5xb4TEcPCxhnTi",
+  "type": "file",
+  "created": "1788454626",
+  "modified": "1789060939",
+  "url": "https://asiainfo-sec.feishu.cn/file/L8OYbSKwboSYD5xb4TEcPCxhnTi"
+ },
+ {
+  "path": "learning-docs/11-数据结构与算法/09-缓存淘汰-LRU-LFU与两级缓存.md",
+  "name": "09-缓存淘汰-LRU-LFU与两级缓存.md",
+  "token": "WJ10bwztroO6lhxEv6ocEGTenOc",
+  "type": "file",
+  "created": "1788454624",
+  "modified": "1789060938",
+  "url": "https://asiainfo-sec.feishu.cn/file/WJ10bwztroO6lhxEv6ocEGTenOc"
+ },
+ {
+  "path": "learning-docs/11-数据结构与算法/08-动态规划与贪心.md",
+  "name": "08-动态规划与贪心.md",
+  "token": "Xj9HbiR4aogPYFxFD2nckEPfnqY",
+  "type": "file",
+  "created": "1788454622",
+  "modified": "1789060936",
+  "url": "https://asiainfo-sec.feishu.cn/file/Xj9HbiR4aogPYFxFD2nckEPfnqY"
+ },
+ {
+  "path": "learning-docs/11-数据结构与算法/07-字符串匹配-Trie与PII脱敏.md",
+  "name": "07-字符串匹配-Trie与PII脱敏.md",
+  "token": "RwzWbTpE3ocic7xuaTWcXLCpngh",
+  "type": "file",
+  "created": "1788454620",
+  "modified": "1789060935",
+  "url": "https://asiainfo-sec.feishu.cn/file/RwzWbTpE3ocic7xuaTWcXLCpngh"
+ },
+ {
+  "path": "learning-docs/11-数据结构与算法/06-排序与二分查找.md",
+  "name": "06-排序与二分查找.md",
+  "token": "PH9ibaBMdoAwZgx9VaGcTSvnnPh",
+  "type": "file",
+  "created": "1788454618",
+  "modified": "1789060934",
+  "url": "https://asiainfo-sec.feishu.cn/file/PH9ibaBMdoAwZgx9VaGcTSvnnPh"
+ },
+ {
+  "path": "learning-docs/11-数据结构与算法/05-图论与搜索-BFS-DFS-拓扑排序.md",
+  "name": "05-图论与搜索-BFS-DFS-拓扑排序.md",
+  "token": "ScY2bwgLno6WTmxkPOKc1gdCnKe",
+  "type": "file",
+  "created": "1788454616",
+  "modified": "1789060933",
+  "url": "https://asiainfo-sec.feishu.cn/file/ScY2bwgLno6WTmxkPOKc1gdCnKe"
+ },
+ {
+  "path": "learning-docs/11-数据结构与算法/04-树堆与TopK.md",
+  "name": "04-树堆与TopK.md",
+  "token": "ZfTNbHmbNoM45yxQctVcksoRnXf",
+  "type": "file",
+  "created": "1788454614",
+  "modified": "1789060932",
+  "url": "https://asiainfo-sec.feishu.cn/file/ZfTNbHmbNoM45yxQctVcksoRnXf"
+ },
+ {
+  "path": "learning-docs/11-数据结构与算法/03-哈希-冲突扰动与分片路由.md",
+  "name": "03-哈希-冲突扰动与分片路由.md",
+  "token": "SmI8bJYGWotwcGxG0GHcxtZpnQc",
+  "type": "file",
+  "created": "1788454612",
+  "modified": "1789060931",
+  "url": "https://asiainfo-sec.feishu.cn/file/SmI8bJYGWotwcGxG0GHcxtZpnQc"
+ },
+ {
+  "path": "learning-docs/11-数据结构与算法/02-线性结构-数组链表栈队列.md",
+  "name": "02-线性结构-数组链表栈队列.md",
+  "token": "Kg0qbcaLmo6Dt5xH0f7cAzalnmd",
+  "type": "file",
+  "created": "1788454611",
+  "modified": "1789060929",
+  "url": "https://asiainfo-sec.feishu.cn/file/Kg0qbcaLmo6Dt5xH0f7cAzalnmd"
+ },
+ {
+  "path": "learning-docs/11-数据结构与算法/01-复杂度分析与算法思维.md",
+  "name": "01-复杂度分析与算法思维.md",
+  "token": "UCuebzSBXoltzTxippVcYYDwndh",
+  "type": "file",
+  "created": "1788454609",
+  "modified": "1789060928",
+  "url": "https://asiainfo-sec.feishu.cn/file/UCuebzSBXoltzTxippVcYYDwndh"
+ },
+ {
+  "path": "learning-docs/10-Python服务/01-FastAPI对话服务实战.md",
+  "name": "01-FastAPI对话服务实战.md",
+  "token": "YXCtbVNCoojZOPxHQaDcloF5nie",
+  "type": "file",
+  "created": "1788454607",
+  "modified": "1788454607",
+  "url": "https://asiainfo-sec.feishu.cn/file/YXCtbVNCoojZOPxHQaDcloF5nie"
+ },
+ {
+  "path": "learning-docs/09-安全与设计模式/04-设计模式在微服务中的实战.md",
+  "name": "04-设计模式在微服务中的实战.md",
+  "token": "WVO7bvoP3oVNPQxOOjGc8MDbnWb",
+  "type": "file",
+  "created": "1788454605",
+  "modified": "1788454605",
+  "url": "https://asiainfo-sec.feishu.cn/file/WVO7bvoP3oVNPQxOOjGc8MDbnWb"
+ },
+ {
+  "path": "learning-docs/09-安全与设计模式/03-SpringSecurity微服务两层安全模型.md",
+  "name": "03-SpringSecurity微服务两层安全模型.md",
+  "token": "Xu2xbZ2fcob6k5xifv9cDCisnRd",
+  "type": "file",
+  "created": "1788190064",
+  "modified": "1788190065",
+  "url": "https://asiainfo-sec.feishu.cn/file/Xu2xbZ2fcob6k5xifv9cDCisnRd"
+ },
+ {
+  "path": "learning-docs/09-安全与设计模式/02-接口安全与限流策略.md",
+  "name": "02-接口安全与限流策略.md",
+  "token": "MwQIbWjq8oy3acx3CFzcURsSnrh",
+  "type": "file",
+  "created": "1788015604",
+  "modified": "1788015604",
+  "url": "https://asiainfo-sec.feishu.cn/file/MwQIbWjq8oy3acx3CFzcURsSnrh"
+ },
+ {
+  "path": "learning-docs/09-安全与设计模式/01-JWT鉴权与异常处理.md",
+  "name": "01-JWT鉴权与异常处理.md",
+  "token": "MNQgbOpfqogfAhxq1dncy4Ign4i",
+  "type": "file",
+  "created": "1788015602",
+  "modified": "1788015603",
+  "url": "https://asiainfo-sec.feishu.cn/file/MNQgbOpfqogfAhxq1dncy4Ign4i"
+ },
+ {
+  "path": "learning-docs/08-测试/05-性能压测实战-k6与JMeter.md",
+  "name": "05-性能压测实战-k6与JMeter.md",
+  "token": "OgrUbOeHHoVZY8xBFOEcq4cTnid",
+  "type": "file",
+  "created": "1788454603",
+  "modified": "1788454604",
+  "url": "https://asiainfo-sec.feishu.cn/file/OgrUbOeHHoVZY8xBFOEcq4cTnid"
+ },
+ {
+  "path": "learning-docs/08-测试/04-Cucumber-BDD行为驱动实战.md",
+  "name": "04-Cucumber-BDD行为驱动实战.md",
+  "token": "KxeRb0mploQzJExToqBcJhobnBo",
+  "type": "file",
+  "created": "1788454601",
+  "modified": "1788454602",
+  "url": "https://asiainfo-sec.feishu.cn/file/KxeRb0mploQzJExToqBcJhobnBo"
+ },
+ {
+  "path": "learning-docs/08-测试/03-一等公民验证清单（一二梯队落地）.md",
+  "name": "03-一等公民验证清单（一二梯队落地）.md",
+  "token": "D56RbenUuoHcYLxSiv3ca8LonGc",
+  "type": "file",
+  "created": "1788049434",
+  "modified": "1788049434",
+  "url": "https://asiainfo-sec.feishu.cn/file/D56RbenUuoHcYLxSiv3ca8LonGc"
+ },
+ {
+  "path": "learning-docs/08-测试/02-Testcontainers与安全框架技术选型.md",
+  "name": "02-Testcontainers与安全框架技术选型.md",
+  "token": "TduLbnJFwoPkA5xuzOccy3dXn9h",
+  "type": "file",
+  "created": "1788049432",
+  "modified": "1788049433",
+  "url": "https://asiainfo-sec.feishu.cn/file/TduLbnJFwoPkA5xuzOccy3dXn9h"
+ },
+ {
+  "path": "learning-docs/08-测试/01-JUnit5与Mockito单元测试.md",
+  "name": "01-JUnit5与Mockito单元测试.md",
+  "token": "W0AFbdXSlo4B90xLF93ch1XynHg",
+  "type": "file",
+  "created": "1788015600",
+  "modified": "1788015600",
+  "url": "https://asiainfo-sec.feishu.cn/file/W0AFbdXSlo4B90xLF93ch1XynHg"
+ },
+ {
+  "path": "learning-docs/07-运维部署/01-Docker容器化.md",
+  "name": "01-Docker容器化.md",
+  "token": "NYkhbDcKeoMjfAxWmpWcQQHOnuc",
+  "type": "file",
+  "created": "1788015594",
+  "modified": "1789060927",
+  "url": "https://asiainfo-sec.feishu.cn/file/NYkhbDcKeoMjfAxWmpWcQQHOnuc"
+ },
+ {
+  "path": "learning-docs/07-运维部署/06-优雅停机与零丢失滚动更新.md",
+  "name": "06-优雅停机与零丢失滚动更新.md",
+  "token": "So8rb1mA1ox1O0xDg2Zct7e0nnf",
+  "type": "file",
+  "created": "1788190062",
+  "modified": "1788454743",
+  "url": "https://asiainfo-sec.feishu.cn/file/So8rb1mA1ox1O0xDg2Zct7e0nnf"
+ },
+ {
+  "path": "learning-docs/07-运维部署/05-XXL-Job分布式调度.md",
+  "name": "05-XXL-Job分布式调度.md",
+  "token": "Nic3bLUcfoiPaexwsbwcB1zknxf",
+  "type": "file",
+  "created": "1788049431",
+  "modified": "1788454742",
+  "url": "https://asiainfo-sec.feishu.cn/file/Nic3bLUcfoiPaexwsbwcB1zknxf"
+ },
+ {
+  "path": "learning-docs/07-运维部署/04-Prometheus可观测性.md",
+  "name": "04-Prometheus可观测性.md",
+  "token": "TO7Tb0zc5olPYuxbEBjc92Wvnnh",
+  "type": "file",
+  "created": "1788049422",
+  "modified": "1788454741",
+  "url": "https://asiainfo-sec.feishu.cn/file/TO7Tb0zc5olPYuxbEBjc92Wvnnh"
+ },
+ {
+  "path": "learning-docs/07-运维部署/03-JenkinsCICD流水线.md",
+  "name": "03-JenkinsCICD流水线.md",
+  "token": "R7whbH7UooGqApxrsDDc0zMjn1d",
+  "type": "file",
+  "created": "1788015598",
+  "modified": "1788454740",
+  "url": "https://asiainfo-sec.feishu.cn/file/R7whbH7UooGqApxrsDDc0zMjn1d"
+ },
+ {
+  "path": "learning-docs/07-运维部署/02-Kubernetes入门.md",
+  "name": "02-Kubernetes入门.md",
+  "token": "GTGpb6jZUoTpmsx0qEEcpFuunAd",
+  "type": "file",
+  "created": "1788015596",
+  "modified": "1788454739",
+  "url": "https://asiainfo-sec.feishu.cn/file/GTGpb6jZUoTpmsx0qEEcpFuunAd"
+ },
+ {
+  "path": "learning-docs/07-运维部署/07-Loki日志聚合.md",
+  "name": "07-Loki日志聚合.md",
+  "token": "W9MEboG8modFbDxTHrUcem3Hndb",
+  "type": "file",
+  "created": "1788454599",
+  "modified": "1788454599",
+  "url": "https://asiainfo-sec.feishu.cn/file/W9MEboG8modFbDxTHrUcem3Hndb"
+ },
+ {
+  "path": "learning-docs/06-前端开发/01-Vue3核心基础.md",
+  "name": "01-Vue3核心基础.md",
+  "token": "Y6jJbstCHoBUo4xFgOPcwzdonjd",
+  "type": "file",
+  "created": "1788015588",
+  "modified": "1788454737",
+  "url": "https://asiainfo-sec.feishu.cn/file/Y6jJbstCHoBUo4xFgOPcwzdonjd"
+ },
+ {
+  "path": "learning-docs/06-前端开发/04-Pinia状态管理实战.md",
+  "name": "04-Pinia状态管理实战.md",
+  "token": "RUAibJsiCoiWcOxLYv5cnjgZnQe",
+  "type": "file",
+  "created": "1788454598",
+  "modified": "1788454598",
+  "url": "https://asiainfo-sec.feishu.cn/file/RUAibJsiCoiWcOxLYv5cnjgZnQe"
+ },
+ {
+  "path": "learning-docs/06-前端开发/03-路由守卫与Axios请求封装.md",
+  "name": "03-路由守卫与Axios请求封装.md",
+  "token": "WfQpbhxqRo8MD7xVVKacYp4Qnwe",
+  "type": "file",
+  "created": "1788015592",
+  "modified": "1788015592",
+  "url": "https://asiainfo-sec.feishu.cn/file/WfQpbhxqRo8MD7xVVKacYp4Qnwe"
+ },
+ {
+  "path": "learning-docs/06-前端开发/02-ElementPlus与前后端联调.md",
+  "name": "02-ElementPlus与前后端联调.md",
+  "token": "IELsbUMhdonSogxlN48cseFDnAd",
+  "type": "file",
+  "created": "1788015590",
+  "modified": "1788015590",
+  "url": "https://asiainfo-sec.feishu.cn/file/IELsbUMhdonSogxlN48cseFDnAd"
+ },
+ {
+  "path": "learning-docs/03-数据库与ORM/01-MySQL核心知识.md",
+  "name": "01-MySQL核心知识.md",
+  "token": "HuMubliYboCfFlxDyL9c9QhLnDe",
+  "type": "file",
+  "created": "1788015487",
+  "modified": "1789060873",
+  "url": "https://asiainfo-sec.feishu.cn/file/HuMubliYboCfFlxDyL9c9QhLnDe"
+ },
+ {
+  "path": "learning-docs/03-数据库与ORM/05-MySQL锁机制与主从复制读写分离.md",
+  "name": "05-MySQL锁机制与主从复制读写分离.md",
+  "token": "JQ5AbJYpbo22P9xTk62cdZvOnOe",
+  "type": "file",
+  "created": "1788454596",
+  "modified": "1788454596",
+  "url": "https://asiainfo-sec.feishu.cn/file/JQ5AbJYpbo22P9xTk62cdZvOnOe"
+ },
+ {
+  "path": "learning-docs/03-数据库与ORM/04-分布式ID规范.md",
+  "name": "04-分布式ID规范.md",
+  "token": "WEs0bWsfVoZj2NxymwWcm1eVnab",
+  "type": "file",
+  "created": "1788190050",
+  "modified": "1788190050",
+  "url": "https://asiainfo-sec.feishu.cn/file/WEs0bWsfVoZj2NxymwWcm1eVnab"
+ },
+ {
+  "path": "learning-docs/03-数据库与ORM/03-ShardingSphere用户表分库分表实战.md",
+  "name": "03-ShardingSphere用户表分库分表实战.md",
+  "token": "E3tybN1KdoXHmQxJiBycPDKCn0b",
+  "type": "file",
+  "created": "1788015491",
+  "modified": "1788015491",
+  "url": "https://asiainfo-sec.feishu.cn/file/E3tybN1KdoXHmQxJiBycPDKCn0b"
+ },
+ {
+  "path": "learning-docs/03-数据库与ORM/02-MyBatisPlus实战.md",
+  "name": "02-MyBatisPlus实战.md",
+  "token": "VnMHbOmzzoEnsSxJ6tEcHHninob",
+  "type": "file",
+  "created": "1788015489",
+  "modified": "1788015489",
+  "url": "https://asiainfo-sec.feishu.cn/file/VnMHbOmzzoEnsSxJ6tEcHHninob"
+ },
+ {
+  "path": "learning-docs/02-Spring微服务/14-分布式幂等设计.md",
+  "name": "14-分布式幂等设计.md",
+  "token": "Ky8cbpOSroQ9adxZCC1cOXwznCi",
+  "type": "file",
+  "created": "1788454594",
+  "modified": "1789060872",
+  "url": "https://asiainfo-sec.feishu.cn/file/Ky8cbpOSroQ9adxZCC1cOXwznCi"
+ },
+ {
+  "path": "learning-docs/02-Spring微服务/06-Seata分布式事务AT模式.md",
+  "name": "06-Seata分布式事务AT模式.md",
+  "token": "HTmzb3Wkwo0bi0xU1mEcnMW7nKc",
+  "type": "file",
+  "created": "1788049408",
+  "modified": "1789060871",
+  "url": "https://asiainfo-sec.feishu.cn/file/HTmzb3Wkwo0bi0xU1mEcnMW7nKc"
+ },
+ {
+  "path": "learning-docs/02-Spring微服务/05-SpringDoc接口文档.md",
+  "name": "05-SpringDoc接口文档.md",
+  "token": "XdO2brQO4oLbFlxuVp3cUk6rnVf",
+  "type": "file",
+  "created": "1788015485",
+  "modified": "1789060870",
+  "url": "https://asiainfo-sec.feishu.cn/file/XdO2brQO4oLbFlxuVp3cUk6rnVf"
+ },
+ {
+  "path": "learning-docs/02-Spring微服务/04-SpringCloudGateway网关.md",
+  "name": "04-SpringCloudGateway网关.md",
+  "token": "MHKXbFpRmoCXSoxgj28cKhBqnTh",
+  "type": "file",
+  "created": "1788015483",
+  "modified": "1789060868",
+  "url": "https://asiainfo-sec.feishu.cn/file/MHKXbFpRmoCXSoxgj28cKhBqnTh"
+ },
+ {
+  "path": "learning-docs/02-Spring微服务/03-Nacos注册与配置中心.md",
+  "name": "03-Nacos注册与配置中心.md",
+  "token": "T3akbDGk1opEjpxIYh9cenfSnTg",
+  "type": "file",
+  "created": "1788015481",
+  "modified": "1789060867",
+  "url": "https://asiainfo-sec.feishu.cn/file/T3akbDGk1opEjpxIYh9cenfSnTg"
+ },
+ {
+  "path": "learning-docs/02-Spring微服务/02-SpringCloud微服务架构.md",
+  "name": "02-SpringCloud微服务架构.md",
+  "token": "LsYXbPdGJosnQKxVqYjcOxZon3b",
+  "type": "file",
+  "created": "1788015479",
+  "modified": "1789060866",
+  "url": "https://asiainfo-sec.feishu.cn/file/LsYXbPdGJosnQKxVqYjcOxZon3b"
+ },
+ {
+  "path": "learning-docs/02-Spring微服务/13-支付渠道集成与回调一致性.md",
+  "name": "13-支付渠道集成与回调一致性.md",
+  "token": "QuO0boilSo9BGIxxKduc17bVnbf",
+  "type": "file",
+  "created": "1788454592",
+  "modified": "1788454592",
+  "url": "https://asiainfo-sec.feishu.cn/file/QuO0boilSo9BGIxxKduc17bVnbf"
+ },
+ {
+  "path": "learning-docs/02-Spring微服务/12-订单状态机治理.md",
+  "name": "12-订单状态机治理.md",
+  "token": "PxP8bhkzvoyaI8xgmiAcsKHWnae",
+  "type": "file",
+  "created": "1788190042",
+  "modified": "1788190043",
+  "url": "https://asiainfo-sec.feishu.cn/file/PxP8bhkzvoyaI8xgmiAcsKHWnae"
+ },
+ {
+  "path": "learning-docs/02-Spring微服务/11-STOMP实时通知与用户目的地.md",
+  "name": "11-STOMP实时通知与用户目的地.md",
+  "token": "NeVobZDvUoOBa4x2R6PcQYxTnDf",
+  "type": "file",
+  "created": "1788190040",
+  "modified": "1788190040",
+  "url": "https://asiainfo-sec.feishu.cn/file/NeVobZDvUoOBa4x2R6PcQYxTnDf"
+ },
+ {
+  "path": "learning-docs/02-Spring微服务/10-自定义Starter与自动装配.md",
+  "name": "10-自定义Starter与自动装配.md",
+  "token": "GriubOvltoY3ZBxs1Jyc0TTgnQf",
+  "type": "file",
+  "created": "1788190038",
+  "modified": "1788190039",
+  "url": "https://asiainfo-sec.feishu.cn/file/GriubOvltoY3ZBxs1Jyc0TTgnQf"
+ },
+ {
+  "path": "learning-docs/02-Spring微服务/09-SpringCache与事务领域事件.md",
+  "name": "09-SpringCache与事务领域事件.md",
+  "token": "EGGDbdN3coBdOTxip3cc9VaGnOf",
+  "type": "file",
+  "created": "1788190032",
+  "modified": "1788190032",
+  "url": "https://asiainfo-sec.feishu.cn/file/EGGDbdN3coBdOTxip3cc9VaGnOf"
+ },
+ {
+  "path": "learning-docs/02-Spring微服务/08-Feign熔断与降级语义.md",
+  "name": "08-Feign熔断与降级语义.md",
+  "token": "RmY1bIWtNonwjox7683cX2epnlM",
+  "type": "file",
+  "created": "1788190030",
+  "modified": "1788190030",
+  "url": "https://asiainfo-sec.feishu.cn/file/RmY1bIWtNonwjox7683cX2epnlM"
+ },
+ {
+  "path": "learning-docs/02-Spring微服务/07-服务调用统一与SeataXID传播.md",
+  "name": "07-服务调用统一与SeataXID传播.md",
+  "token": "JJwrbJJYmomqN9xL1kVcHVoinQh",
+  "type": "file",
+  "created": "1788190028",
+  "modified": "1788190028",
+  "url": "https://asiainfo-sec.feishu.cn/file/JJwrbJJYmomqN9xL1kVcHVoinQh"
+ },
+ {
+  "path": "learning-docs/02-Spring微服务/01-SpringBoot核心原理.md",
+  "name": "01-SpringBoot核心原理.md",
+  "token": "N8Q3bed0bo9CL0xg1KPcIXyonTd",
+  "type": "file",
+  "created": "1788015477",
+  "modified": "1788015477",
+  "url": "https://asiainfo-sec.feishu.cn/file/N8Q3bed0bo9CL0xg1KPcIXyonTd"
+ },
+ {
+  "path": "learning-docs/01-Java基础/08-语言级细节与序列化.md",
+  "name": "08-语言级细节与序列化.md",
+  "token": "J4HObLmgNolF2kxr0Y7cHnBNnwb",
+  "type": "file",
+  "created": "1788454591",
+  "modified": "1788454591",
+  "url": "https://asiainfo-sec.feishu.cn/file/J4HObLmgNolF2kxr0Y7cHnBNnwb"
+ },
+ {
+  "path": "learning-docs/01-Java基础/07-IO模型与Netty基础.md",
+  "name": "07-IO模型与Netty基础.md",
+  "token": "OC66bNkLKoQYoHxyyF4c9KtMnAf",
+  "type": "file",
+  "created": "1788454588",
+  "modified": "1788454589",
+  "url": "https://asiainfo-sec.feishu.cn/file/OC66bNkLKoQYoHxyyF4c9KtMnAf"
+ },
+ {
+  "path": "learning-docs/01-Java基础/06-反射动态代理与SPI.md",
+  "name": "06-反射动态代理与SPI.md",
+  "token": "BgJxby9B7okXhexgK8TcNQy9nkg",
+  "type": "file",
+  "created": "1788454586",
+  "modified": "1788454587",
+  "url": "https://asiainfo-sec.feishu.cn/file/BgJxby9B7okXhexgK8TcNQy9nkg"
+ },
+ {
+  "path": "learning-docs/01-Java基础/05-集合框架与源码.md",
+  "name": "05-集合框架与源码.md",
+  "token": "FGUAbnWAJoNKeWxyeVmc1Nu6noc",
+  "type": "file",
+  "created": "1788454584",
+  "modified": "1788454585",
+  "url": "https://asiainfo-sec.feishu.cn/file/FGUAbnWAJoNKeWxyeVmc1Nu6noc"
+ },
+ {
+  "path": "learning-docs/01-Java基础/04-并发编程进阶.md",
+  "name": "04-并发编程进阶.md",
+  "token": "MLMxb9Q6toRCeNxs4URc6TjZnAd",
+  "type": "file",
+  "created": "1788454583",
+  "modified": "1788454583",
+  "url": "https://asiainfo-sec.feishu.cn/file/MLMxb9Q6toRCeNxs4URc6TjZnAd"
+ },
+ {
+  "path": "learning-docs/01-Java基础/03-JVM内存模型与GC实战.md",
+  "name": "03-JVM内存模型与GC实战.md",
+  "token": "VXljbs8MJoaSKWxKTQNcavgrn4g",
+  "type": "file",
+  "created": "1788454581",
+  "modified": "1788454581",
+  "url": "https://asiainfo-sec.feishu.cn/file/VXljbs8MJoaSKWxKTQNcavgrn4g"
+ },
+ {
+  "path": "learning-docs/01-Java基础/02-Maven多模块管理.md",
+  "name": "02-Maven多模块管理.md",
+  "token": "HL2Yba0mzoKe4Hxauu3crbDonkh",
+  "type": "file",
+  "created": "1788015475",
+  "modified": "1788015475",
+  "url": "https://asiainfo-sec.feishu.cn/file/HL2Yba0mzoKe4Hxauu3crbDonkh"
+ },
+ {
+  "path": "learning-docs/01-Java基础/01-Java17核心特性.md",
+  "name": "01-Java17核心特性.md",
+  "token": "UWrobxBEIoXYmmxG1nOcMq1Znyh",
+  "type": "file",
+  "created": "1788015473",
+  "modified": "1788015473",
+  "url": "https://asiainfo-sec.feishu.cn/file/UWrobxBEIoXYmmxG1nOcMq1Znyh"
+ },
+ {
+  "path": "learning-docs/00-学习路线总览/README.md",
+  "name": "README.md",
+  "token": "XIn1brLkUozYzUxiNn2cOUZNnnH",
+  "type": "file",
+  "created": "1788015471",
+  "modified": "1789060865",
+  "url": "https://asiainfo-sec.feishu.cn/file/XIn1brLkUozYzUxiNn2cOUZNnnH"
+ },
+ {
+  "path": "learning-docs/00-学习路线总览/02-中间件补全开发计划.md",
+  "name": "02-中间件补全开发计划.md",
+  "token": "WPXvbHga9oUceTxlGnac10omnLc",
+  "type": "file",
+  "created": "1788454574",
+  "modified": "1789060863",
+  "url": "https://asiainfo-sec.feishu.cn/file/WPXvbHga9oUceTxlGnac10omnLc"
+ },
+ {
+  "path": "learning-docs/00-学习路线总览/05-技术缺口分析与补全计划.md",
+  "name": "05-技术缺口分析与补全计划.md",
+  "token": "XiyxbWKjEorCOZxqfV8cCHNjnPd",
+  "type": "file",
+  "created": "1788454579",
+  "modified": "1788454579",
+  "url": "https://asiainfo-sec.feishu.cn/file/XiyxbWKjEorCOZxqfV8cCHNjnPd"
+ },
+ {
+  "path": "learning-docs/00-学习路线总览/04-Java基础补全开发计划.md",
+  "name": "04-Java基础补全开发计划.md",
+  "token": "Tx55bzbiColMomxZ3lQctLb9nRg",
+  "type": "file",
+  "created": "1788454578",
+  "modified": "1788454578",
+  "url": "https://asiainfo-sec.feishu.cn/file/Tx55bzbiColMomxZ3lQctLb9nRg"
+ },
+ {
+  "path": "learning-docs/00-学习路线总览/03-微服务治理补全开发计划.md",
+  "name": "03-微服务治理补全开发计划.md",
+  "token": "Va0HbItyYobydSxlJVgcPkOJnlh",
+  "type": "file",
+  "created": "1788454575",
+  "modified": "1788454576",
+  "url": "https://asiainfo-sec.feishu.cn/file/Va0HbItyYobydSxlJVgcPkOJnlh"
+ },
+ {
+  "path": "learning-docs/00-学习路线总览/01-Spring技术补全开发计划.md",
+  "name": "01-Spring技术补全开发计划.md",
+  "token": "PUtwbXH5Dox4o6x2idIcRBF8nkj",
+  "type": "file",
+  "created": "1788454572",
+  "modified": "1788454572",
+  "url": "https://asiainfo-sec.feishu.cn/file/PUtwbXH5Dox4o6x2idIcRBF8nkj"
+ },
+ {
+  "path": "learning-docs/05-AI集成/05-向量数据库/README.md",
+  "name": "README.md",
+  "token": "OFDdb7oV9oDoIQxORfXcNOK2nab",
+  "type": "file",
+  "created": "1789060826",
+  "modified": "1789060827",
+  "url": "https://asiainfo-sec.feishu.cn/file/OFDdb7oV9oDoIQxORfXcNOK2nab"
+ },
+ {
+  "path": "learning-docs/05-AI集成/05-向量数据库/05-面试专练与追问链.md",
+  "name": "05-面试专练与追问链.md",
+  "token": "V1qNbhNdGoxNDXxvkLAcAIfEnxg",
+  "type": "file",
+  "created": "1789060824",
+  "modified": "1789060824",
+  "url": "https://asiainfo-sec.feishu.cn/file/V1qNbhNdGoxNDXxvkLAcAIfEnxg"
+ },
+ {
+  "path": "learning-docs/05-AI集成/05-向量数据库/04-生产运维-向量库跑起来之后才会遇到的事.md",
+  "name": "04-生产运维-向量库跑起来之后才会遇到的事.md",
+  "token": "XqcjbAtfVoqs3WxbqudcjuJRn1f",
+  "type": "file",
+  "created": "1789060822",
+  "modified": "1789060822",
+  "url": "https://asiainfo-sec.feishu.cn/file/XqcjbAtfVoqs3WxbqudcjuJRn1f"
+ },
+ {
+  "path": "learning-docs/05-AI集成/05-向量数据库/03-选型与容量规划.md",
+  "name": "03-选型与容量规划.md",
+  "token": "F8gYb8HXWoB9SBxyC54cVDoCn1f",
+  "type": "file",
+  "created": "1789060820",
+  "modified": "1789060820",
+  "url": "https://asiainfo-sec.feishu.cn/file/F8gYb8HXWoB9SBxyC54cVDoCn1f"
+ },
+ {
+  "path": "learning-docs/05-AI集成/05-向量数据库/02-索引算法-向量检索怎么从全表扫描里活下来.md",
+  "name": "02-索引算法-向量检索怎么从全表扫描里活下来.md",
+  "token": "T9fQbXxe3oz9rFxy3iHc0O0Ennk",
+  "type": "file",
+  "created": "1789060818",
+  "modified": "1789060818",
+  "url": "https://asiainfo-sec.feishu.cn/file/T9fQbXxe3oz9rFxy3iHc0O0Ennk"
+ },
+ {
+  "path": "learning-docs/05-AI集成/05-向量数据库/01-向量与相似度-把文字变成坐标.md",
+  "name": "01-向量与相似度-把文字变成坐标.md",
+  "token": "CHuFbC7ALozo2DxUFpQcr7OPn3t",
+  "type": "file",
+  "created": "1789060816",
+  "modified": "1789060816",
+  "url": "https://asiainfo-sec.feishu.cn/file/CHuFbC7ALozo2DxUFpQcr7OPn3t"
+ },
+ {
+  "path": "learning-docs/05-AI集成/02-RAG全栈实战/10-RAG全栈实战-知识点汇总.md",
+  "name": "10-RAG全栈实战-知识点汇总.md",
+  "token": "VbXlbEwfIoKuptxheSqcH54UnKd",
+  "type": "file",
+  "created": "1788015539",
+  "modified": "1789060909",
+  "url": "https://asiainfo-sec.feishu.cn/file/VbXlbEwfIoKuptxheSqcH54UnKd"
+ },
+ {
+  "path": "learning-docs/05-AI集成/02-RAG全栈实战/08-知识库增量同步实战-RocketMQ驱动向量化.md",
+  "name": "08-知识库增量同步实战-RocketMQ驱动向量化.md",
+  "token": "EPklbi2R4oeMLSxCROOcm1tMnZg",
+  "type": "file",
+  "created": "1788015536",
+  "modified": "1789060907",
+  "url": "https://asiainfo-sec.feishu.cn/file/EPklbi2R4oeMLSxCROOcm1tMnZg"
+ },
+ {
+  "path": "learning-docs/05-AI集成/02-RAG全栈实战/07-文档格式扩展实战-Tika多格式解析.md",
+  "name": "07-文档格式扩展实战-Tika多格式解析.md",
+  "token": "OmZobSPtYobarnxYp0mc7riEnGc",
+  "type": "file",
+  "created": "1788015533",
+  "modified": "1789060906",
+  "url": "https://asiainfo-sec.feishu.cn/file/OmZobSPtYobarnxYp0mc7riEnGc"
+ },
+ {
+  "path": "learning-docs/05-AI集成/02-RAG全栈实战/06-引用溯源实战-带出处回答.md",
+  "name": "06-引用溯源实战-带出处回答.md",
+  "token": "YTW0bGWBjoQJ7Sx8N6pcd6qynBh",
+  "type": "file",
+  "created": "1788015532",
+  "modified": "1789060905",
+  "url": "https://asiainfo-sec.feishu.cn/file/YTW0bGWBjoQJ7Sx8N6pcd6qynBh"
+ },
+ {
+  "path": "learning-docs/05-AI集成/02-RAG全栈实战/05-混合检索实战-ES-BM25与向量RRF融合.md",
+  "name": "05-混合检索实战-ES-BM25与向量RRF融合.md",
+  "token": "Wb01bTTPaoO69Gx7UJgcipiznhd",
+  "type": "file",
+  "created": "1788015530",
+  "modified": "1789060904",
+  "url": "https://asiainfo-sec.feishu.cn/file/Wb01bTTPaoO69Gx7UJgcipiznhd"
+ },
+ {
+  "path": "learning-docs/05-AI集成/02-RAG全栈实战/03-RAG向量检索实战.md",
+  "name": "03-RAG向量检索实战.md",
+  "token": "JyqBb9hProKGDsx496UcV8Kandc",
+  "type": "file",
+  "created": "1788015525",
+  "modified": "1789060903",
+  "url": "https://asiainfo-sec.feishu.cn/file/JyqBb9hProKGDsx496UcV8Kandc"
+ },
+ {
+  "path": "learning-docs/05-AI集成/02-RAG全栈实战/02-RAG检索增强开发.md",
+  "name": "02-RAG检索增强开发.md",
+  "token": "CiSZbUQ8Ro0ZKSxe9shcXAzcnAh",
+  "type": "file",
+  "created": "1788015523",
+  "modified": "1789060901",
+  "url": "https://asiainfo-sec.feishu.cn/file/CiSZbUQ8Ro0ZKSxe9shcXAzcnAh"
+ },
+ {
+  "path": "learning-docs/05-AI集成/02-RAG全栈实战/01-RAG检索增强生成.md",
+  "name": "01-RAG检索增强生成.md",
+  "token": "UH6Pbeh4io8t8wxr6S1cnRimnSf",
+  "type": "file",
+  "created": "1788015521",
+  "modified": "1789060900",
+  "url": "https://asiainfo-sec.feishu.cn/file/UH6Pbeh4io8t8wxr6S1cnRimnSf"
+ },
+ {
+  "path": "learning-docs/05-AI集成/02-RAG全栈实战/11-知识库新范式-LLM-Wiki与Agentic检索.md",
+  "name": "11-知识库新范式-LLM-Wiki与Agentic检索.md",
+  "token": "R473bFI24oEK51xpiBQcC2hTn1b",
+  "type": "file",
+  "created": "1789060814",
+  "modified": "1789060814",
+  "url": "https://asiainfo-sec.feishu.cn/file/R473bFI24oEK51xpiBQcC2hTn1b"
+ },
+ {
+  "path": "learning-docs/05-AI集成/02-RAG全栈实战/RAG全栈实战-知识点汇总.docx",
+  "name": "RAG全栈实战-知识点汇总.docx",
+  "token": "PNaVbONheovyJyxVRhlc9tFhnhg",
+  "type": "file",
+  "created": "1788015541",
+  "modified": "1788015542",
+  "url": "https://asiainfo-sec.feishu.cn/file/PNaVbONheovyJyxVRhlc9tFhnhg"
+ },
+ {
+  "path": "learning-docs/05-AI集成/02-RAG全栈实战/09-ai-cs-knowledge-search接口测试报告.md",
+  "name": "09-ai-cs-knowledge-search接口测试报告.md",
+  "token": "Vs0WbmoSQofPu7xqM9Pcy92snRc",
+  "type": "file",
+  "created": "1788015537",
+  "modified": "1788015537",
+  "url": "https://asiainfo-sec.feishu.cn/file/Vs0WbmoSQofPu7xqM9Pcy92snRc"
+ },
+ {
+  "path": "learning-docs/05-AI集成/02-RAG全栈实战/04-RAG进阶实战-Rerank重排序.md",
+  "name": "04-RAG进阶实战-Rerank重排序.md",
+  "token": "Ow6kbz1ECoPLI1xLS2Cckns0nlc",
+  "type": "file",
+  "created": "1788015528",
+  "modified": "1788015528",
+  "url": "https://asiainfo-sec.feishu.cn/file/Ow6kbz1ECoPLI1xLS2Cckns0nlc"
+ },
+ {
+  "path": "learning-docs/05-AI集成/01-SpringAI框架集成/10-提示词版本管理与灰度发布实战.md",
+  "name": "10-提示词版本管理与灰度发布实战.md",
+  "token": "W5NcbMq3Eoem0lxqLDacAChpnge",
+  "type": "file",
+  "created": "1788454752",
+  "modified": "1789060899",
+  "url": "https://asiainfo-sec.feishu.cn/file/W5NcbMq3Eoem0lxqLDacAChpnge"
+ },
+ {
+  "path": "learning-docs/05-AI集成/01-SpringAI框架集成/09-ai-cs-chat接口测试报告.md",
+  "name": "09-ai-cs-chat接口测试报告.md",
+  "token": "QXpwbHtcaoxLErxgeZ2chsDZnob",
+  "type": "file",
+  "created": "1788015519",
+  "modified": "1789060898",
+  "url": "https://asiainfo-sec.feishu.cn/file/QXpwbHtcaoxLErxgeZ2chsDZnob"
+ },
+ {
+  "path": "learning-docs/05-AI集成/01-SpringAI框架集成/08-AI功能与技术缺口分析.md",
+  "name": "08-AI功能与技术缺口分析.md",
+  "token": "Fxu2bLVPLosLVuxZO0rcRxuwnTO",
+  "type": "file",
+  "created": "1788015517",
+  "modified": "1789060896",
+  "url": "https://asiainfo-sec.feishu.cn/file/Fxu2bLVPLosLVuxZO0rcRxuwnTO"
+ },
+ {
+  "path": "learning-docs/05-AI集成/01-SpringAI框架集成/07-AI集成.md",
+  "name": "07-AI集成.md",
+  "token": "QTSjbhVMVoYgVnxueDxcr32UnNb",
+  "type": "file",
+  "created": "1788015515",
+  "modified": "1789060894",
+  "url": "https://asiainfo-sec.feishu.cn/file/QTSjbhVMVoYgVnxueDxcr32UnNb"
+ },
+ {
+  "path": "learning-docs/05-AI集成/01-SpringAI框架集成/06-AI安全网关与Guardrails实现文档.md",
+  "name": "06-AI安全网关与Guardrails实现文档.md",
+  "token": "XIy7bjyfHoHsnNxRlBGcnycbnhc",
+  "type": "file",
+  "created": "1788015512",
+  "modified": "1789060893",
+  "url": "https://asiainfo-sec.feishu.cn/file/XIy7bjyfHoHsnNxRlBGcnycbnhc"
+ },
+ {
+  "path": "learning-docs/05-AI集成/01-SpringAI框架集成/05-LLM可观测性评估与成本治理实现文档.md",
+  "name": "05-LLM可观测性评估与成本治理实现文档.md",
+  "token": "RMTcbLpQroopzJxfvDNcpwCxnb3",
+  "type": "file",
+  "created": "1788015511",
+  "modified": "1789060892",
+  "url": "https://asiainfo-sec.feishu.cn/file/RMTcbLpQroopzJxfvDNcpwCxnb3"
+ },
+ {
+  "path": "learning-docs/05-AI集成/01-SpringAI框架集成/04-智能客服Agent编排与人工转接实现文档.md",
+  "name": "04-智能客服Agent编排与人工转接实现文档.md",
+  "token": "VOxQb3hFeouFKaxF3FxcGVSHn8e",
+  "type": "file",
+  "created": "1788015509",
+  "modified": "1789060891",
+  "url": "https://asiainfo-sec.feishu.cn/file/VOxQb3hFeouFKaxF3FxcGVSHn8e"
+ },
+ {
+  "path": "learning-docs/05-AI集成/01-SpringAI框架集成/03-多模态图生文实战-VLM视觉理解.md",
+  "name": "03-多模态图生文实战-VLM视觉理解.md",
+  "token": "MBdebP3wEo6uzfxYGnBc4TIQnBg",
+  "type": "file",
+  "created": "1788015507",
+  "modified": "1789060890",
+  "url": "https://asiainfo-sec.feishu.cn/file/MBdebP3wEo6uzfxYGnBc4TIQnBg"
+ },
+ {
+  "path": "learning-docs/05-AI集成/01-SpringAI框架集成/02-LLM工程化实践.md",
+  "name": "02-LLM工程化实践.md",
+  "token": "PVTIbj5osoquqZxHi40cWzahnYD",
+  "type": "file",
+  "created": "1788015505",
+  "modified": "1789060888",
+  "url": "https://asiainfo-sec.feishu.cn/file/PVTIbj5osoquqZxHi40cWzahnYD"
+ },
+ {
+  "path": "learning-docs/05-AI集成/01-SpringAI框架集成/01-SpringAI入门.md",
+  "name": "01-SpringAI入门.md",
+  "token": "YRz9bSylfoVf5Tx9ulGc2VA9n3b",
+  "type": "file",
+  "created": "1788015503",
+  "modified": "1789060887",
+  "url": "https://asiainfo-sec.feishu.cn/file/YRz9bSylfoVf5Tx9ulGc2VA9n3b"
+ },
+ {
+  "path": "learning-docs/05-AI集成/01-SpringAI框架集成/12-SpringAI-2.0升级评估与迁移指南.md",
+  "name": "12-SpringAI-2.0升级评估与迁移指南.md",
+  "token": "WJrhbeuGvoyiAAxns25ctqJ3nri",
+  "type": "file",
+  "created": "1789060812",
+  "modified": "1789060812",
+  "url": "https://asiainfo-sec.feishu.cn/file/WJrhbeuGvoyiAAxns25ctqJ3nri"
+ },
+ {
+  "path": "learning-docs/05-AI集成/01-SpringAI框架集成/11-MCP协议实战-模型上下文协议.md",
+  "name": "11-MCP协议实战-模型上下文协议.md",
+  "token": "Ld9fbV83zooXkfxUexGcUCyinmc",
+  "type": "file",
+  "created": "1789060810",
+  "modified": "1789060810",
+  "url": "https://asiainfo-sec.feishu.cn/file/Ld9fbV83zooXkfxUexGcUCyinmc"
+ },
+ {
+  "path": "learning-docs/05-AI集成/面试题/README.md",
+  "name": "README.md",
+  "token": "OPMubIZrBo8Sy7xfIk6ceQoan2b",
+  "type": "file",
+  "created": "1788015586",
+  "modified": "1789060926",
+  "url": "https://asiainfo-sec.feishu.cn/file/OPMubIZrBo8Sy7xfIk6ceQoan2b"
+ },
+ {
+  "path": "learning-docs/05-AI集成/面试题/10-综合实战与高频场景题.md",
+  "name": "10-综合实战与高频场景题.md",
+  "token": "SiARbZWWboWKBkxmykQcNGbLnvb",
+  "type": "file",
+  "created": "1788015584",
+  "modified": "1789060925",
+  "url": "https://asiainfo-sec.feishu.cn/file/SiARbZWWboWKBkxmykQcNGbLnvb"
+ },
+ {
+  "path": "learning-docs/05-AI集成/面试题/09-AI工程化与性能优化.md",
+  "name": "09-AI工程化与性能优化.md",
+  "token": "J0fDbOAmyo52ENxZ2d6ce0ntnHb",
+  "type": "file",
+  "created": "1788015582",
+  "modified": "1789060924",
+  "url": "https://asiainfo-sec.feishu.cn/file/J0fDbOAmyo52ENxZ2d6ce0ntnHb"
+ },
+ {
+  "path": "learning-docs/05-AI集成/面试题/08-AI应用架构与系统设计.md",
+  "name": "08-AI应用架构与系统设计.md",
+  "token": "Am5Gbz6wnorU7Xx59xicUoJLnWd",
+  "type": "file",
+  "created": "1788015580",
+  "modified": "1789060922",
+  "url": "https://asiainfo-sec.feishu.cn/file/Am5Gbz6wnorU7Xx59xicUoJLnWd"
+ },
+ {
+  "path": "learning-docs/05-AI集成/面试题/07-AI安全与Guardrails.md",
+  "name": "07-AI安全与Guardrails.md",
+  "token": "Axe1bfzGXonZVrxXItNcUczmnAd",
+  "type": "file",
+  "created": "1788015578",
+  "modified": "1789060921",
+  "url": "https://asiainfo-sec.feishu.cn/file/Axe1bfzGXonZVrxXItNcUczmnAd"
+ },
+ {
+  "path": "learning-docs/05-AI集成/面试题/06-Prompt-Engineering.md",
+  "name": "06-Prompt-Engineering.md",
+  "token": "EiWCbTKCqoN6z9xk0acc9cmWnWc",
+  "type": "file",
+  "created": "1788015576",
+  "modified": "1789060920",
+  "url": "https://asiainfo-sec.feishu.cn/file/EiWCbTKCqoN6z9xk0acc9cmWnWc"
+ },
+ {
+  "path": "learning-docs/05-AI集成/面试题/05-AI-Agent与工具调用.md",
+  "name": "05-AI-Agent与工具调用.md",
+  "token": "R2cybCIXSoelDlxstRhccDIFnXb",
+  "type": "file",
+  "created": "1788015574",
+  "modified": "1789060919",
+  "url": "https://asiainfo-sec.feishu.cn/file/R2cybCIXSoelDlxstRhccDIFnXb"
+ },
+ {
+  "path": "learning-docs/05-AI集成/面试题/04-向量数据库与Embedding.md",
+  "name": "04-向量数据库与Embedding.md",
+  "token": "SAp5bk4XFoKhkcxqzJVcln5Inbg",
+  "type": "file",
+  "created": "1788015572",
+  "modified": "1789060918",
+  "url": "https://asiainfo-sec.feishu.cn/file/SAp5bk4XFoKhkcxqzJVcln5Inbg"
+ },
+ {
+  "path": "learning-docs/05-AI集成/面试题/03-RAG检索增强生成.md",
+  "name": "03-RAG检索增强生成.md",
+  "token": "LQPYbMmnvo9j48xr85FcpHvknLd",
+  "type": "file",
+  "created": "1788015570",
+  "modified": "1789060917",
+  "url": "https://asiainfo-sec.feishu.cn/file/LQPYbMmnvo9j48xr85FcpHvknLd"
+ },
+ {
+  "path": "learning-docs/05-AI集成/面试题/02-Spring-AI框架.md",
+  "name": "02-Spring-AI框架.md",
+  "token": "UeZ0blXSeoNu52xqTxScHiCmncc",
+  "type": "file",
+  "created": "1788015567",
+  "modified": "1789060916",
+  "url": "https://asiainfo-sec.feishu.cn/file/UeZ0blXSeoNu52xqTxScHiCmncc"
+ },
+ {
+  "path": "learning-docs/05-AI集成/面试题/01-AI基础与大模型原理.md",
+  "name": "01-AI基础与大模型原理.md",
+  "token": "LDuvbRAqgoxwCaxb1W3cta1mn0f",
+  "type": "file",
+  "created": "1788015566",
+  "modified": "1789060915",
+  "url": "https://asiainfo-sec.feishu.cn/file/LDuvbRAqgoxwCaxb1W3cta1mn0f"
+ },
+ {
+  "path": "learning-docs/05-AI集成/04-规格驱动工具/04-SpecKit实战-RAG进阶六件套.md",
+  "name": "04-SpecKit实战-RAG进阶六件套.md",
+  "token": "VihibxipzoPb42xL9Oec0Bo8nEc",
+  "type": "file",
+  "created": "1788015561",
+  "modified": "1789060912",
+  "url": "https://asiainfo-sec.feishu.cn/file/VihibxipzoPb42xL9Oec0Bo8nEc"
+ },
+ {
+  "path": "learning-docs/05-AI集成/04-规格驱动工具/02-Superpowers（SpecKit）实战：LLM调用工程化.md",
+  "name": "02-Superpowers（SpecKit）实战：LLM调用工程化.md",
+  "token": "Kv5ZbcVhlo3qt5xcco6crkfxncd",
+  "type": "file",
+  "created": "1788015557",
+  "modified": "1789060911",
+  "url": "https://asiainfo-sec.feishu.cn/file/Kv5ZbcVhlo3qt5xcco6crkfxncd"
+ },
+ {
+  "path": "learning-docs/05-AI集成/04-规格驱动工具/03-SpecKit-OpenSpec-Superpowers-对比与实战指南.md",
+  "name": "03-SpecKit-OpenSpec-Superpowers-对比与实战指南.md",
+  "token": "QbIEbuAi8oMm4Txvo3QcZZuInjf",
+  "type": "file",
+  "created": "1788015559",
+  "modified": "1788015559",
+  "url": "https://asiainfo-sec.feishu.cn/file/QbIEbuAi8oMm4Txvo3QcZZuInjf"
+ },
+ {
+  "path": "learning-docs/05-AI集成/04-规格驱动工具/01-OpenSpec实战-会话历史持久化.md",
+  "name": "01-OpenSpec实战-会话历史持久化.md",
+  "token": "KJGybW4pYoAaz2xJfNmc1ooUnQf",
+  "type": "file",
+  "created": "1788015555",
+  "modified": "1788015555",
+  "url": "https://asiainfo-sec.feishu.cn/file/KJGybW4pYoAaz2xJfNmc1ooUnQf"
+ },
+ {
+  "path": "learning-docs/05-AI集成/03-AI编码方法论/05-ConversationalIterative对话迭代.md",
+  "name": "05-ConversationalIterative对话迭代.md",
+  "token": "CedMbKSCAoPvYkxOkcdcXnlNnhg",
+  "type": "file",
+  "created": "1788015551",
+  "modified": "1789060910",
+  "url": "https://asiainfo-sec.feishu.cn/file/CedMbKSCAoPvYkxOkcdcXnlNnhg"
+ },
+ {
+  "path": "learning-docs/05-AI集成/03-AI编码方法论/06-AI开发模式全景对比.md",
+  "name": "06-AI开发模式全景对比.md",
+  "token": "SFWKbqIxBomWngxxa30c8xujnJf",
+  "type": "file",
+  "created": "1788015553",
+  "modified": "1788015553",
+  "url": "https://asiainfo-sec.feishu.cn/file/SFWKbqIxBomWngxxa30c8xujnJf"
+ },
+ {
+  "path": "learning-docs/05-AI集成/03-AI编码方法论/04-BDD行为驱动开发.md",
+  "name": "04-BDD行为驱动开发.md",
+  "token": "RPStbEi56ot3gRxi5N4c35aHnfb",
+  "type": "file",
+  "created": "1788015549",
+  "modified": "1788015549",
+  "url": "https://asiainfo-sec.feishu.cn/file/RPStbEi56ot3gRxi5N4c35aHnfb"
+ },
+ {
+  "path": "learning-docs/05-AI集成/03-AI编码方法论/03-AgenticCoding自主编码.md",
+  "name": "03-AgenticCoding自主编码.md",
+  "token": "Xk6zbDEUqogcQoxB7OzcR1fZnEe",
+  "type": "file",
+  "created": "1788015547",
+  "modified": "1788015547",
+  "url": "https://asiainfo-sec.feishu.cn/file/Xk6zbDEUqogcQoxB7OzcR1fZnEe"
+ },
+ {
+  "path": "learning-docs/05-AI集成/03-AI编码方法论/02-PlanFirst计划驱动开发.md",
+  "name": "02-PlanFirst计划驱动开发.md",
+  "token": "DtxqbMqgBo01FyxT8KPco8VAnUw",
+  "type": "file",
+  "created": "1788015545",
+  "modified": "1788015546",
+  "url": "https://asiainfo-sec.feishu.cn/file/DtxqbMqgBo01FyxT8KPco8VAnUw"
+ },
+ {
+  "path": "learning-docs/05-AI集成/03-AI编码方法论/01-VibeCoding氛围编程.md",
+  "name": "01-VibeCoding氛围编程.md",
+  "token": "Ue5LbSHgQooWa9xKEvEc6j8Lnqc",
+  "type": "file",
+  "created": "1788015544",
+  "modified": "1788015544",
+  "url": "https://asiainfo-sec.feishu.cn/file/Ue5LbSHgQooWa9xKEvEc6j8Lnqc"
+ }
+]

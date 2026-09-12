@@ -65,3 +65,6 @@ tools/nacos-start2.out
 # 本机私密配置（LLM 密钥等），严禁提交
 tools/env.local.ps1
 tools/seata/
+
+# Personal docs excluded from repo
+learning-docs/财务/
