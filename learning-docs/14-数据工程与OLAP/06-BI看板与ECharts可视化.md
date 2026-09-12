@@ -1,7 +1,7 @@
 # BI 看板与 ECharts 可视化
 
 > 对应项目：`ai-cs-frontend/src/views/ChatDashboardView.vue`（本项目 ECharts 唯一消费点，102 行完整走读）、`ai-cs-frontend/package.json:14`（`"echarts": "^5.6.0"`）、后端图表生成链 `ai-cs-chat/src/main/java/com/aics/chat/nl2sql/chart/ChartController.java`、`EChartsOptionBuilder.java`、`ChartAnswer.java`。
-> 本篇是缺口补全：`06-前端开发/` 目录此前零覆盖 ECharts（见 [00-学习路线总览/05-技术缺口分析与补全计划](../00-学习路线总览/05-技术缺口分析与补全计划.md) A 类缺口"ECharts 数据可视化"），本篇与 [06-前端开发/04-Pinia状态管理实战](../06-前端开发/04-Pinia状态管理实战.md) 同属前端篇的补全线。
+> 本篇是缺口补全：`06-前端开发/` 目录此前零覆盖 ECharts（见 [00-学习路线总览/05-技术缺口分析与补全计划](../00-学习路线总览/05-技术缺口分析与补全计划.md) A 类缺口"ECharts 数据可视化"），本篇与 [06-前端开发/07-Pinia状态管理实战](../06-前端开发/07-Pinia状态管理实战.md) 同属前端篇的补全线。
 > 相关：[01-OLAP与列式存储原理](./01-OLAP与列式存储原理.md)、[02-ClickHouse实战](./02-ClickHouse实战.md)（看板的数据从哪来）、[07-LLM用量计量与成本分析](./07-LLM用量计量与成本分析.md)（成本看板的指标）、[04-中间件/05-SSE与WebSocket实时通信](../04-中间件/05-SSE与WebSocket实时通信.md)（流式刷新的另一条路线）。
 
 ---

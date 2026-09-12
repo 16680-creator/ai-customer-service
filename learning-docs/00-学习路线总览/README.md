@@ -70,7 +70,7 @@
 
 | 序号 | 文件夹 | 内容 | 对应项目代码 |
 |------|--------|------|-------------|
-| 3 | [03-数据库与ORM](../03-数据库与ORM/) | MySQL、MyBatis-Plus | `ai-cs-order`、`ai-cs-product` |
+| 3 | [03-数据库与ORM](../03-数据库与ORM/) | MySQL（索引/事务/MVCC/三大日志/锁/主从/备份恢复/建表规范/大表治理）、MyBatis-Plus、ShardingSphere 分库分表、分布式 ID | `ai-cs-order`、`ai-cs-product`、`deploy/mysql/` |
 | 4 | [04-中间件](../04-中间件/) | Redis、RocketMQ、ES、MinIO、SSE、WebSocket、MongoDB、Canal、Kafka（双栈开关） | `docker-compose.yml`、`ai-cs-notify`、`ai-cs-mq` |
 
 ### 第三阶段：AI 能力（1-2 周）
@@ -84,7 +84,7 @@
 
 | 序号 | 文件夹 | 内容 | 对应项目代码 |
 |------|--------|------|-------------|
-| 7 | [06-前端开发](../06-前端开发/) | Vue3、Element Plus、路由守卫、Axios 封装、前后端联调、Pinia 状态管理 | `ai-cs-frontend` |
+| 7 | [06-前端开发](../06-前端开发/) | Java 后端转全栈路径：HTML/CSS/JS/TS 基础、Vue3 全家桶（核心/联调/路由 Axios/Pinia）、组件进阶与组合式函数、工程化、浏览器与跨域、React/SSR/跨端、面试题自检 | `ai-cs-frontend` |
 
 ### 第五阶段：工程化（1-2 周）
 
@@ -221,7 +221,7 @@ docker compose -f deploy/docker-compose/docker-compose-observability.yml up -d
 | FastAPI Python 对话服务（与 Java 同协议对照） | [10-Python服务/01-FastAPI对话服务实战.md](../10-Python服务/01-FastAPI对话服务实战.md) | 多语言服务 |
 | MySQL 锁机制与主从复制读写分离 | [03-数据库与ORM/05-MySQL锁机制与主从复制读写分离.md](../03-数据库与ORM/05-MySQL锁机制与主从复制读写分离.md) | 数据库进阶 |
 | 设计模式在微服务中的实战（策略/状态/装饰器/责任链） | [09-安全与设计模式/04-设计模式在微服务中的实战.md](../09-安全与设计模式/04-设计模式在微服务中的实战.md) | 设计模式 |
-| Pinia 状态管理（auth.js 收编 + WebSocket 重连） | [06-前端开发/04-Pinia状态管理实战.md](../06-前端开发/04-Pinia状态管理实战.md) | 前端进阶 |
+| Pinia 状态管理（auth.js 收编 + WebSocket 重连） | [06-前端开发/07-Pinia状态管理实战.md](../06-前端开发/07-Pinia状态管理实战.md) | 前端进阶 |
 | Loki 日志聚合（可观测性第三支柱落地路线） | [07-运维部署/07-Loki日志聚合.md](../07-运维部署/07-Loki日志聚合.md) | 运维监控 |
 
 ---
@@ -348,6 +348,25 @@ docker compose -f deploy/docker-compose/docker-compose-observability.yml up -d
 > 写法与既有篇章一致：核心概念给"人话 + 表格 + 决策树"，风险与边界显式摊开，
 > 并在 §九 绑定本项目真实资产（`kb_document`、`knowledge-doc-sync-topic`、`citations`、`GraphRagService`）给出落地清单；
 > 引用社区资料处标注"按公开资料转述"，不做未经核实的数字承诺。
+
+---
+
+## 进阶专题（2026-09 第十批补全：数据库与 ORM 深化）
+
+> 前九批判的多是"别的模块"，这一批回到 `03-数据库与ORM` 自身：模块此前只有 01~05 且**没有 README**，
+> MVCC 与三大日志、建表规范、大表治理、备份恢复四个原理与工程主题全部空白
+> （深分页、Seata、Canal CDC 等已由 12/02/04 模块覆盖，本批只做链接不做重复）。
+> 新增 README + 5 篇，并盘点出一处工程侧真实缺口（`slave.cnf` 复制过滤，见
+> [05-技术缺口分析与补全计划](./05-技术缺口分析与补全计划.md) 附·顺带发现）。
+
+| 篇 | 主题 | 核心产出 |
+|---|---|---|
+| [README](../03-数据库与ORM/README.md) | 模块索引 | 文档地图、**与其他 8 个模块的分工查重表**、数据库资产清单、四档学习路径 |
+| [06](../03-数据库与ORM/06-事务进阶-MVCC实现与三大日志.md) | 事务进阶：MVCC 与三大日志 | undo 版本链 + ReadView 手算、RC/RR 唯一实现差异、redo/undo/binlog 三维对比、两阶段提交为什么必须存在、`mysql.cnf` 双 1 逐行解读；辨析 Seata undo_log 表 ≠ InnoDB undo log |
+| [07](../03-数据库与ORM/07-建表规范与字段类型选型.md) | 建表规范与字段类型选型 | 金额/时间/状态/大字段四类选型表、自增 vs 雪花双轨判据、事实快照 vs 现状引用、**对 `order-init.sql` 的六条真实规范审视（含修法）** |
+| [08](../03-数据库与ORM/08-大表治理-冷热分离与数据归档.md) | 大表治理 | `chat_message` 增长算例、归档<分区<分库分表决策口诀、切批搬运三段式与三个坑、分区表的唯一键代价、Online DDL 三板斧与 MDL 雪崩 |
+| [09](../03-数据库与ORM/09-备份恢复与数据安全.md) | 备份恢复与数据安全 | **冗余 ≠ 备份**（误删会同步到从库）、mysqldump+binlog 点恢复五步流程、从库备份策略、延时从库；**发现 `slave.cnf` 复制过滤不含订单库的真实缺口** |
+| [10](../03-数据库与ORM/10-数据库面试专练.md) | 面试专练 | 四层答题模板、五组高频题（判断/权衡/排查/设计，各配锚点）、三条追问链、考前 30 分钟速览卡 |
 
 ---
 
