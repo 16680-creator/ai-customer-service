@@ -16,6 +16,7 @@
 | P4 | 自定义 Starter | common 自动装配化 | common + 全部 11 服务 | 2 天 |
 | P5 | STOMP | WebSocket 通道升级 + CONNECT 鉴权 | notify + 前端 | 2~3 天 |
 | P6 | Spring State Machine | 订单状态机治理 | order | 3 天 |
+| P7 | Spring 本体原理文档（2026-09 追加） | AOP/事务、IoC/生命周期、MVC 全链路、面试专练 4 篇 + 模块 README | learning-docs（零代码改动） | 2 天 |
 
 **依赖关系**：
 
@@ -291,7 +292,44 @@ broker 简单实现 vs 外置 RabbitMQ relay 的扩展边界。
 
 ---
 
-## 七、风险与回滚
+## 七、P7：Spring 本体原理补全（2026-09 文档批次）
+
+### 立项依据
+
+P1~P6 补的是**生态缺口**（Security / 缓存与事件 / Testcontainers / Starter / STOMP / 状态机），
+但盘点时发现 `02-Spring微服务` 14 篇全是"使用 + 落地记录"，**Spring Framework 本体原理零正文**：
+全库 grep `Bean 生命周期|循环依赖|三级缓存|事务传播|事务失效|DispatcherServlet` 在 02 模块均无正文命中，
+而项目侧 `@Aspect`（`IdempotentAspect`，全仓唯一手写切面）、`@Transactional`（order/product/knowledge/common
+共 6 个文件 12 处）、`@EnableCaching`、`@EnableMethodSecurity`、
+`WebMvcConfigurer + HandlerInterceptor`（chat 可观测性）、`spring-boot-starter-validation`（6 个 pom）
+全在使用——属典型的 **A 类缺口**（工程已用、文档未覆盖，补文档即可）。
+
+### 产出（4 篇 + 模块 README，零代码改动）
+
+| 篇 | 主题 | 主要项目锚点 |
+|---|---|---|
+| [15](../02-Spring微服务/15-SpringAOP与声明式事务原理.md) | AOP 与声明式事务原理 | `IdempotentAspect` + `IdempotentAspectTest`（AspectJProxyFactory 织入）、`ProductServiceImpl` 的 `@Transactional + @CacheEvict`、`OrderServiceImpl` 双层事务、`OrderPaidEventListener` AFTER_COMMIT |
+| [16](../02-Spring微服务/16-IoC容器与Bean生命周期.md) | IoC 容器与 Bean 生命周期 | `AutoConfiguration.imports`（5 行）+ 5 个自动配置类、`CommonAutoConfigurationTest`（三段式）、`ChatModelRegistry`（@PostConstruct + volatile 快照）、`Neo4jGraphStore`（@PreDestroy）、`PaySchemaInitializer`（ApplicationRunner） |
+| [17](../02-Spring微服务/17-SpringMVC请求全链路与参数校验.md) | MVC 请求全链路与参数校验 | `HeaderAuthenticationFilter`（唯一 Filter）、`TraceInterceptor` + `ObservabilityWebConfig`（唯一拦截器）、`CartController` + `CartAddDTO`、`GlobalExceptionHandler`、`ChatController` 的 `SseEmitter` |
+| [18](../02-Spring微服务/18-Spring面试专练与追问链.md) | Spring 面试专练 | 四层答题模板 + 6 组 30+ 高频题 + 4 条追问链 + 考前速览卡 + 自测表 |
+| [README](../02-Spring微服务/README.md) | 模块索引 | 19 篇地图 + 与其他 9 个模块的查重表 + Spring 资产清单 + 四档路径 |
+
+### 任务清单（✅ 2026-09 已落地）
+
+- [x] 15 AOP 与事务原理（代理模型 / JDK vs CGLIB / 事务失效七查 / 四注解叠加顺序）
+- [x] 16 IoC 与 Bean 生命周期（refresh 六阶段 / Bean 八步 / 三级缓存 / 自动装配条件四件套）
+- [x] 17 MVC 九站链路（四取数注解 / @Valid 三异常 / Filter-Interceptor-AOP 对比 / SSE 特殊路径）
+- [x] 18 面试专练 + 模块 README（补上体例缺口：此前 02 模块无 README）
+- [x] [00-学习路线总览/README](../00-学习路线总览/README.md) 登记"第十一批补全"
+
+### 面试要点
+
+Bean 生命周期（**AOP 代理诞生于 `BeanPostProcessor.after`**）、循环依赖三级缓存、`@Transactional` 原理与失效场景、
+Filter/Interceptor/AOP 的边界与项目三实体、自动装配条件注解与"用户永远赢"——这五条覆盖 Spring 面试约 80% 的追问。
+
+---
+
+## 八、风险与回滚
 
 | 风险 | 缓解 |
 |------|------|

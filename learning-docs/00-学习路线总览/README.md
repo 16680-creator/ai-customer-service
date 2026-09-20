@@ -64,14 +64,14 @@
 | 序号 | 文件夹 | 内容 | 对应项目代码 |
 |------|--------|------|-------------|
 | 1 | [01-Java基础](../01-Java基础/) | Java 17 核心特性、Maven 多模块、JVM/GC 实战、并发进阶、集合源码、反射/代理/SPI、I/O 与 Netty、语言级细节与序列化 | `pom.xml`、`ai-cs-common` |
-| 2 | [02-Spring微服务](../02-Spring微服务/) | Spring Boot、Cloud、Nacos、Gateway、SpringDoc 接口文档 | 各服务 `application.yml` |
+| 2 | [02-Spring微服务](../02-Spring微服务/) | Spring Boot、Cloud、Nacos、Gateway、SpringDoc 接口文档；本体原理 IoC/AOP/事务/MVC（15~17 篇） | 各服务 `application.yml` |
 
 ### 第二阶段：核心能力（2-3 周）
 
 | 序号 | 文件夹 | 内容 | 对应项目代码 |
 |------|--------|------|-------------|
 | 3 | [03-数据库与ORM](../03-数据库与ORM/) | MySQL（索引/事务/MVCC/三大日志/锁/主从/备份恢复/建表规范/大表治理）、MyBatis-Plus、ShardingSphere 分库分表、分布式 ID | `ai-cs-order`、`ai-cs-product`、`deploy/mysql/` |
-| 4 | [04-中间件](../04-中间件/) | Redis、RocketMQ、ES、MinIO、SSE、WebSocket、MongoDB、Canal、Kafka（双栈开关） | `docker-compose.yml`、`ai-cs-notify`、`ai-cs-mq` |
+| 4 | [04-中间件](../04-中间件/) | Redis、RocketMQ、ES、MinIO、SSE、WebSocket、MongoDB、Canal、Kafka（双栈开关）；认知拓展批 13~22（Nginx/SkyWalking/Dubbo/ZK/etcd/Caffeine/gRPC/Debezium/PG+pgvector/RabbitMQ/Eureka，逐篇给引入决策） | `docker-compose.yml`、`ai-cs-notify`、`ai-cs-mq` |
 
 ### 第三阶段：AI 能力（1-2 周）
 
@@ -367,6 +367,50 @@ docker compose -f deploy/docker-compose/docker-compose-observability.yml up -d
 | [08](../03-数据库与ORM/08-大表治理-冷热分离与数据归档.md) | 大表治理 | `chat_message` 增长算例、归档<分区<分库分表决策口诀、切批搬运三段式与三个坑、分区表的唯一键代价、Online DDL 三板斧与 MDL 雪崩 |
 | [09](../03-数据库与ORM/09-备份恢复与数据安全.md) | 备份恢复与数据安全 | **冗余 ≠ 备份**（误删会同步到从库）、mysqldump+binlog 点恢复五步流程、从库备份策略、延时从库；**发现 `slave.cnf` 复制过滤不含订单库的真实缺口** |
 | [10](../03-数据库与ORM/10-数据库面试专练.md) | 面试专练 | 四层答题模板、五组高频题（判断/权衡/排查/设计，各配锚点）、三条追问链、考前 30 分钟速览卡 |
+
+---
+
+## 进阶专题（2026-09 第十一批补全：Spring Framework 本体原理）
+
+> 前十批判的多是"生态与专项"，这一批判的是 `02-Spring微服务` **自身的原理层空白**：
+> 模块此前 14 篇都是使用与落地记录，Spring Framework 本体（AOP 与声明式事务、IoC 容器与 Bean 生命周期、
+> Spring MVC 请求全链路）**零正文**——而项目侧 `@Aspect`（`IdempotentAspect`）、`@Transactional`（6 个文件 12 处）、
+> `@EnableCaching`、`@EnableMethodSecurity`、`WebMvcConfigurer + HandlerInterceptor`、
+> `spring-boot-starter-validation`（6 个 pom）全在使用。
+> 新增 4 篇 + 模块 README，写法与前批一致：**每个原理都绑定本仓真实源码锚点**，并给出"四层答题模板"的面试口径。
+
+| 篇 | 主题 | 核心产出 |
+|---|---|---|
+| [15](../02-Spring微服务/15-SpringAOP与声明式事务原理.md) | AOP 与声明式事务 | 代理直觉（"注解是贴纸，代理是执行者"）、五种通知、JDK vs CGLIB（含 Mapper 代理）、`@Transactional` = 环绕通知 + ThreadLocal、**失效七查**、四注解叠加顺序口诀 |
+| [16](../02-Spring微服务/16-IoC容器与Bean生命周期.md) | IoC 容器与 Bean 生命周期 | refresh() 六阶段、Bean 八步（**AOP 代理在 BPP.after 诞生**）、构造器注入三理由、三级缓存与构造器环依赖、自动装配条件四件套、`@ConfigurationProperties` |
+| [17](../02-Spring微服务/17-SpringMVC请求全链路与参数校验.md) | MVC 请求全链路 | 九站旅程、四取数注解、`@Valid` 三种校验异常、**Filter/Interceptor/AOP 三方对比**、SSE 异步请求的 afterCompletion 时机 |
+| [18](../02-Spring微服务/18-Spring面试专练与追问链.md) | Spring 面试专练 | 四层答题模板 + 6 组 30+ 高频题（各配项目锚点）+ 4 条追问链 + 考前 30 分钟速览卡 + 自测记录表 |
+| [README](../02-Spring微服务/README.md) | 模块索引 | 19 篇地图、与其他 9 个模块的查重表、Spring 资产清单、四档学习路径 |
+
+> 分工边界：15 篇只讲 **Spring 事务管理**（DB 侧 MVCC/锁留给 [03-数据库与ORM/06](../03-数据库与ORM/06-事务进阶-MVCC实现与三大日志.md)）；
+> 代理的 Java 语言层原理留给 [01-Java基础/06](../01-Java基础/06-反射动态代理与SPI.md)；
+> Security 机制留给 [09-安全与设计模式/03](../09-安全与设计模式/03-SpringSecurity微服务两层安全模型.md)，本批只做面试口径串联。
+
+---
+
+## 进阶专题（2026-09 第十二批补全：中间件认知拓展 13~22）
+
+> 补的是**广度空白**：04-中间件此前 01~12 全是"工程在用"的组件，而 Nginx/SkyWalking/Dubbo/ZK/etcd/gRPC/Caffeine/PostgreSQL/RabbitMQ/Eureka 这些**求职高频但工程未落地**的组件没有坐标。本批新增 10 篇 + 模块 README，纪律不变：
+> **每篇开头显式给引入决策（未部署/只学不引/明确不引入），正文绑定本仓既有锚点做对照**（如 SkyWalking↔手写 TraceInterceptor、Dubbo↔Feign 双轨、Caffeine↔chat 缓存族、pgvector↔Chroma 选型钩子）。
+
+| 篇 | 主题 | 引入决策 | 核心产出 |
+|---|---|---|---|
+| [13](../04-中间件/13-Nginx与OpenResty反向代理.md) | Nginx / OpenResty | 未部署（可选 Ingress） | 反代四词、epoll 模型、三层限流分工、SSE/WS 透传坑 |
+| [14](../04-中间件/14-SkyWalking链路追踪.md) | SkyWalking APM | 未落地（可与 Tempo 并存） | Agent 字节码增强 vs Spring AOP、与 OTel/Tempo 选型表 |
+| [15](../04-中间件/15-Dubbo与RPC框架.md) | Dubbo | 未引入（存量 Feign） | 四角色、SPI/@Adaptive、容错六策、隐式传参↔XID |
+| [16](../04-中间件/16-ZooKeeper与etcd分布式协调.md) | ZooKeeper / etcd | 不引入（K8s Lease 可替代选主） | 临时节点/租约、ZAB vs Raft、AP/CP 锁账本 |
+| [17](../04-中间件/17-Caffeine本地缓存与两级缓存.md) | Caffeine | 未引入（chat 两级化评估） | W-TinyLFU、四旋钮、两级缓存+失效广播 |
+| [18](../04-中间件/18-gRPC与Protobuf跨语言调用.md) | gRPC / Protobuf | 未引入（py-chat 评估） | varint 编码、四种流（SSE 同构）、deadline 传播 |
+| [19](../04-中间件/19-Debezium与Canal的CDC对比.md) | Debezium vs Canal | 只对比不引入 | 架构差异、决策树、本仓 CDC 六任务互译 |
+| [20](../04-中间件/20-PostgreSQL与pgvector.md) | PostgreSQL / pgvector | 未引入（Chroma→pgvector→Milvus） | MVCC 两派、索引家族、ivfflat/hnsw 调参 |
+| [21](../04-中间件/21-RabbitMQ概念模型与AMQP协议.md) | RabbitMQ | **明确不引入**（C 类） | AMQP 路由模型、可靠性三板斧、三 MQ 总对照 |
+| [22](../04-中间件/22-Eureka与Consul注册中心对照.md) | Eureka / Consul | 不引入（Nacos 在用） | 自我保护/健康检查/多 DC、K8s 双层发现 |
+| [README](../04-中间件/README.md) | 模块索引（22 篇） | — | 地图、查重表、学习路径、更新日志 |
 
 ---
 
