@@ -1,9 +1,7 @@
 package com.aics.order.service.impl;
 
-import cn.hutool.core.util.IdUtil;
 import com.aics.common.exception.BusinessException;
 import com.aics.common.result.ResultCode;
-import com.aics.order.bo.PriceCalcBO;
 import com.aics.order.client.PayClient;
 import com.aics.order.client.ProductClient;
 import com.aics.order.entity.*;
@@ -14,28 +12,20 @@ import com.aics.order.mapper.*;
 import com.aics.order.statemachine.OrderEvent;
 import com.aics.order.statemachine.OrderStateTransitionService;
 import com.aics.order.service.OrderService;
-import com.aics.order.service.PromotionService;
 import com.aics.order.vo.OrderVO;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.rocketmq.spring.core.RocketMQTemplate;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import com.aics.order.lock.OrderCreateLockService;
-import io.seata.spring.annotation.GlobalTransactional;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 /**
@@ -50,123 +40,23 @@ public class OrderServiceImpl implements OrderService {
     private final OrderItemMapper orderItemMapper;
     private final CartItemMapper cartItemMapper;
     private final CouponMapper couponMapper;
-    private final PromotionService promotionService;
     private final ProductClient productClient;
     private final OrderCreateLockService orderCreateLockService;
-    private final RocketMQTemplate rocketMQTemplate;
+    private final OrderCreateTxService orderCreateTxService;
     private final PayClient payClient;
     private final ApplicationEventPublisher eventPublisher;
     private final OrderStateTransitionService orderStateTransitionService;
 
-    @Value("${order.timeout-minutes:30}")
-    private int timeoutMinutes;
-
-    private static final AtomicInteger SEQUENCE = new AtomicInteger(0);
-
     @Override
     /**
-     * 创建订单（入口）：分布式锁防重 + 委托 {@link #doCreateOrder} 执行全局事务。
+     * 创建订单（入口）：分布式锁防重 + 委托 {@link OrderCreateTxService#doCreateOrder} 执行全局事务。
      *
      * <p>锁在全局事务外层：同一用户的并发下单请求快速失败，拿到锁才进入
      * {@code @GlobalTransactional} 边界，避免锁内空占事务资源。</p>
      */
     public OrderVO createOrder(Long userId, List<Long> cartItemIds, Long couponId, String paymentMethod) {
         return orderCreateLockService.withCreateLock(userId,
-                () -> doCreateOrder(userId, cartItemIds, couponId, paymentMethod));
-    }
-
-    @GlobalTransactional(rollbackFor = Exception.class, name = "order-create")
-    @Transactional(rollbackFor = Exception.class)
-    /**
-     * 创建订单：由购物车条目生成订单，应用优惠券并计算应付金额。
-     *
-     * <p><b>学习要点</b>：下单是典型"多步骤写操作"——校验购物车 → 计算商品合计 →
-     * 应用优惠/满减 → 生成订单与订单项 → 清空已下单购物车。AI 客服的"帮我下单"工具即调用本方法。</p>
-     *
-     * @param userId        用户 ID
-     * @param cartItemIds   选中的购物车条目 ID
-     * @param couponId      优惠券 ID（可空）
-     * @param paymentMethod 支付方式（见 ai-cs-common PaymentMethod）
-     * @return 创建后的订单 VO
-     */
-    public OrderVO doCreateOrder(Long userId, List<Long> cartItemIds, Long couponId, String paymentMethod) {
-        // 1. 获取购物车商品
-        List<CartItem> cartItems = cartItemMapper.selectBatchIds(cartItemIds);
-        if (cartItems.isEmpty()) {
-            throw new BusinessException(ResultCode.ORDER_CART_EMPTY);
-        }
-
-        // 2. 实时扣减库存（以商品服务 DB 为权威源，原子扣减）
-        //    学习要点（Seata AT）：扣库存是 Feign 调用 product 的分支事务——XID 随请求头传播，
-        //    product 侧数据源代理生成 undo_log；任一环节失败（如库存不足），
-        //    全局事务二阶段回滚时按 undo_log 反向补偿已提交的分支，无需手写「失败回补」。
-        //    注意：MQ 不是 Seata 资源，全局回滚时下方延迟消息已发出——但消息消费侧
-        //    cancelExpiredOrder 查不到订单会直接返回，天然幂等安全。
-        for (CartItem item : cartItems) {
-            productClient.deductStock(item.getProductId(), item.getQuantity());
-        }
-
-        // 3. 计算价格
-        BigDecimal totalAmount = cartItems.stream()
-                .map(item -> item.getProductPrice().multiply(BigDecimal.valueOf(item.getQuantity())))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        PriceCalcBO priceCalc = promotionService.calculatePrice(totalAmount, userId, couponId);
-
-        // 4. 生成订单
-        String orderNo = generateOrderNo();
-        Order order = new Order();
-        order.setOrderNo(orderNo);
-        order.setUserId(userId);
-        order.setTotalAmount(priceCalc.getTotalAmount());
-        order.setDiscountAmount(priceCalc.getDiscountAmount());
-        order.setPayAmount(priceCalc.getPayAmount());
-        order.setFullReductionAmount(priceCalc.getFullReductionAmount());
-        order.setCouponAmount(priceCalc.getCouponAmount());
-        order.setCouponId(couponId);
-        order.setPaymentMethod(paymentMethod);
-        order.setStatus(OrderStatus.PENDING_PAY.getCode());
-        order.setExpireTime(LocalDateTime.now().plusMinutes(timeoutMinutes));
-        orderMapper.insert(order);
-
-        // 5. 生成订单项
-        for (CartItem item : cartItems) {
-            OrderItem orderItem = new OrderItem();
-            orderItem.setOrderId(order.getId());
-            orderItem.setOrderNo(orderNo);
-            orderItem.setProductId(item.getProductId());
-            orderItem.setProductName(item.getProductName());
-            orderItem.setProductPrice(item.getProductPrice());
-            orderItem.setQuantity(item.getQuantity());
-            orderItem.setSubtotal(item.getProductPrice().multiply(BigDecimal.valueOf(item.getQuantity())));
-            orderItemMapper.insert(orderItem);
-        }
-
-        // 6. 核销优惠券
-        if (couponId != null && priceCalc.getCouponAmount().compareTo(BigDecimal.ZERO) > 0) {
-            Coupon coupon = couponMapper.selectById(couponId);
-            if (coupon != null) {
-                coupon.setStatus(CouponStatus.USED.getCode());
-                coupon.setUseTime(LocalDateTime.now());
-                coupon.setOrderNo(orderNo);
-                couponMapper.updateById(coupon);
-            }
-        }
-
-        // 7. 发送延迟消息（超时取消）
-        rocketMQTemplate.syncSend("order-timeout-topic",
-                MessageBuilder.withPayload(orderNo).build(),
-                5000, 16); // delayLevel 16 ≈ 30min
-
-        // 8. 组装返回（支付由独立支付服务完成，此处不再生成支付链接）
-        OrderVO vo = new OrderVO();
-        vo.setOrderNo(orderNo);
-        vo.setStatus(OrderStatus.PENDING_PAY.getCode());
-        vo.setPayAmount(priceCalc.getPayAmount());
-        vo.setPaymentMethod(paymentMethod);
-        vo.setExpireTime(order.getExpireTime());
-
-        log.info("订单创建成功: orderNo={}, userId={}, payAmount={}", orderNo, userId, priceCalc.getPayAmount());
-        return vo;
+                () -> orderCreateTxService.doCreateOrder(userId, cartItemIds, couponId, paymentMethod));
     }
 
     @Override
@@ -401,9 +291,4 @@ public class OrderServiceImpl implements OrderService {
         return vo;
     }
 
-    private String generateOrderNo() {
-        String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
-        int seq = SEQUENCE.incrementAndGet() % 10000;
-        return timestamp + "01" + String.format("%04d", seq);
-    }
 }

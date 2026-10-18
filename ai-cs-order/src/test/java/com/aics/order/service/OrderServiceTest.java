@@ -14,6 +14,7 @@ import com.aics.order.mapper.CartItemMapper;
 import com.aics.order.mapper.CouponMapper;
 import com.aics.order.mapper.OrderItemMapper;
 import com.aics.order.mapper.OrderMapper;
+import com.aics.order.service.impl.OrderCreateTxService;
 import com.aics.order.service.impl.OrderServiceImpl;
 import com.aics.order.vo.OrderVO;
 import org.apache.rocketmq.spring.core.RocketMQTemplate;
@@ -64,11 +65,31 @@ class OrderServiceTest {
     @Mock
     private com.aics.order.statemachine.OrderStateTransitionService orderStateTransitionService;
 
+    /**
+     * 下单事务边界已拆到独立 Bean（OrderCreateTxService），
+     * 这里用 mock 注入 + 委托真实实例，保证原有"下单业务逻辑"断言仍然有效。
+     */
+    @Mock
+    private OrderCreateTxService orderCreateTxService;
+
+    private OrderCreateTxService realOrderCreateTxService;
+
     @InjectMocks
     private OrderServiceImpl orderService;
 
     @BeforeEach
     void setUpLockPassThrough() {
+        realOrderCreateTxService = new OrderCreateTxService(
+                orderMapper, orderItemMapper, cartItemMapper, couponMapper,
+                promotionService, productClient, rocketMQTemplate);
+        org.mockito.Mockito.lenient().when(orderCreateTxService.doCreateOrder(
+                        org.mockito.ArgumentMatchers.anyLong(),
+                        org.mockito.ArgumentMatchers.anyList(),
+                        org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.anyString()))
+                .thenAnswer(inv -> realOrderCreateTxService.doCreateOrder(
+                        inv.getArgument(0), inv.getArgument(1), inv.getArgument(2), inv.getArgument(3)));
+
         // 锁服务在单测中直通：拿到锁立即执行业务（分布式锁行为由 OrderCreateLockServiceTest 覆盖）
         // lenient：仅下单用例会实际使用该 stub
         org.mockito.Mockito.lenient().when(orderCreateLockService.withCreateLock(
