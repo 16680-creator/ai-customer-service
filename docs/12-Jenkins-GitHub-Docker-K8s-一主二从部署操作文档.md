@@ -1,5 +1,8 @@
 # Jenkins + Gitee/GitHub + Docker + Kubernetes 一主二从部署操作文档
 
+> **版本说明（2026-10 清理）**：本篇是 **Gitee 版**（较新、内容更全，含 Gitee 与 GitHub 两种拉码方式）。
+> 纯 GitHub 场景也可参考较早的 [09-GitHub 版](./09-Jenkins-GitHub-Docker-K8s-一主二从部署操作文档.md)。
+
 本文档承接 [08-VMware-Workstation-26H1-一主二从虚拟机创建.md](./08-VMware-Workstation-26H1-一主二从虚拟机创建.md)，用于把本项目部署成下面这条流水线：
 
 ```text

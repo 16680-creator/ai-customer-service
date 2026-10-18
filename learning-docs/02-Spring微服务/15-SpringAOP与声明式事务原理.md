@@ -280,7 +280,8 @@ Spring 要造"替身"，只有两条路（Java 层原理见 [01-Java基础/06](.
 ### 5.2 项目实证：一个方法上叠了两层事务注解
 
 ```java
-// ai-cs-order/src/main/java/com/aics/order/service/impl/OrderServiceImpl.java:78-79
+// ai-cs-order/src/main/java/com/aics/order/service/impl/OrderCreateTxService.java
+// （2026-10 由 OrderServiceImpl 拆出独立 Bean；原位置 :78-79）
 @GlobalTransactional(rollbackFor = Exception.class, name = "order-create")  // ① Seata 全局事务（跨服务）
 @Transactional(rollbackFor = Exception.class)                              // ② Spring 本地事务（本服务 DB）
 public OrderVO doCreateOrder(Long userId, List<Long> cartItemIds, Long couponId, String paymentMethod) {
@@ -293,21 +294,26 @@ public OrderVO doCreateOrder(Long userId, List<Long> cartItemIds, Long couponId,
 - `@Transactional`：管**本服务**的 order/cart/coupon 三张表；
 - `@GlobalTransactional`：管**跨服务**（order → product 扣库存 → coupon），Seata 用 XID 把各服务的本地事务串成一个全局事务。
 
-> 另外注意 `createOrder`（入口）和 `doCreateOrder` 被拆成了两个方法（`:73-79`）。**设计意图**很清楚：
+> 另外注意 `createOrder`（入口）和 `doCreateOrder` 被拆成了两个方法。**设计意图**很清楚：
 > 入口先加 Redis 分布式锁，**锁在全局事务外层**，拿到锁才进入事务边界，避免"锁内空占事务资源"。
 >
-> ⚠️ **但这里恰好是"代理视角"的高危点（本项目待验证的隐患，值得你亲手确认）**：
-> `createOrder` 内部是通过 lambda 调 `this.doCreateOrder(...)`
+> ✅ **这个"代理视角"的高危点在本项目真实发生过，并已修复（2026-10）**：
+> 原实现里 `createOrder` 通过 lambda 调 `this.doCreateOrder(...)`
 > （`orderCreateLockService.withCreateLock(userId, () -> doCreateOrder(...))` 只是"加锁后执行回调"，
-> 并没有让调用穿过另一个 Bean 的代理）——严格按 AOP 语义推演，**这是同类自调用，
-> `doCreateOrder` 上的 `@Transactional` / `@GlobalTransactional` 可能并未生效**
-> （代理套在 `createOrder` 这层，而 `createOrder` 自身没有任何注解）。
-> 佐证：`OrderServiceTest` 用 `@InjectMocks` 直接持有实现类实例来测，**根本不存在代理**，所以单元测试发现不了这个问题。
+> 并没有让调用穿过另一个 Bean 的代理）——按 AOP 语义就是**同类自调用**，
+> `doCreateOrder` 上的 `@Transactional` / `@GlobalTransactional` **确实没有生效**。
+> 佐证：原有 `OrderServiceTest` 用 `@InjectMocks` 直接持有实现类实例，**根本不存在代理**，所以 143 个单测都没发现。
 >
-> 建议的验证与修复：
-> 1. 加一条**回滚断言**集成测试：让第二次扣库存抛异常，断言 `orders` 表里查不到半成品订单（`@SpringBootTest`，从容器里拿 `OrderService`）；
-> 2. 若确认失效，按第六节场景 1 的三选一修复——**拆出独立 Bean（如 `OrderTransactionalService`）最稳**，也可注入 self 或 `AopContext.currentProxy()`；
-> 3. 这个案例的教训值得背：**"锁在事务外"的设计要成立，前提是两次调用跨越代理边界**——设计对了、调用方式错了，等于没做。
+> 修复与验证（可作为面试的完整故事）：
+> 1. 新增 `OrderCreateTxWiringTest`：最小 Spring 上下文（`@EnableTransactionManagement` + H2），
+>    在 `orderMapper.insert` 被调用的瞬间断言 `TransactionSynchronizationManager.isActualTransactionActive()`；
+>    **修复前 RED（Expecting true but was false），修复后 GREEN**；
+> 2. 拆出独立 Bean `OrderCreateTxService`（原 `OrderServiceImpl` 内部只保留 `createOrder` 的锁与委托），
+>    事务注解随方法一起迁入，代理重新生效；
+> 3. order 模块全量回归：`Tests run: 85, Failures: 0, Errors: 0`。
+>
+> 教训：**"锁在事务外"的设计要成立，前提是两次调用跨越代理边界**——设计对了、调用方式错了，等于没做。
+> 案例详情见 [docs/28 故障案例库 C1](../../docs/28-故障案例库.md)。
 
 ### 5.3 七个传播行为（面试必问，别死背，用一句话理解）
 

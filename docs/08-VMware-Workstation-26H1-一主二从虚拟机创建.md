@@ -1464,3 +1464,62 @@ curl: (3) URL rejected: Bad hostname
 ```cmd
 curl.exe -L -C - -o "D:\DevTools\ISO\ubuntu-24.04.4-live-server-amd64.iso" "https://mirrors.tuna.tsinghua.edu.cn/ubuntu-releases/24.04.4/ubuntu-24.04.4-live-server-amd64.iso"
 ```
+
+---
+
+## 16. 本次实战最终主机 IP 信息
+
+本项目后续 09（GitHub 版）/ 12（Gitee 版）两篇部署文档都按下面这组三台机器写，除非你重新改 VMware 网络，否则不要再随意换 IP。
+
+| 虚拟机 | Linux 主机名 | 固定 IP | 主要用途 | 登录用户 |
+|---|---|---|---|---|
+| VM1 | `k8s-master` | `192.168.56.10` | Kubernetes 控制平面、kubectl 管理入口 | `yexw` |
+| VM2 | `k8s-worker01` | `192.168.56.11` | Kubernetes 工作节点，运行业务 Pod / 中间件 Pod | `yexw` |
+| VM3 | `k8s-worker02` | `192.168.56.12` | Kubernetes 工作节点、Jenkins、Docker 构建机、本地镜像仓库 | `yexw` |
+
+Windows 宿主机连接方式：
+
+```powershell
+ssh yexw@192.168.56.10
+ssh yexw@192.168.56.11
+ssh yexw@192.168.56.12
+```
+
+三台 Linux 的 `/etc/hosts` 建议保持一致：
+
+```bash
+sudo tee -a /etc/hosts >/dev/null <<'EOF'
+192.168.56.10 k8s-master
+192.168.56.11 k8s-worker01
+192.168.56.12 k8s-worker02
+EOF
+```
+
+校验命令：
+
+```bash
+hostname
+ip addr show ens33 | grep 'inet '
+ping -c 3 192.168.56.10
+ping -c 3 192.168.56.11
+ping -c 3 192.168.56.12
+```
+
+## 17. 访问地址总表
+
+这些是从 Windows 宿主机或局域网访问时最常用的地址：
+
+| 组件 | 所在机器 / 暴露方式 | 访问地址 |
+|---|---|---|
+| Kubernetes API Server | `k8s-master` | `https://192.168.56.10:6443` |
+| Jenkins | `k8s-worker02` | `http://192.168.56.12:8080` |
+| 本地 Docker Registry | `k8s-worker02` | `http://192.168.56.12:5000/v2/_catalog` |
+| 业务网关 API Gateway | Kubernetes NodePort | `http://192.168.56.10:30080`、`http://192.168.56.11:30080`、`http://192.168.56.12:30080` |
+
+如果 master 虚拟机关闭，`192.168.56.10:30080` 和 `192.168.56.10:6443` 都会不可用；此时 Jenkins 也会因为连不上 `192.168.56.10:6443` 部署失败。先启动 master，再检查：
+
+```bash
+sudo systemctl restart kubelet
+sudo ss -lntp | grep 6443
+kubectl get nodes -o wide
+```

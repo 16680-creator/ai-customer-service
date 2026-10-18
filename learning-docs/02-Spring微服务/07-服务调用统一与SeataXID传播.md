@@ -8,7 +8,7 @@
 改造前的调用链：
 
 ```java
-// OrderServiceImpl.doCreateOrder —— @GlobalTransactional 开启全局事务
+// OrderCreateTxService.doCreateOrder —— @GlobalTransactional 开启全局事务
 productStockClient.deductStock(productId, quantity);
 //   ↓ ProductStockClient（旧实现）
 restTemplate.put("http://ai-cs-product/product/{id}/stock/deduct?quantity=", null, id, qty);

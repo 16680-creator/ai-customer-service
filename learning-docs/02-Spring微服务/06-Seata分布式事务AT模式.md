@@ -67,7 +67,7 @@ sequenceDiagram
 
 | 节点              | 职责                                                                                   |
 | --------------- | ------------------------------------------------------------------------------------ |
-| `ai-cs-order`   | 全局事务发起方，既是 TM，也是本地数据库 RM；`OrderServiceImpl.doCreateOrder` 上有 `@GlobalTransactional`  |
+| `ai-cs-order`   | 全局事务发起方，既是 TM，也是本地数据库 RM；`OrderCreateTxService.doCreateOrder` 上有 `@GlobalTransactional`  |
 | `OpenFeign`     | 业务 HTTP 调用工具；Seata 的 `SeataFeignRequestInterceptor` 将 order 线程中的 XID 注入 `TX_XID` 请求头 |
 | `ai-cs-product` | 分支事务参与方 RM；接收 `TX_XID`，执行扣库存本地事务，并通过数据源代理记录 undo_log                                 |
 | `Seata Server`  | TC 事务协调器；记录全局事务/分支事务，统一通知各 RM 提交或回滚                                                  |
@@ -895,7 +895,7 @@ SCA Seata starter 提供 Feign 请求拦截器。裸 RestTemplate 默认没有�
 3. 记住 TC/TM/RM 三个角色
 4. 理解 XID 如何从 order 传到 product
 5. 理解 before image、after image、undo_log
-6. 阅读 `OrderServiceImpl.doCreateOrder`
+6. 阅读 `OrderCreateTxService.doCreateOrder`
 7. 阅读 `ProductServiceImpl.deductStock`
 8. 对比 `ProductClient` 和旧 RestTemplate 实现
 9. 起真实基础设施做一次正常提交

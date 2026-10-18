@@ -128,7 +128,7 @@
 3. **再追问：怎么修？**
    → 拆到另一个 Bean（推荐）/ 注入自己 / `AopContext.currentProxy()`（需 `exposeProxy`）/ 编程式事务 `TransactionTemplate`。
 4. **再追问：项目里有自调用的例子吗，是 bug 吗？**
-   → 用"一正一反"对比答：① **正例** `cancelExpiredOrder`——MQ/定时任务从容器拿到的是代理，外层事务正常开启，内部调私有 `doCancelOrder` 共享事务，属有意设计；② **反例（我们自己识别出的待验证隐患）** `createOrder` 通过 lambda 调 `this.doCreateOrder(...)`，**没有穿过代理**，严格推演 `doCreateOrder` 上的 `@Transactional/@GlobalTransactional` 可能失效——修复用"拆 Bean / 注入 self / 编程式事务"三选一，并用一条回滚断言集成测试锁死。主动说出这个隐患，比背十条原理更能体现工程判断。
+   → 用"一正一反"对比答：① **正例** `cancelExpiredOrder`——MQ/定时任务从容器拿到的是代理，外层事务正常开启，内部调私有 `doCancelOrder` 共享事务，属有意设计；② **反例（我们自己识别并已修复的真实缺陷，2026-10）** `createOrder` 通过 lambda 调 `this.doCreateOrder(...)`，**没有穿过代理**，`doCreateOrder` 上的 `@Transactional/@GlobalTransactional` 确实失效——已按"拆独立 Bean"修复（新增 `OrderCreateTxService`），并补了一条事务状态断言集成测试 `OrderCreateTxWiringTest` 锁死（修复前 RED、修复后 GREEN，order 模块 85 个测试全绿）。主动说出这个隐患的**发现→复现→修复→回归**闭环，比背十条原理更能体现工程判断。
 
 ### 链 3："自动装配到底怎么自动的？" → 四连追问
 
