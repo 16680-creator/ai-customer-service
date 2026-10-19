@@ -21,13 +21,19 @@ $feDir    = "$root\ai-cs-frontend"
 $JAVA8_HOME  = ""      # e.g. "D:\DevTools\jdk\jdk8u492"
 $JAVA17_HOME = ""      # e.g. "D:\DevTools\jdk\jdk17.0.19"
 $MAVEN_HOME  = ""      # e.g. "D:\DevTools\maven\maven3.9.16"
-$DB_PASSWORD = "Yxw172707"
+$DB_PASSWORD = ""      # do not hardcode: loaded from env.local.ps1 or DB_PASSWORD env var
 
 $envFile = "$tools\env.ps1"
 if (Test-Path -LiteralPath $envFile) { . $envFile }
 # 本机私密配置（LLM 密钥等），不入库；后加载可覆盖 env.ps1 中的非敏感默认值
 $envLocalFile = "$tools\env.local.ps1"
 if (Test-Path -LiteralPath $envLocalFile) { . $envLocalFile }
+
+# DB password priority: env.local.ps1 > OS env var > env.ps1 (no plaintext stored there)
+if ([string]::IsNullOrWhiteSpace($DB_PASSWORD)) { $DB_PASSWORD = $env:DB_PASSWORD }
+if ([string]::IsNullOrWhiteSpace($DB_PASSWORD)) {
+    Write-Warning "DB_PASSWORD is not set. Set the DB_PASSWORD env var or configure tools/env.local.ps1 (gitignored)."
+}
 
 # ------------------------------------------------------------------ helpers
 function Test-PortListening([int]$port) {

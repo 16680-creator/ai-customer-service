@@ -15,8 +15,9 @@ $JAVA17_HOME = "D:\DevTools\jdk\jdk17.0.19"
 # Apache Maven (required to build / spring-boot:run thin-jar services)
 $MAVEN_HOME = "D:\DevTools\maven\maven3.9.16"
 
-# Remote MySQL password (fills the ${DB_PASSWORD} placeholders in ai-cs-*.yml)
-$DB_PASSWORD = "Yxw172707"
+# Remote MySQL password: DO NOT put it here (this file is committed).
+# Configure it in tools/env.local.ps1 (gitignored) or via the DB_PASSWORD env var.
+$DB_PASSWORD = ""
 
 # LLM API keys：不要写在本文件（本文件会提交到仓库）。
 # 请复制 tools/env.local.ps1 模板填入真实密钥，该文件已被 .gitignore 排除，
