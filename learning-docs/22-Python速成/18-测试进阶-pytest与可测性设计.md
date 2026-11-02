@@ -253,15 +253,20 @@ def test_create_note(tmp_path):
 
 ---
 
-## 九、覆盖率：找盲区，不是追求数字
+## 九、覆盖率检查与门禁
+
+### 运行覆盖率测试
 
 ```bash
 python -m pip install pytest-cov
-pytest --cov=app --cov-report=term-missing
+pytest tests/ --cov=app --cov-report=html --cov-report=term-missing
+
+# 输出：
+# app/services/order.py:42  100%
+# app/services/order.py:45   50%  # 缺失这一行的分支
 ```
 
 看 `Missing` 行号，重点补：
-
 - 异常分支
 - 参数为空/边界值
 - 重试、超时、熔断恢复
@@ -270,16 +275,125 @@ pytest --cov=app --cov-report=term-missing
 
 **100% 覆盖不等于没有 bug**。一行代码被执行过，不代表结果被正确断言，也不代表并发与外部契约正确。
 
+### JaCoCo 同等标准：门禁配置
+
+在 `pyproject.toml` 中：
+
+```toml
+[tool.pytest.ini_options]
+addopts = “--cov=app --cov-fail-under=60 --cov-report=term-missing”
+```
+
+**与 Java 对标：**
+
+| Java | Python |
+|------|--------|
+| Maven Surefire 收集覆盖率 | pytest + pytest-cov |
+| JaCoCo 门禁 `<limit>` | `--cov-fail-under` |
+| IDE 显示绿/红行 | `--cov-report=html` + 浏览器 |
+
 ---
 
-## 十、稳定测试的十条纪律
+## 十、性能测试集成
+
+### pytest-benchmark
+
+```bash
+pip install pytest-benchmark
+```
+
+```python
+def test_recommendations_performance(benchmark):
+    “””
+    性能回归测试（确保不会无故变慢）
+    
+    对标 Java: @Benchmark (JMH)
+    “””
+    def recommendation():
+        return service.get_recommendations(user_id=1, limit=5)
+    
+    result = benchmark(recommendation)
+    # pytest-benchmark 自动计算统计、检测回归
+```
+
+运行：
+
+```bash
+pytest tests/test_perf.py --benchmark-only
+```
+
+输出：
+
+```
+test_recommendations_performance:
+  Name (time in ms): 15.45 ± 2.34
+  Median: 14.89 ms
+  IQR: 2.10 ms
+  Outliers: 1 (1.2%)
+  OPS/sec: 64.73
+  Rounds: 100
+  Iterations: 1
+```
+
+---
+
+## 十一、CI 集成与缺陷检测
+
+### GitHub Actions 测试工作流
+
+```yaml
+name: Tests
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [“3.11”, “3.12”]
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      
+      - name: Install dependencies
+        run: |
+          pip install -e “.[dev]”
+      
+      - name: Run tests
+        run: |
+          pytest tests/ \
+            --cov=app \
+            --cov-fail-under=60 \
+            --cov-report=xml \
+            --junitxml=test-results.xml
+      
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage.xml
+```
+
+### 失败时自动打印详细日志
+
+```bash
+pytest -vv --tb=long --capture=no
+```
+
+---
+
+## 十二、稳定测试的十条纪律
 
 1. 不访问互联网
 2. 不依赖执行顺序
 3. 不共享可变的全局状态
 4. 不依赖真实当前时间
 5. 不写无必要的 `sleep`
-6. 不只断言“没抛异常”
+6. 不只断言”没抛异常”
 7. 不用生产数据库和生产密钥
 8. 临时文件用 `tmp_path`
 9. 失败信息能看出输入、输出、期望
@@ -287,7 +401,7 @@ pytest --cov=app --cov-report=term-missing
 
 ---
 
-## 十一、一个接口测试的最小清单
+## 十三、一个接口测试的最小清单
 
 ```text
 ✓ 正常输入返回正确数据
@@ -299,6 +413,34 @@ pytest --cov=app --cov-report=term-missing
 ✓ 流式响应 -> 分帧、异常帧、结束帧正确
 ✓ 多并发 -> 不超卖、不重复扣款
 ```
+
+---
+
+## 十四、实战练习：为 ai-cs-py-recommend 补测试
+
+```bash
+cd ai-cs-py-recommend
+
+# 1. 运行现有测试
+pytest tests/ -v
+
+# 2. 生成覆盖率报告
+pytest tests/ --cov=app --cov-report=html
+
+# 3. 打开报告
+open htmlcov/index.html
+
+# 4. 在红线处补充测试
+# 重复直到覆盖率 ≥ 60%
+```
+
+**检查清单：**
+- [ ] 所有 API 端点都有 happy path + error path 测试
+- [ ] Service 层的所有公共方法都有单元测试
+- [ ] 参数校验（422）都测过
+- [ ] 缓存命中/未命中都测过
+- [ ] 并发场景测试通过
+- [ ] 覆盖率 ≥ 60%
 
 ---
 

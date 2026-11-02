@@ -145,9 +145,222 @@ system prompt
 [1] 来源：refund-policy / c-003
 内容：...
 
+[2] 来源：refund-policy / c-004
+内容：...
+
 要求：
-- 只能依据给定资料回答
-- 资料不足时明确说不知道
+- 只能依据给定资料回答，必须用 [数字] 标记引用
+- 资料不足时明确说"我无法根据现有资料回答"
+```
+
+答案里用 `[1]`、`[2]` 引用，然后解析答案中的数字，反向映射到原始 citations。
+
+**解析映射算法：**
+
+```python
+import re
+
+def extract_citations(answer: str, num_references: int) -> list[int]:
+    """从答案中提取被引用的参考文献编号"""
+    pattern = r'\[(\d+)\]'
+    matches = re.findall(pattern, answer)
+    return [int(m) for m in matches if 1 <= int(m) <= num_references]
+
+def link_citations(answer: str, chunks: list[dict]) -> list[dict]:
+    """
+    关联引用
+    
+    答案: "根据 [1]，退款在 [2] 时间内处理。"
+    chunks: [
+        {"id": "c-001", "content": "..."},
+        {"id": "c-002", "content": "..."},
+    ]
+    
+    返回: [
+        {"id": "c-001", "content": "...", "is_cited": True},
+        {"id": "c-002", "content": "...", "is_cited": True},
+    ]
+    """
+    citation_indices = extract_citations(answer, len(chunks))
+    
+    for i, chunk in enumerate(chunks):
+        chunk["is_cited"] = (i + 1) in citation_indices
+    
+    return chunks
+```
+
+---
+
+## 七、Embedding 成本与缓存
+
+Embedding 调用通常按 token 计费，成本远低于 Chat，但量大时仍有压力。
+
+### 缓存策略
+
+```python
+class EmbeddingCache:
+    """
+    Embedding 缓存（可选）
+    
+    权衡：缓存容量 vs 重新计算
+    """
+    
+    def __init__(self, max_size: int = 100000):
+        self.cache: dict[str, list[float]] = {}
+        self.max_size = max_size
+    
+    async def embed(self, texts: list[str], model: str) -> list[list[float]]:
+        """
+        向量化，优先走缓存
+        
+        对标 Spring Cache 的 @Cacheable
+        """
+        to_compute = []
+        cache_keys = []
+        
+        for text in texts:
+            key = f"{model}:{hash(text)}"
+            if key in self.cache:
+                # 缓存命中
+                to_compute.append(None)
+            else:
+                # 缓存未命中，需计算
+                to_compute.append(text)
+                cache_keys.append(key)
+        
+        # 只对未命中的文本调用 API
+        if any(t is not None for t in to_compute):
+            computed = await self.embedding_client.embed([t for t in to_compute if t])
+            
+            # 写入缓存
+            for key, embedding in zip(cache_keys, computed):
+                if len(self.cache) >= self.max_size:
+                    self.cache.pop(next(iter(self.cache)))  # FIFO 淘汰
+                self.cache[key] = embedding
+        
+        # 组合结果
+        results = []
+        for text, computed_val in zip(texts, to_compute):
+            if computed_val is None:
+                key = f"{model}:{hash(text)}"
+                results.append(self.cache[key])
+            else:
+                # 从刚计算的结果取
+                ...
+        
+        return results
+```
+
+---
+
+## 八、Rerank 的使用时机与降级
+
+Rerank 精度高，但也有成本。不是每次都必须用：
+
+```python
+async def retrieve_with_rerank(
+    question: str,
+    use_rerank: bool = True,
+) -> list[dict]:
+    """
+    检索 → 可选 Rerank → 返回
+    
+    决策树：
+    - 响应要求快（<100ms）？ → 跳过 Rerank
+    - 检索结果已足够清晰？ → 跳过 Rerank
+    - 用户问题复杂/歧义多？ → 用 Rerank
+    """
+    
+    # 1. 向量检索 Top 50（快）
+    candidates = await vector_db.search(question, top_k=50)
+    
+    if not use_rerank or len(candidates) <= 5:
+        return candidates[:10]
+    
+    # 2. Rerank Top 50 → Top 10（精准但慢）
+    try:
+        reranked = await rerank_client.rank(question, candidates)
+        return reranked[:10]
+    except Exception as e:
+        # 降级：Rerank 失败直接返回向量检索结果
+        logger.warning("Rerank 失败，使用向量检索结果", extra={"error": str(e)})
+        return candidates[:10]
+```
+
+---
+
+## 九、评估指标与持续改进
+
+### 常见指标
+
+| 指标 | 计算方式 | 改进方向 |
+|------|---------|---------|
+| **准确率** | 回答正确的问题数 / 总问题数 | 调整提示词、Embedding 模型、分块 |
+| **召回率** | 检索到相关文档的问题数 / 总问题数 | 加分块、调参数 TopK、多路检索 |
+| **F1** | 2 × (准确 × 召回) / (准确 + 召回) | 综合指标 |
+| **响应时间** | P99 延迟 | 缓存、Rerank 降级 |
+| **成本** | token 总数 × 单价 | 压缩 context、减 Rerank 频率 |
+
+### 测试集构建
+
+```python
+# test_rag_quality.py
+@pytest.fixture
+def test_cases():
+    """构建 50 个测试问题"""
+    return [
+        {
+            "question": "退款要多久？",
+            "expected_document_ids": ["refund-policy"],
+            "expected_keywords": ["3~5 工作日"],
+        },
+        # ...
+    ]
+
+def test_retrieval_recall(test_cases):
+    """检索召回率"""
+    total = len(test_cases)
+    recalled = sum(
+        1 for tc in test_cases
+        if all(doc_id in retrieved for doc_id in tc["expected_document_ids"])
+        for retrieved in [rag_service.retrieve(tc["question"])]
+    )
+    assert recalled / total >= 0.90  # 门禁
+
+def test_answer_accuracy(test_cases):
+    """答案准确率"""
+    total = len(test_cases)
+    correct = sum(
+        1 for tc in test_cases
+        if any(kw in answer for kw in tc["expected_keywords"])
+        for answer in [rag_service.answer(tc["question"])]
+    )
+    assert correct / total >= 0.85
+```
+
+---
+
+## 十、生产部署清单
+
+```text
+□ Embedding 模型与向量库对齐
+□ 提示词版本控制（Git + 审批）
+□ 超时与重试配置明确
+□ 降级兜底文案清晰
+□ 成本监控告警
+□ 日志里记录 model、tokens、耗时、成本
+□ 入库前清洗/审核（防止对抗样本）
+□ 读写一致性测试通过
+□ Rerank 异常降级验证
+□ 引用映射测试通过
+□ 多租户隔离
+□ 限流/熔断/降级链路完整
+□ 灾备方案（Embedding/Vector DB/LLM 任一宕机）
+```
+
+---
+
+**上一篇**：[20-部署与生产运行](20-部署与生产运行.md)　**下一篇**：完结
 - 结论后标注引用编号，如 [1]
 ```
 
