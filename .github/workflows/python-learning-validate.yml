@@ -1,0 +1,120 @@
+name: Python 速成文档验证
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - "learning-docs/22-Python速成/**"
+      - "ai-cs-py-recommend/**"
+  pull_request:
+    paths:
+      - "learning-docs/22-Python速成/**"
+      - "ai-cs-py-recommend/**"
+
+jobs:
+  # ============== 文档代码验证 ==============
+  validate-examples:
+    runs-on: ubuntu-latest
+    name: 验证文档代码示例
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: 验证代码示例
+        run: |
+          cd learning-docs/22-Python速成/code
+          python validate_all_examples.py --verbose
+
+  # ============== ai-cs-py-recommend 测试 ==============
+  test-py-recommend:
+    runs-on: ubuntu-latest
+    name: 推荐服务单元测试与覆盖率
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: 安装依赖
+        run: |
+          cd ai-cs-py-recommend
+          pip install -r requirements.txt
+          pip install -e ".[dev]"
+
+      - name: 代码质量检查（Ruff）
+        run: |
+          cd ai-cs-py-recommend
+          ruff check app/ tests/
+
+      - name: 代码格式检查（Black）
+        run: |
+          cd ai-cs-py-recommend
+          black --check app/ tests/ || true
+
+      - name: 类型检查（Mypy）
+        run: |
+          cd ai-cs-py-recommend
+          mypy app/ --ignore-missing-imports || true
+
+      - name: 运行测试
+        run: |
+          cd ai-cs-py-recommend
+          pytest tests/ -v --cov=app --cov-report=xml
+
+      - name: 上传覆盖率报告
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./ai-cs-py-recommend/coverage.xml
+          flags: python-recommend
+          fail_ci_if_error: false
+
+  # ============== 链接有效性检查 ==============
+  check-links:
+    runs-on: ubuntu-latest
+    name: 检查文档链接有效性
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: 检查 Markdown 链接
+        uses: gaurav-nelson/github-action-markdown-link-check@v1
+        with:
+          use-quiet-mode: "yes"
+          use-verbose-mode: "yes"
+          folder-path: "learning-docs/22-Python速成"
+
+  # ============== 构建 Docker 镜像 ==============
+  build-docker:
+    runs-on: ubuntu-latest
+    name: 构建 Docker 镜像
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: 构建镜像
+        uses: docker/build-push-action@v4
+        with:
+          context: ./ai-cs-py-recommend
+          push: false
+          tags: ai-cs-py-recommend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
