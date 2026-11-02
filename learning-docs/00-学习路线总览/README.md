@@ -497,6 +497,47 @@ docker compose -f deploy/docker-compose/docker-compose-observability.yml up -d
 
 ---
 
+## 进阶专题（2026-11 第十六批补全：Python 语言速成）
+
+> 前十五批补的是"Java 侧的知识域"，这一批补的是"**另一门语言的迁移成本**"：
+> 项目里已有 `ai-cs-py-chat`（FastAPI + AsyncOpenAI），但 10-Python服务 只讲**架构取舍**，不讲**语言本身**。
+> 新增 [`22-Python速成`](../22-Python速成/README.md)：面向 Java 开发者的 7 / 14 天语言迁移，加 10 天工程化加练。
+
+| 篇 | 主题 | 核心产出 | 状态 |
+|---|---|---|---|
+| [README](../22-Python速成/README.md) | 模块索引 | 三阶段模型、目录导航、学完自检 | ✅ |
+| [00](../22-Python速成/00-学习计划与验收标准.md) | 学习计划与验收标准 | 7 天 / 14 天双计划、每日闭环、可勾选验收清单 | ✅ |
+| [01](../22-Python速成/01-环境搭建与工具链.md) | 环境搭建与工具链 | venv/uv vs Maven、pyproject 逐项对照、pdb 调试、REPL | ✅ |
+| [02](../22-Python速成/02-语法速通-Java对照.md) | 语法速通 | 90% 日常语法的逐条 Java 对照 + 10 分钟自测 | ✅ |
+| [03](../22-Python速成/03-数据类型与容器.md) | 数据类型与容器 | list/dict/set/tuple、切片、推导式、**可变性与拷贝语义** | ✅ |
+| [04](../22-Python速成/04-函数与作用域.md) | 函数与作用域 | 默认参数陷阱、`*args/**kwargs`、闭包、装饰器、生成器 | ✅ |
+| [05](../22-Python速成/05-面向对象与Java对比.md) | 面向对象 | `self`、dataclass vs Lombok、`@property`、魔术方法、MRO、Protocol | ✅ |
+| [06](../22-Python速成/06-异常、文件与上下文管理器.md) | 异常/文件/上下文 | 无 checked exception、EAFP、`with`、pathlib、**Windows 编码坑** | ✅ |
+| [07](../22-Python速成/07-模块、包与依赖管理.md) | 模块与依赖 | import 机制、`python -m` vs `python x.py`、循环导入、uv | ✅ |
+| [08](../22-Python速成/08-并发模型.md) | 并发模型 | **GIL 实证**、asyncio、`to_thread` 与 `boundedElastic` 的同构、多进程 | ✅ |
+| [09](../22-Python速成/09-类型注解与工程化.md) | 类型注解与工程化 | typing、mypy/pyright、ruff、pytest、pre-commit、CI | ✅ |
+| [10](../22-Python速成/10-标准库必会清单.md) | 标准库必会清单 | pathlib/json/re/datetime/collections/logging/subprocess | ✅ |
+| [11](../22-Python速成/11-FastAPI实战-对着SpringBoot学.md) | FastAPI 实战 | 用 `ai-cs-py-chat` 真实代码逐层对照 Spring Boot | ✅ |
+| [12](../22-Python速成/12-Java开发者踩坑清单.md) | 踩坑清单 | 50 条：现象 / 原因 / 正确做法 | ✅ |
+| [13](../22-Python速成/13-速查表.md) | 速查表 | 一页纸语法 + 标准库 + 命令 + Java→Python 映射表 | ✅ |
+| [14](../22-Python速成/14-练习题库与参考答案.md) | 练习题库 | 30 题三档难度，全部可运行验证 | ✅ |
+| [15](../22-Python速成/15-项目实战路线.md) | 项目实战路线 | 对账工具 → 库存服务 → AI 对话服务增强（三个递进项目） | ✅ |
+| [16](../22-Python速成/16-调试与故障排查手册.md) | 调试与故障排查 | 异常链、pdb、faulthandler、asyncio 卡死、内存/编码/import 定位 | ✅ |
+| [17](../22-Python速成/17-性能优化与基准测试.md) | 性能优化与基准测试 | timeit、cProfile、tracemalloc、算法/缓存/IO 优化 | ✅ |
+| [18](../22-Python速成/18-测试进阶-pytest与可测性设计.md) | 测试进阶 | 测试分层、fixture、Mock、异步/FastAPI 测试、覆盖率 | ✅ |
+| [19](../22-Python速成/19-HTTP与数据库实战.md) | HTTP 与数据库 | httpx、超时/重试、SQLite 事务、SQLAlchemy 边界 | ✅ |
+| [20](../22-Python速成/20-部署与生产运行.md) | 部署与生产运行 | Docker、worker、配置、日志、健康检查、优雅停机、SSE 代理 | ✅ |
+| [21](../22-Python速成/21-AI应用实战-从对话到RAG.md) | AI 应用实战 | OpenAI 兼容、RAG、Rerank、引用、结构化输出与评估 | ✅ |
+| [22](../22-Python速成/22-Pythonic重构清单.md) | Pythonic 重构清单 | 24 组 Java 风格 → Pythonic 对照、提交前检查 | ✅ |
+| [23](../22-Python速成/23-安全编码与常见漏洞.md) | 安全编码 | SQL/命令/路径/SSRF/反序列化/密钥/越权/CORS/AI 风险与审查清单 | ✅ |
+| [24](../22-Python速成/24-Java项目迁移Python的策略与边界.md) | Java→Python 迁移边界 | 决策表、三种共存形态、契约/数据一致性、本项目模块结论 | ✅ |
+
+> 与 10-Python服务 的分工：`10` 讲**架构取舍**（为什么这么设计），`22` 讲**语言本身**（怎么写、为什么这么写）。先学 22 再读 10。
+> `code/` 示例已在本机 Python 3.13 实际验证：标准库环境 **32 通过 + 1 跳过**（Web 示例缺 FastAPI），
+> 在已装可选依赖的环境 **33/33 通过**；pytest **52 passed**。`run_all.py` 会明确区分 PASS/SKIP/FAIL，不会把跳过算成通过。
+
+---
+
 ## 项目开发计划（技术栈补全施工计划）
 
 > 原 `10-项目开发计划` 目录已并入本目录。这 5 篇是**技术栈补全的施工计划**，记录"缺口是什么、为什么补、补到什么程度算完"；
