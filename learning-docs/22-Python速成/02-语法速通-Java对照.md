@@ -238,10 +238,21 @@ for name in ["a", "b"]:
 # 需要下标：用 enumerate（替代 Java 的 for (int i = 0; ...)）
 for i, name in enumerate(["a", "b"]):
     print(i, name)
+// 等价于 enumerate(["a", "b"])  →  0 a / 1 b
+String[] names = {"a", "b"};
+for (int i = 0; i < names.length; i++) {
+    System.out.println(i + " " + names[i]);
+}
+
+
 
 for i, name in enumerate(["a", "b"], start=1):   # 从 1 开始
     print(i, name)
-
+    
+// 等价于 enumerate(..., start=1)  →  1 a / 2 b
+for (int i = 1; i <= names.length; i++) {
+    System.out.println(i + " " + names[i - 1]);
+}
 # 范围循环：range
 for i in range(5):          # 0,1,2,3,4
     print(i)
