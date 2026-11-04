@@ -36,10 +36,13 @@ Java 侧同一链路多了 RAG、Redis 历史、RocketMQ 异步落库、Resilien
 DeepSeek、硅基流动等 OpenAI 兼容服务，可以复用同一客户端：
 
 ```python
-client = AsyncOpenAI(
-    base_url=settings.llm_base_url,
-    api_key=settings.llm_api_key,
-    timeout=settings.llm_timeout,
+# ---- 本段讲：用 AsyncOpenAI 客户端接任意 OpenAI 兼容服务 ----
+# 对照 Java：类似 spring-ai-openai 或 langchain4j 里配 OpenAiChatModel；
+# base_url/api_key/model 三项全部来自配置（见 20 章的 Settings），不在代码里写死。
+client = AsyncOpenAI(                       # Async 开头 = 异步客户端，方法返回协程，需 await；同步版是 OpenAI
+    base_url=settings.llm_base_url,         # 指向 DeepSeek/硅基流动等兼容网关地址，默认才用 api.openai.com
+    api_key=settings.llm_api_key,           # 密钥从配置注入（SecretStr），绝不硬编码在源码里
+    timeout=settings.llm_timeout,           # 请求超时（秒）；LLM 生成慢，必须显式设，否则默认可能长时间挂起
 )
 ```
 
@@ -158,13 +161,21 @@ system prompt
 **解析映射算法：**
 
 ```python
+# ---- 本段讲：RAG 引用溯源的核心——从答案文本反查引用编号 ----
+# 模型只输出 [1]、[2] 这样的编号，真实 document_id/chunk_id 由服务端保存并映射，
+# 绝不能让模型自己编造来源。Java 对照：正则 Pattern + 提取后映射 DTO 列表。
 import re
+# re 是 Python 标准库的正则模块，等价 Java 的 java.util.regex.Pattern/Matcher
 
 def extract_citations(answer: str, num_references: int) -> list[int]:
     """从答案中提取被引用的参考文献编号"""
     pattern = r'\[(\d+)\]'
+    # 原始字符串 r'' 避免反斜杠转义问题；\[(\d+)\] 匹配 [数字] 并用括号捕获数字部分
     matches = re.findall(pattern, answer)
+    # findall 返回所有捕获组的字符串列表，如 ["1", "2"]；等价 Java 的 Matcher.find() 循环 + group(1)
     return [int(m) for m in matches if 1 <= int(m) <= num_references]
+    # 列表推导式：把字符串转 int，并过滤掉越界编号（模型可能幻觉出 [9] 但只有 5 个片段），
+    # 防止后续按编号索引时越界，等价 Java 的 stream().map(Integer::parseInt).filter(...)
 
 def link_citations(answer: str, chunks: list[dict]) -> list[dict]:
     """
@@ -181,12 +192,19 @@ def link_citations(answer: str, chunks: list[dict]) -> list[dict]:
         {"id": "c-002", "content": "...", "is_cited": True},
     ]
     """
+    # 前面这一大段 docstring 是给调用方看的"接口说明"，不影响运行；等价 Java 的 Javadoc
     citation_indices = extract_citations(answer, len(chunks))
-    
+    # 第一步：从答案文本里提取出所有合法引用编号，len(chunks) 是编号上限
+    # （编号从 1 开始，对应片段下标 0，所以判断时要用 i+1）
+
     for i, chunk in enumerate(chunks):
+        # enumerate 同时给元素和下标，等价 Java 的 for (int i = 0; i < list.size(); i++)
         chunk["is_cited"] = (i + 1) in citation_indices
-    
+        # 直接在 dict 上写字段（Python dict 可变，无需新建对象）；
+        # is_cited 标记该片段是否被答案实际引用，前端据此展示"答案来自哪条资料"
+
     return chunks
+    # 原地修改后返回同一列表；Java 对照：给 DTO set 一个新字段后返回
 ```
 
 ---
@@ -198,6 +216,9 @@ Embedding 调用通常按 token 计费，成本远低于 Chat，但量大时仍�
 ### 缓存策略
 
 ```python
+# ---- 本段讲：Embedding 结果的进程内缓存，减少重复向量化调用 ----
+# 同一段文本向量化结果不变，缓存可省 API 费用与延迟。
+# Java 对照：Spring Cache 的 @Cacheable / Caffeine 本地缓存；这里是手写版便于看清原理。
 class EmbeddingCache:
     """
     Embedding 缓存（可选）
@@ -206,23 +227,32 @@ class EmbeddingCache:
     """
     
     def __init__(self, max_size: int = 100000):
+        # 构造函数；self 相当于 Java 的 this，必须显式写在参数里
         self.cache: dict[str, list[float]] = {}
+        # 缓存主体：key 是 "模型:文本哈希" 字符串，value 是向量（float 列表）；普通 dict 无容量限制
         self.max_size = max_size
-    
+        # 容量上限，超过后用 FIFO 淘汰；生产上应换 LRU（functools.lru_cache 或 Caffeine）
+
     async def embed(self, texts: list[str], model: str) -> list[list[float]]:
         """
         向量化，优先走缓存
         
         对标 Spring Cache 的 @Cacheable
         """
+        # async def：内部要 await 网络 IO，整个方法可在事件循环上并发执行
         to_compute = []
+        # 待计算列表：命中的位置放 None 占位，未命中的放原文本，保证与入参 texts 按位置对齐
         cache_keys = []
-        
+        # 未命中文本对应的缓存 key，顺序与 to_compute 里非 None 的元素一一对应
+
         for text in texts:
             key = f"{model}:{hash(text)}"
+            # 缓存 key 由模型名 + 文本哈希组成：换 Embedding 模型后哈希不变但向量空间不同，
+            # 必须带上 model 避免新旧向量混用；hash() 内置但对 str 有随机化，重启后会变（教学示例可接受）
             if key in self.cache:
                 # 缓存命中
                 to_compute.append(None)
+                # None 占位，表示"这个位置已有缓存，不用算"，同时保住下标对齐
             else:
                 # 缓存未命中，需计算
                 to_compute.append(text)
@@ -230,23 +260,32 @@ class EmbeddingCache:
         
         # 只对未命中的文本调用 API
         if any(t is not None for t in to_compute):
+            # any() 短路求值：只要有一个未命中就发起批量调用；批量 Embedding 比逐条调便宜得多
             computed = await self.embedding_client.embed([t for t in to_compute if t])
+            # 列表推导式过滤掉 None 占位后批量请求；await 等待异步网络调用完成
             
             # 写入缓存
             for key, embedding in zip(cache_keys, computed):
+                # zip 把 key 序列与结果序列按下标配对，等价 Java 的 IntStream 遍历两个 list
                 if len(self.cache) >= self.max_size:
                     self.cache.pop(next(iter(self.cache)))  # FIFO 淘汰
+                    # next(iter(dict)) 取第一个插入的 key 并删除，即先进先出淘汰；
+                    # Python 3.7+ dict 保持插入序，这里借它实现简易 FIFO
                 self.cache[key] = embedding
         
         # 组合结果
         results = []
         for text, computed_val in zip(texts, to_compute):
+            # 再次按位置配对：texts 是原始输入，to_compute 记录每个位置是命中还是未命中
             if computed_val is None:
                 key = f"{model}:{hash(text)}"
                 results.append(self.cache[key])
+                # 命中位：从缓存取回已存在的向量
             else:
                 # 从刚计算的结果取
                 ...
+                # 教学片段省略了实现：应按下标从 computed 中取出对应向量 append；
+                # 注意此片段是伪代码性质，重点在"命中跳过、未命中批量算"的思路
         
         return results
 ```
@@ -258,10 +297,13 @@ class EmbeddingCache:
 Rerank 精度高，但也有成本。不是每次都必须用：
 
 ```python
-async def retrieve_with_rerank(
-    question: str,
-    use_rerank: bool = True,
-) -> list[dict]:
+# ---- 本段讲：RAG 在线读路径「向量粗召回 → 可选 Rerank → 失败降级」的完整链路 ----
+# 对照 Java：向量检索 ≈ VectorStore.similaritySearch；Rerank ≈ 再调一次精排模型给候选重打分。
+# 关键工程点：Rerank 是额外的网络调用，必须有开关、有超时、失败能降级回原向量排序，否则会拖垮主链路。
+async def retrieve_with_rerank(           # 异步函数：内部有多处 await 网络调用，不能阻塞事件循环
+    question: str,                        # 用户原始问题（查询文本）
+    use_rerank: bool = True,              # 是否启用 Rerank 精排；默认开，要求低延迟时可关
+) -> list[dict]:                          # 返回命中的片段列表（每项含 id / 内容 / 分数等元数据）
     """
     检索 → 可选 Rerank → 返回
     
@@ -273,18 +315,24 @@ async def retrieve_with_rerank(
     
     # 1. 向量检索 Top 50（快）
     candidates = await vector_db.search(question, top_k=50)
+    # ↑ 粗召回：从向量库取最相似的 50 条，代价低、速度快，但只保证"可能相关"；
+    #   等价 Java 的 vectorStore.similaritySearch(question, 50)
     
     if not use_rerank or len(candidates) <= 5:
         return candidates[:10]
+    # ↑ 短路返回：不需要精排、或候选本来就少（精排收益低）时，直接取前 10 条，省一次网络调用
     
     # 2. Rerank Top 50 → Top 10（精准但慢）
     try:
         reranked = await rerank_client.rank(question, candidates)
-        return reranked[:10]
+        # ↑ 精排：把"问题 + 候选"一起交给重排序模型打分；它能判断"这段是否真能回答当前问题"，
+        #   比单纯向量相似度准，但多一次网络往返、有成本
+        return reranked[:10]              # 取精排后的前 10 条作为最终上下文
     except Exception as e:
         # 降级：Rerank 失败直接返回向量检索结果
         logger.warning("Rerank 失败，使用向量检索结果", extra={"error": str(e)})
-        return candidates[:10]
+        # extra= 给日志挂结构化字段；等价 Java 的 log.warn(msg, e)，但更便于日志系统检索
+        return candidates[:10]            # 兜底：精排挂了也不能让整条检索链失败，退回向量排序结果
 ```
 
 ---
@@ -304,38 +352,44 @@ async def retrieve_with_rerank(
 ### 测试集构建
 
 ```python
-# test_rag_quality.py
-@pytest.fixture
-def test_cases():
-    """构建 50 个测试问题"""
-    return [
+# ---- 本段讲：RAG 质量评估——用固定测试集给"召回率 / 准确率"设门禁 ----
+# 对照 Java：≈ JUnit 参数化测试 + 断言阈值；这里用 pytest，测试失败即"质量回退"，可接进 CI。
+# 核心思想：把"改了 chunk/prompt 后感觉变准了"变成可量化的数字，防止凭感觉上线。
+# test_rag_quality.py                       # 文件名：RAG 质量测试
+@pytest.fixture                              # fixture：被注入到测试函数参数里的"准备数据"（≈ @BeforeEach 的准备逻辑）
+def test_cases():                            # 提供测试集的夹具；所有用例共用同一份问题集
+    """构建 50 个测试问题"""                  # docstring：给调用方看的说明，运行时不执行（≈ Javadoc）
+    return [                                 # 每个元素是一条"问题 + 期望文档 + 期望关键词"的用例
         {
-            "question": "退款要多久？",
-            "expected_document_ids": ["refund-policy"],
-            "expected_keywords": ["3~5 工作日"],
+            "question": "退款要多久？",           # 用户问题
+            "expected_document_ids": ["refund-policy"],   # 期望被检索到的文档 ID（用于算召回率）
+            "expected_keywords": ["3~5 工作日"],          # 答案里必须出现的关键词（用于算准确率）
         },
-        # ...
+        # ...                                # 教学省略：真实测试集应有几十条覆盖真实业务的问题
     ]
 
-def test_retrieval_recall(test_cases):
-    """检索召回率"""
-    total = len(test_cases)
-    recalled = sum(
-        1 for tc in test_cases
+def test_retrieval_recall(test_cases):       # 召回率测试；参数名 test_cases 对应上面的夹具，pytest 自动注入
+    """检索召回率"""                          # 含义：相关文档被成功检索到的比例
+    total = len(test_cases)                   # 问题总数（分母）
+    recalled = sum(                           # 命中数（分子）：统计有多少条用例的期望文档都被检索到
+        1 for tc in test_cases                 # 每条用例记 1（当下面条件成立时）
         if all(doc_id in retrieved for doc_id in tc["expected_document_ids"])
-        for retrieved in [rag_service.retrieve(tc["question"])]
+        # ↑ all(...)：该用例期望的每个 document_id 都出现在检索结果里，才算这条召回成功
+        for retrieved in [rag_service.retrieve(tc["question"])]   # 调一次检索，用单元素列表把结果绑成变量 retrieved
     )
     assert recalled / total >= 0.90  # 门禁
+    # ↑ 召回率必须 ≥ 90%；不达标测试直接失败，等价 JUnit 里的 assertTrue(ratio >= 0.90)
 
-def test_answer_accuracy(test_cases):
-    """答案准确率"""
-    total = len(test_cases)
-    correct = sum(
-        1 for tc in test_cases
+def test_answer_accuracy(test_cases):        # 准确率测试
+    """答案准确率"""                          # 含义：答案里包含期望要点的比例
+    total = len(test_cases)                   # 分母
+    correct = sum(                            # 分子：答案命中的条数
+        1 for tc in test_cases                 # 每条记 1（当下面条件成立时）
         if any(kw in answer for kw in tc["expected_keywords"])
-        for answer in [rag_service.answer(tc["question"])]
+        # ↑ any(...)：答案里只要出现任一期望关键词就算答对（更严格的评估会对齐语义而非关键字）
+        for answer in [rag_service.answer(tc["question"])]   # 调一次问答，把结果绑成变量 answer
     )
-    assert correct / total >= 0.85
+    assert correct / total >= 0.85            # 门禁：准确率 ≥ 85%
 ```
 
 ---
@@ -378,11 +432,15 @@ def test_answer_accuracy(test_cases):
 - 非流式主链路不阻塞事件循环
 
 ```python
-try:
+# ---- 本段讲：给 Rerank 加独立超时，并在超时/报错时降级回原向量排序 ----
+# 对照 Java：asyncio.wait_for 等价 Mono.timeout(Duration)；把 rerank 包一层超时，
+# 超时或抛错都不让主链路失败——直接退回向量召回的排序 candidates。
+try:                                          # 尝试做精排
     ranked = await asyncio.wait_for(rerank(query, candidates), timeout=2.0)
-except (asyncio.TimeoutError, RerankError):
-    logger.warning("rerank 失败，降级向量排序")
-    ranked = candidates
+    # ↑ wait_for 给协程加"真超时"（2 秒到点就取消并抛 TimeoutError）；rerank 是额外网络调用，必须限时
+except (asyncio.TimeoutError, RerankError):   # 同时捕获"超时"与"精排服务自身错误"
+    logger.warning("rerank 失败，降级向量排序")   # 只告警，不把异常抛给上层
+    ranked = candidates                        # 降级：直接用原向量排序结果，保证仍有可用上下文
 ```
 
 这与 Java 侧“`Mono.fromCallable` 必须显式 `subscribeOn(boundedElastic)`，异常降级向量排序”是同一条工程原则。
@@ -392,13 +450,17 @@ except (asyncio.TimeoutError, RerankError):
 ## 八、结构化输出：必须校验，不要直接信任模型
 
 ```python
-raw = await llm.chat(...)
-try:
-    payload = json.loads(raw)
+# ---- 本段讲：结构化输出的"生成 → 解析 → 校验"三步，绝不直接信任模型返回 ----
+# 对照 Java：≈ Jackson 反序列化 + Bean Validation；模型可能吐 Markdown 包裹、解释文字或缺字段，
+# 所以必须先 json.loads，再用 Pydantic 模型校验，任一步失败都走修复重试或降级。
+raw = await llm.chat(...)                      # 让模型"只输出 JSON"；... 表示省略了 messages 等参数
+try:                                           # 解析与校验都放进 try，两类失败统一处理
+    payload = json.loads(raw)                  # 1) 把字符串解析成 dict；非法 JSON 会抛 JSONDecodeError
     result = AnswerModel.model_validate(payload)
-except (json.JSONDecodeError, ValidationError):
+    # ↑ 2) 用 Pydantic 模型校验字段类型/必填项；缺字段或类型不符会抛 ValidationError
+except (json.JSONDecodeError, ValidationError):   # 覆盖"JSON 坏了"和"结构不符合契约"两种失败
     # 记录原始输出（注意脱敏与长度），走修复重试或降级
-    ...
+    ...                                        # 省略实现：重试一次或用兜底答案，并留存 raw 便于排查
 ```
 
 建议：

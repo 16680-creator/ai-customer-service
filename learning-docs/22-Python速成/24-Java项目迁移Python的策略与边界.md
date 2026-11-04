@@ -97,8 +97,16 @@
 Java/前端习惯 camelCase，Python 内部 snake_case：
 
 ```python
+# ---- 本段讲：用 Pydantic 在 Python 内部保留 snake_case，同时兼容 Java/前端的 camelCase 契约 ----
+# 迁移的关键不是机械改写 DTO，而是先固定跨语言字段语义，避免调用方随实现语言一起变化。
+# 这相当于 Java DTO 上使用 Jackson 的 @JsonAlias 或 @JsonProperty：外部仍传 sessionId，内部使用 session_id。
+# 只有 AI、数据处理等收益明确的边界适合迁移；核心交易链路应优先保留 Java，并通过稳定契约与 Python 共存。
+
+# 定义请求模型；BaseModel 类似 Java 中承担校验与反序列化职责的 DTO。
 class ChatRequest(BaseModel):
+    # 允许既按 Python 字段名填充，也按下面声明的别名填充，便于迁移期双端兼容。
     model_config = ConfigDict(populate_by_name=True)
+    # Python 侧使用 snake_case；对外 JSON 继续暴露 sessionId，且允许缺省或为 null。
     session_id: str | None = Field(None, alias="sessionId")
 ```
 

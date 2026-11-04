@@ -227,23 +227,24 @@ python -m pytest                  # 52 个测试用例
 ## 五、学完自检（不通过就别往下走）
 
 ```python
+# ---- 本段讲：学完 22 篇后的自检样例——能默写说明语法已过关 ----
 # 能在 60 秒内不查资料写出来，说明基础过关
-from dataclasses import dataclass
-from typing import Protocol
+from dataclasses import dataclass   # dataclass 装饰器：自动生成 __init__/__repr__/__eq__，省掉 Java 式样板
+from typing import Protocol         # Protocol：结构化接口（鸭子类型的静态版），此处仅作导入示例
 
-@dataclass
-class Order:
-    order_no: str
-    amount: float
-    items: list[str]
+@dataclass                          # 标注 Order 为数据类，免手写构造函数
+class Order:                        # 一个订单模型，对应 Java 的 record/DTO
+    order_no: str                   # 字段：订单号（类型注解供 IDE/mypy 检查，运行时不强制）
+    amount: float                   # 字段：金额
+    items: list[str]                # 字段：商品列表，list[str] 等价 Java 的 List<String>
 
-    @property
-    def is_large(self) -> bool:
-        return self.amount > 10_000
+    @property                       # @property 把方法伪装成只读属性，调用方写 o.is_large 而非 o.is_large()
+    def is_large(self) -> bool:     # 是否为"大额单"
+        return self.amount > 10_000   # 10_000 的下划线是数字分隔符，等价 Java 的 10000
 
-def settle(orders: list[Order]) -> dict[str, float]:
+def settle(orders: list[Order]) -> dict[str, float]:   # 批量结算：传入订单列表，返回"订单号→金额"映射
     """按订单号聚合金额，只保留大额单"""
-    return {o.order_no: o.amount for o in orders if o.is_large}
+    return {o.order_no: o.amount for o in orders if o.is_large}   # 字典推导式：一行完成 filter+map+toMap，等价 Java Stream
 ```
 
 写不出来 → 回到 03/04/05 篇。能写出来但觉得别扭 → 正常，写 300 行就顺了。
