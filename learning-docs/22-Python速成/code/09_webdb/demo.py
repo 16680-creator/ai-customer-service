@@ -25,6 +25,12 @@ from app import create_app
 
 
 def main() -> None:
+    """不启端口，用 TestClient 在进程内跑通一遍 CRUD 流程并做断言。
+
+    流程：健康检查 -> 连续 POST 三条（其中一条是 SQL 注入串）-> 校验 422 ->
+    GET 列表 -> 断言条数与注入串被原样保存。
+    最后两条 assert 就是本演示的验收点：参数化查询确实生效了。
+    """
     # with 语句在进入时触发 lifespan 启动、退出时触发关闭（关闭数据库连接）
     # 这行等价于"启动应用 + 拿到测试客户端" <-> @SpringBootTest 启动上下文 + 注入 MockMvc
     with TestClient(create_app()) as client:

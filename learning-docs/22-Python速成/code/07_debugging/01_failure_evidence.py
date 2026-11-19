@@ -108,6 +108,14 @@ def demo_path_diagnosis() -> None:
 
 # ---- 本段讲：依次运行四个演示 ----
 def main() -> None:
+    """合并演示三种"出事时该看什么证据"的排查手段。
+
+    demo_exception_chain()  —— 异常链：保留根因，别让中间层把原始错误吃掉
+    demo_request_timing()   —— 分段耗时 + 上下文日志（含脱敏）
+    demo_faulthandler()     —— 卡死时 dump 所有线程栈，定位到底卡在哪一行
+
+    三者组合起来就是"线上问题第一次排查"的最小工具箱。
+    """
     demo_exception_chain()   # 1. 异常链
     demo_request_timing()    # 2. 上下文日志 + 脱敏
     demo_faulthandler()      # 3. 线程栈

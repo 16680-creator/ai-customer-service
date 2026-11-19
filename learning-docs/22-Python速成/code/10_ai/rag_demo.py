@@ -80,6 +80,30 @@ def vectorize(text: str) -> Counter[str]:
 # 余弦相似度：cos = A·B / (|A| * |B|)，词频非负时取值在 0~1
 # 直观理解：两个词频向量的"方向"越一致，分数越高
 def cosine(left: Counter[str], right: Counter[str]) -> float:
+    """计算两个稀疏词频向量的余弦相似度，取值 0.0 ~ 1.0。
+
+    公式
+    ----
+        cos(A, B) = (A · B) / (|A| * |B|)
+
+    取值含义
+    --------
+    1.0  两个向量方向完全一致（用词分布相同，最相关）
+    0.0  无公共词，或任一向量为空（完全无关）
+
+    为什么用余弦而不是欧氏距离
+    ------------------------
+    余弦只看"方向"不看"长度"，所以长文档不会仅因为词多就压过短文档。
+    这对检索很重要：一段 20 字的精准片段不该输给一段 500 字的泛泛而谈。
+
+    稀疏实现技巧
+    ------------
+    只遍历公共词（set 交集）：非公共词在点积里贡献本来就是 0，
+    跳过后计算量与词表规模无关，只与两段的交集大小有关。
+
+    边界约定：空向量返回 0.0 而不是抛 ZeroDivisionError，
+    让"空查询"退化成"什么都没检索到"，不会把整个请求打挂。
+    """
     # 任一为空向量则模长为 0，按约定返回 0，既合理又能避免除零
     if not left or not right:
         return 0.0
@@ -98,6 +122,31 @@ def cosine(left: Counter[str], right: Counter[str]) -> float:
 # 切块：滑动窗口把长文本切成"最多 max_chars 字、相邻重叠 overlap 字"的片段
 # 重叠的作用：避免关键句正好被切断导致语义丢失 <-> 文本切分里的 chunk overlap
 def chunk_document(document: Document, max_chars: int = 50, overlap: int = 10) -> list[Chunk]:
+    """把一篇长文档切成带重叠的片段（滑动窗口）。
+
+    参数
+    ----
+    document  : 原始文档；只用它的 text / document_id / title
+    max_chars : 单个片段的最大字符数（窗口宽度）
+    overlap   : 相邻片段的重叠字符数；必须满足 0 <= overlap < max_chars
+
+    返回
+    ----
+    list[Chunk]，顺序即原文顺序，chunk_id 形如 "refund-policy-c000"。
+
+    为什么要重叠
+    ------------
+    假设一句关键话是"退款需在签收后 7 天内申请"，窗口正好在"7 天"中间切开，
+    前半句进了片段 A、后半句进了片段 B，两边都检索不到完整语义。
+    重叠 overlap 个字让被切断的句子在下一个片段里完整出现。
+
+    为什么要校验 overlap < max_chars
+    ------------------------------
+    step = max_chars - overlap。若 overlap >= max_chars，step <= 0，
+    range(0, len(text), step) 会原地打转甚至死循环。
+
+    复杂度：O(n) 时间（每个字符至多被最近的几个窗口覆盖），O(n) 输出。
+    """
     # 参数校验一：窗口长度必须为正
     if max_chars <= 0:
         raise ValueError("max_chars 必须为正")
@@ -134,6 +183,23 @@ def chunk_document(document: Document, max_chars: int = 50, overlap: int = 10) -
 
 # 迷你 RAG 索引：内存里维护"片段列表"和"对应向量列表"，两者下标一一对应
 class MiniRAG:
+    """内存版迷你 RAG 索引：切块 -> 向量化 -> 余弦检索。
+
+    数据结构是两条平行列表（下标一一对应）：
+
+        self._chunks[i]   第 i 个片段的原文与元信息
+        self._vectors[i]  第 i 个片段的稀疏词频向量
+
+    "两条平行列表按下标对齐"是本类最容易写错的地方：
+    add_document 里必须成对 append，一旦某次只追加了其中一个，后续 zip 就会错位，
+    检索结果会张冠李戴。所以两个列表的追加永远写在同一个循环体里。
+
+    为什么用暴力全量比对而不是向量库：
+    这是教学实现，片段量小（几十个），O(n) 扫一遍完全够。
+    生产换成 Chroma/pgvector 后，这一步会被 ANN（近似最近邻）索引替代，
+    但"把 query 向量化 -> 与候选向量算相似度 -> 取 top_k"的职责划分不变。
+    """
+
     def __init__(self):
         # 所有片段，按加入顺序排列
         self._chunks: list[Chunk] = []
@@ -153,6 +219,20 @@ class MiniRAG:
 
     # 检索：对查询向量与所有片段向量算余弦相似度，过滤阈值后取 top_k
     def search(self, query: str, *, top_k: int = 3, min_score: float = 0.0) -> list[SearchHit]:
+        """检索最相关的 top_k 个片段，按相似度从高到低返回。
+
+        参数
+        ----
+        query     : 用户问题原文；内部会先走与文档相同的 vectorize 流程
+        top_k     : 返回条数上限，必须为正
+        min_score : 相似度阈值，低于它的结果直接丢弃（默认 0 = 不过滤）
+
+        为什么 min_score 默认是 0 而不是某个正数：
+        阈值强依赖语料与向量化方式（这里只是词频），换成真实 Embedding 后合理阈值完全不同，
+        所以默认"不裁剪"，由调用方按自己的语料调参（main 里演示了传 0.01）。
+
+        返回的列表长度 <= top_k，可能为空（全部低于阈值时）。
+        """
         # top_k 必须为正，否则后面的切片语义会出错
         if top_k <= 0:
             raise ValueError("top_k 必须为正")
@@ -193,6 +273,17 @@ def build_prompt(query: str, hits: list[SearchHit]) -> str:
 
 # 生成引用元数据：返回给前端做"来源可点"，与提示词里的编号一一对应
 def build_citations(hits: list[SearchHit]) -> list[dict]:
+    """把命中结果转成前端可直接渲染的"引用来源"列表。
+
+    返回的每个 dict 对应提示词里的一个 [n]，ref 与编号严格一致——
+    模型输出 "见 [2]" 时，前端就能用 ref=2 这条记录跳到对应段落。
+    字段设计对应"可点回链"需求：
+      ref / document_id / chunk_id  定位到具体文档的具体片段
+      score                          展示相关度，也便于排查检索质量
+
+    编号必须由程序生成（enumerate 从 1 开始），不能让模型自己编，
+    否则引用的编号和实际资料对不上 —— 这是 RAG 引用可信度的底线。
+    """
     # 列表推导式：每个命中生成一个 dict，键名即前后端契约
     return [
         {
@@ -211,6 +302,13 @@ def build_citations(hits: list[SearchHit]) -> list[dict]:
 
 # 构造演示用知识库：三篇客服政策文档
 def build_demo_rag() -> MiniRAG:
+    """构造演示用知识库：三篇客服政策文档（退款 / 配送 / 库存）。
+
+    三篇文档故意在主题上有重合词（"订单""用户""时间"），
+    这样检索演示才能体现"分数有高低、需要排序"而不是永远只有一个命中。
+    窗口设得较小（42 字）是为了让一篇文档被切成多个片段，
+    从而看清 chunk_id 编号与重叠机制。
+    """
     rag = MiniRAG()
     # 用列表存放三篇文档；字符串相邻字面量会自动拼接成一个长句
     documents = [
@@ -240,6 +338,11 @@ def build_demo_rag() -> MiniRAG:
 
 # 脚本入口：跑一次完整流程并打印中间结果，便于观察每一步
 def main() -> None:
+    """跑一遍完整 RAG 链路：建索引 -> 检索 -> 组装提示词 -> 生成引用。
+
+    输出刻意把"检索到了哪些片段、分数多少、提示词长什么样、引用怎么编号"全部打出来，
+    方便对照 build_prompt / build_citations 的实现，看清引用编号与 hits 下标的对应关系。
+    """
     # 1) 建索引
     rag = build_demo_rag()
     # 2) 用户问题

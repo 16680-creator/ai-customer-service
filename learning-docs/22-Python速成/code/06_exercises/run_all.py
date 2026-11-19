@@ -118,6 +118,11 @@ def run_one(rel_path: str, quiet: bool) -> tuple[str, str, float, str]:
 # ---- 本段讲：命令行入口与汇总报告 ----
 # main 负责解析 -q/-k 参数、逐个调用 run_one、最后打印统计并返回退出码。
 def main() -> int:
+    """解析命令行参数，逐个跑示例脚本，最后打印统计并返回退出码。
+
+    参数：-q/--quiet 只显示结果行；-k/--keyword 按路径关键字过滤要跑哪些脚本。
+    返回 0 表示没有失败（允许含 SKIP，例如缺可选依赖的 Web 演示），否则返回 1。
+    """
     parser = argparse.ArgumentParser(description="跑完全部示例脚本")   # Java 里常用 args4j / picocli
     parser.add_argument("-q", "--quiet", action="store_true", help="只显示结果")
     # action="store_true"：出现该开关就存 True，不需要再传值（类似布尔 flag）

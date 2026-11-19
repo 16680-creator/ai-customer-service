@@ -122,7 +122,14 @@ zh = "中文"
 print(f"len('中文')        = {len(zh)}          <- 字符数")           # 2 个字符，与编码无关
 print(f"len(zh.encode())   = {len(zh.encode())}     <- 字节数（UTF-8 每字 3 字节）")   # 默认 UTF-8，所以 6 字节
 print(f"zh.encode()        = {zh.encode()}")                          # 显示为 b'\xe4\xb8\xad\xe6\x96\x87' 这种字节字面量
-print(f"b'\\xe4\\xb8\\xad'.decode('utf-8') = {b'\xe4\xb8\xad'.decode('utf-8')!r}")   # 把 3 个字节按 UTF-8 还原成一个汉字
+
+# 反向操作：把字节按 UTF-8 还原成字符串。
+# 注意这里先把 bytes 字面量赋给变量 zhong_bytes，再放进 f-string：
+#   f-string 的表达式中不能出现反斜杠（Python 3.12/PEP 701 之前），
+#   直接写 f"{b'\xe4\xb8\xad'.decode()}" 在 3.11 及更早版本是语法错误。
+# 这也是"f-string 里别塞复杂表达式"的一个实例：先算好再插值，兼容性和可读性都更好。
+zhong_bytes = b"\xe4\xb8\xad"                                       # 汉字"中"的 UTF-8 字节：3 个字节
+print(f"b'\\xe4\\xb8\\xad'.decode('utf-8') = {zhong_bytes.decode('utf-8')!r}")   # 把 3 个字节按 UTF-8 还原成一个汉字
 
 # GBK 与 UTF-8 不通用，这是 Windows 乱码的根源
 print(f"zh.encode('gbk')   = {zh.encode('gbk')}     <- GBK 每字 2 字节")   # GBK 双字节编码，所以只有 4 字节

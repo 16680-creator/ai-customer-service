@@ -510,6 +510,12 @@ def _check(label: str, got, want) -> bool:
 # ---- 自测入口：逐题调用并收集结果 ----
 # results 里每个元素是一个 bool；最后 all(results) 决定进程退出码。
 def main() -> int:
+    """按「入门 / 进阶 / 高级 / 反模式」四档依次跑全部题目并汇总结果。
+
+    每题的产物都交给 _check 做断言，返回值收进 results；
+    末尾统计通过数，返回失败条数作为进程退出码（0 = 全通过），
+    因此可以直接被 CI 或 run_all.py 当作"这一批题目是否达标"的信号。
+    """
     results = []                         # 每个 _check 的返回值都 append 进来
 
     print("入门档 1-12")

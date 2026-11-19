@@ -36,6 +36,16 @@ def io_task(seconds: float) -> str:
 
 
 def main() -> None:
+    """用实测数字证明 GIL 的存在：CPU 密集任务上多线程不加速，多进程才加速。
+
+    三段实验，各自对比"串行 / 多线程 / 多进程"的耗时：
+      1. CPU 密集  -> 多线程与串行几乎相同（GIL 让它们轮流跑），多进程才能真正并行
+      2. IO 密集   -> 多线程有效（等待时释放 GIL）
+      3. 切换间隔  -> 观察 sys.getswitchinterval()，理解 GIL 是"定时强制换手"
+
+    结论先行：Python 选并发模型，先看任务是 CPU 密集还是 IO 密集，
+    而不是像 Java 那样默认"加线程池"。
+    """
     # 所有实验都收在 main() 里，再由文件末尾的 if __name__ == "__main__" 调用。
     # 这样做是为了 Windows 多进程：子进程会重新 import 本模块，若实验写在模块顶层就会被重复执行。
     print(f"Python {sys.version.split()[0]} on {sys.platform}")     # 打印解释器版本与平台，便于对照结果

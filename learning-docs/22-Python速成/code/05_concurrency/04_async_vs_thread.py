@@ -51,6 +51,16 @@ def cpu_block(seconds: float) -> str:
 
 
 async def main() -> None:
+    """对照演示"阻塞调用如何摧毁事件循环"，并给出两种正确修法。
+
+    四组实验：
+      1. async def 里写 time.sleep  -> 5 个"并发"任务串成 1.5s，完全没并发
+      2. await asyncio.sleep        -> 真正并发，约 0.3s
+      3. await asyncio.to_thread    -> 同步阻塞函数丢进线程池，同样约 0.3s
+      4. 1 个阻塞请求 + 50 个快请求 -> 证明"一个坏调用拖垮全站"
+
+    输出里的耗时对比就是结论：asyncio 只有一个线程，阻塞它就等于阻塞所有请求。
+    """
     print("=" * 60)
     print("1. 反例：async def 里 time.sleep")
     print("=" * 60)

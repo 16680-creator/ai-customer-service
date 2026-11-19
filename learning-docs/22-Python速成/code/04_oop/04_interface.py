@@ -186,6 +186,12 @@ class ChatService:
         return await self.llm.chat([], message)   # await 等待协程结果；history 这里传空列表
 
 async def main():
+    """演示同一套 ChatService 在"生产"和"测试"两种注入下的行为差异。
+
+    流程：先用默认构造（注入 RealLlm）走一遍，再显式传入 FakeLlm 走一遍。
+    两次调用代码完全相同，只有注入的实现不同 —— 这就是依赖注入带来的可替换性，
+    也是 ai-cs-py-chat 里把所有 LLM 调用 mock 掉的依据。
+    """
     real = ChatService()              # 默认注入 RealLlm
     print(f"  生产：{await real.reply('你好')}")
 

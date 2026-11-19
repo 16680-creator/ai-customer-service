@@ -603,9 +603,15 @@ headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
 ```python
 # ---- 本段讲：流式端点的收尾约定——异常也要发一帧，且必须补上 [DONE] ----
 # 对照 Java 的 Flux：出错时把错误也作为一条 SSE 事件推给前端，再 concatWith 一个 [DONE] 结束事件。
-except Exception as exc:                                     # 捕获生成过程中的任何异常
-    yield f"data: {json.dumps({'error': str(exc)})}\n\n"     # 把错误信息作为一帧发给前端
-yield "data: [DONE]\n\n"     # ← 无论成功失败都要发；少这一帧前端会一直转圈
+# 完整形态如下：用 try / except / finally 保证"异常也发一帧"且"[DONE] 一定发出"。
+async def stream_chat(prompt: str):
+    try:
+        async for token in call_llm(prompt):
+            yield f"data: {json.dumps({'delta': token}, ensure_ascii=False)}\n\n"
+    except Exception as exc:                                 # 捕获生成过程中的任何异常
+        yield f"data: {json.dumps({'error': str(exc)})}\n\n"  # 把错误信息作为一帧发给前端
+    finally:
+        yield "data: [DONE]\n\n"     # ← 无论成功失败都要发；少这一帧前端会一直转圈
 ```
 
 否则前端会一直等 `[DONE]`，界面永远停在"加载中"。

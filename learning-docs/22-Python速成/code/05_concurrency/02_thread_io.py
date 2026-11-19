@@ -11,6 +11,10 @@
 import threading                                       # 用于第 4 小节演示"共享状态必须加锁"
 import time                                            # sleep 模拟 IO；perf_counter 计时
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import TimeoutError as FutureTimeoutError
+# 注意：concurrent.futures.TimeoutError 在 Python 3.11 之前是独立类，不是内置 TimeoutError，
+# 只 catch 内置 TimeoutError 会漏掉它（3.11+ 两者才合并成同一个类）。
+# 这里别名导入，兼容 3.10 与 3.11+。
 # ThreadPoolExecutor：线程池本体，对应 Java 的 Executors.newFixedThreadPool(n)
 # as_completed：谁先完成先返回，对应 Java 的 ExecutorCompletionService
 
@@ -183,15 +187,37 @@ def main() -> None:
     with ThreadPoolExecutor(max_workers=3) as pool:
         futures = [pool.submit(slow_call, i) for i in range(6)]
         # 3 个 worker 跑 6 个任务 → 分两批，理论耗时 ≈ 1.0s
-        done, not_done = [], []   # 预留两个列表，本示例未实际填充
-        for f in futures:
-            if f.done() or f.result(timeout=None) is not None:
-                # f.done() 非阻塞地判断是否已完成；f.result(timeout=None) 表示"无限等"
-                # 注意：这里没有真正实现超时，只是演示 API；真要超时需 result(timeout=N) 并捕获 TimeoutError
-                pass              # 占位，不做处理
         results = [f.result() for f in futures]   # 按提交顺序收集结果（此时都已完成）
     print(f"  6 个 0.5s 任务，3 并发 -> {time.perf_counter()-t0:.2f}s  结果 {results}")
-    print("  注意：ThreadPoolExecutor 没有内置超时取消，需要自己管理 future")
+    print("  说明：这里没设超时，结果按提交顺序取回，总耗时 ≈ 1.0s")
+
+    # ---- 真正的超时：future.result(timeout=N) ----
+    # 关键认知：ThreadPoolExecutor 没有内置的"超时取消"机制。
+    # result(timeout=N) 只让【等待方】最多等 N 秒，超时抛 TimeoutError，
+    # 但【任务本身仍在工作线程里继续跑】——它不会被自动中断（Java 的 Future.cancel(true) 也只是发中断信号）。
+    print()
+    print("  超时演示：result(timeout=0.2) 对 0.5s 的任务")
+
+    def very_slow(i):
+        # 故意睡 0.5s，必然超过下面的 0.2s 等待阈值
+        time.sleep(0.5)
+        return i
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        fut = pool.submit(very_slow, 99)
+        t0 = time.perf_counter()
+        try:
+            # 只等 0.2s；到点就抛 TimeoutError，不会傻等到任务结束。
+            # 注意这里正常路径拿不到值：任务要 0.5s，必然超时，所以没有赋值给变量。
+            fut.result(timeout=0.2)
+        except FutureTimeoutError:
+            # 捕获超时：此时任务还在后台跑，future 仍是未完成状态
+            waited = time.perf_counter() - t0
+            print(f"    result(timeout=0.2) -> TimeoutError，实际只等了 {waited:.2f}s")
+            # done() 非阻塞地判断任务是否已完成，这里应为 False
+            print(f"    任务是否已完成：done={fut.done()}   <- 超时只是放弃等待，任务还在跑")
+            # cancel() 对"已在运行"的任务返回 False，说明拿不到中断能力
+            print(f"    cancel() 能否取消：{fut.cancel()}   <- 已开始执行的任务取消不了")
 
 
 if __name__ == "__main__":

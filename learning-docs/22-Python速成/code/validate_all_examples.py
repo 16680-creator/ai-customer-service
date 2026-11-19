@@ -6,8 +6,14 @@
 
 运行方式：
     python validate_all_examples.py
-    python validate_all_examples.py --verbose
-    python validate_all_examples.py --fix  # 尝试自动修复简单错误
+    python validate_all_examples.py --verbose      # 同时列出被跳过的块与跳过原因
+    python validate_all_examples.py --dir <path>   # 指定要扫描的文档目录
+
+校验范围约定（避免误判）：
+    只校验【显式标注 ```python 的块】。以下情况跳过、不计入失败：
+      - 裸围栏 ```（未标注语言）：内容可能是输出、火焰图、目录树，无法判定语言
+      - ```python no-check：作者显式标记的示意/伪代码（如 i++、缺函数体的 if）
+      - Java 对照代码、shell 命令、以 ... 结尾的不完整片段
 
 学习章节：本脚本演示了文件处理、正则表达式、异常处理、命令行参数解析
 """
@@ -25,11 +31,21 @@ from typing import List, Tuple           # 类型注解工具（给函数签名�
 class CodeBlock:
     """代码块数据结构"""
 
-    def __init__(self, file: Path, line_no: int, code: str, language: str = "python"):
+    def __init__(
+        self,
+        file: Path,
+        line_no: int,
+        code: str,
+        language: str = "python",
+        explicit: bool = True,
+        no_check: bool = False,
+    ):
         self.file = file            # 该代码块所在的 .md 文件
         self.line_no = line_no      # 代码块起始行号，报错时用来定位
         self.code = code            # 抽出的源码文本（不含 ``` 围栏）
         self.language = language    # 语言标识，默认 python
+        self.explicit = explicit    # 围栏是否显式标注了语言（```python）
+        self.no_check = no_check    # 是否被标记为"不校验"（示意/伪代码）
 
     def __repr__(self):
         # __repr__ ≈ Java 的 toString()：调试/打印对象时的可读表示
@@ -79,6 +95,7 @@ def extract_code_blocks(md_file: Path) -> List[CodeBlock]:
     in_code_block = False   # 状态标志：当前是否处于 ``` 围栏内部
     current_code = []       # 当前块的代码行缓存
     current_lang = ""       # 当前块的语言标识（```python 里的 python）
+    current_info = ""       # 当前块的围栏附加信息（```python no-check 里的 no-check）
     start_line = 0          # 当前块的起始行号
 
     for i, line in enumerate(lines, start=1):
@@ -90,29 +107,39 @@ def extract_code_blocks(md_file: Path) -> List[CodeBlock]:
                 # 开始代码块
                 in_code_block = True
                 start_line = i
-                # 提取语言标识
-                lang_match = re.match(r"```(\w+)", line.strip())
-                # ↑ 正则：``` 后跟一串单词字符（python/js/bash…）；≈ Java new Pattern("```(\\w+)") 匹配该行
+                # 提取语言标识与附加信息：```python no-check → lang=python, info="no-check"
+                fence_info = line.strip()[3:].strip()
+                # ↑ 切掉前三个反引号，剩下的就是围栏信息（可能为空）
+                lang_match = re.match(r"(\w+)", fence_info)
+                # ↑ 正则：取开头的一串单词字符作为语言标识（python/js/bash…）
                 current_lang = lang_match.group(1) if lang_match else "unknown"
-                # ↑ group(1) 取第一个捕获组；无语言标识时归为 "unknown"（≈ Matcher.group(1)）
+                # ↑ group(1) 取语言名；无语言标识时归为 "unknown"
+                current_info = fence_info.lower()
+                # ↑ 低case保存，便于后续查找 no-check / nocheck 标记
                 current_code = []                    # 开新块：清空缓存
             else:
                 # 结束代码块
                 in_code_block = False
                 if current_lang in ("python", "py", "unknown"):
-                    # 只验证 Python 代码（含无标识但疑似 Python 的块）
+                    # python/py/unknown 都先登记进来；unknown 会被标记 explicit=False，
+                    # 由 validate_syntax 判为"跳过"，不计入失败（见 validate_syntax）
                     code = "\n".join(current_code)   # 把缓存的行拼回完整源码
                     if code.strip() and not is_output_block(code):
                         # 非空、且不是"输出示例"才收集（输出块不该拿去编译）
+                        no_check = "no-check" in current_info or "nocheck" in current_info
+                        # ↑ 显式标记 ```python no-check 的块：示意代码，只登记不判失败
                         blocks.append(
                             CodeBlock(
                                 file=md_file,
                                 line_no=start_line,
                                 code=code,
                                 language=current_lang,
+                                explicit=(current_lang != "unknown"),
+                                no_check=no_check,
                             )
                         )
                 current_code = []
+                current_info = ""                    # 复位，避免污染下一个块
         elif in_code_block:
             # 非围栏行且处于块内 ⇒ 是代码内容，逐行缓存
             current_code.append(line)
@@ -165,6 +192,26 @@ def validate_syntax(block: CodeBlock) -> ValidationResult:
     使用 ast.parse 检查语法正确性
     """
     code = block.code.strip()   # 去掉首尾空白再校验
+
+    # 跳过显式标记为"示意代码"的块（```python no-check）
+    # 这类块是刻意写成不合法语法的教学片段（如 i++、缺函数体的 if），
+    # 修好它们反而会破坏对比价值，所以只登记、不判失败。
+    if block.no_check:
+        return ValidationResult(
+            block,
+            is_valid=True,
+            warning="Skipped: marked no-check (示意/伪代码)",
+        )
+
+    # 跳过未显式标注语言的围栏（``` 裸围栏）
+    # 这些块里大量是输出、火焰图、目录树、日志片段，
+    # 用 Python 语法去校验它们属于误判，不能计入失败。
+    if not block.explicit:
+        return ValidationResult(
+            block,
+            is_valid=True,
+            warning="Skipped: no language tag (裸围栏，无法判定语言)",
+        )
 
     # 跳过 Java 代码
     if is_java_code(code):
@@ -244,21 +291,45 @@ def scan_directory(docs_dir: Path, verbose: bool = False) -> List[ValidationResu
 
 
 def print_summary(results: List[ValidationResult], verbose: bool = False):
-    """打印验证摘要"""
+    """打印验证摘要
+
+    统计口径说明（重要）：
+      失败数      = 可判定语言且真正解析失败的块
+      跳过数      = 裸围栏（未标注语言）+ 显式 no-check + Java/shell/片段
+      通过率      = 通过 / (通过 + 失败)   ← 分母排除"无法判定"的块
+
+    之前的口径是 valid/total，把 51% 的裸围栏（输出、火焰图、目录树）
+    也算进分母，导致通过率被严重低估、且失败清单里混满误报。
+    """
     total = len(results)
-    valid = sum(1 for r in results if r.is_valid)      # 统计通过数；sum(1 for ...) ≈ 计数循环
-    invalid = total - valid                            # 失败数 = 总数 - 通过数
-    warnings = sum(1 for r in results if r.warning)    # 被跳过的数量（带 warning 的结果）
+    invalid = sum(1 for r in results if not r.is_valid)          # 只算真正解析失败
+    warnings = sum(1 for r in results if r.warning)              # 被跳过的块
+    skipped = warnings                                            # 跳过 == 带 warning 的结果
+    checked = total - skipped                                     # 真正参与校验的块数
+    passed = sum(1 for r in results if r.is_valid and not r.warning)   # 校验且通过
+    rate = (passed / checked * 100) if checked else 100.0         # 分母只含可校验块
 
     print("\n" + "=" * 60)
     print("📊 验证摘要")
     print("=" * 60)
     print(f"总代码块数: {total}")
-    print(f"✅ 语法正确: {valid}")
-    print(f"❌ 语法错误: {invalid}")
-    print(f"⚠️  跳过 (警告): {warnings}")
-    print(f"通过率: {valid / total * 100:.1f}%")
+    print(f"✅ 通过:     {passed}   （显式标注 python 且语法正确）")
+    print(f"❌ 失败:     {invalid}")
+    print(f"⚠️  跳过:     {skipped}   （裸围栏 / no-check / Java / shell / 片段）")
+    print(f"📐 可校验块: {checked}   （通过率分母，已排除无法判定语言的块）")
+    print(f"通过率: {rate:.1f}%")
     print("=" * 60)
+
+    # 按跳过原因分组，方便判断"是真跳过还是掩盖了问题"
+    if skipped:
+        reasons = {}
+        for r in results:
+            if r.warning:
+                reasons[r.warning] = reasons.get(r.warning, 0) + 1
+        print("\n⚠️  跳过原因分布:")
+        for reason, count in sorted(reasons.items(), key=lambda kv: -kv[1]):
+            print(f"  {count:4d}  {reason}")
+        print()
 
     if invalid > 0:
         print("\n❌ 发现语法错误:\n")
@@ -285,6 +356,17 @@ def print_summary(results: List[ValidationResult], verbose: bool = False):
 
 
 def main():
+    """扫描全部文档，抽取其中的 Python 代码块并逐个做语法校验，最后打印汇总。
+
+    退出码约定：0 = 没有语法错误；1 = 存在无法解析的代码块（供 CI 卡门禁）。
+
+    重要：只有【无法解析】才算失败。以下情况一律跳过、不影响退出码：
+      - 裸围栏（``` 未标注语言）：内容可能是输出、火焰图、目录树，无法判定语言
+      - ```python no-check：作者显式标记的示意/伪代码（如 i++、缺函数体的 if）
+      - Java 对照代码、shell 命令、以 ... 结尾的不完整片段
+
+    --verbose  列出被跳过的代码块及原因，并附跳过原因分布
+    """
     # argparse ≈ Java 的 picocli / args4j：声明式定义命令行参数
     parser = argparse.ArgumentParser(
         description="验证 22-Python速成 文档中的代码示例"

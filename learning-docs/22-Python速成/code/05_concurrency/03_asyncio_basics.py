@@ -151,6 +151,12 @@ async def demo_exception() -> None:
 
 
 async def main() -> None:
+    """按固定顺序跑完六个 asyncio 核心用法的演示。
+
+    六个演示刻意用"串行 await"依次调用，是为了让各段输出分块清晰、互不穿插；
+    它们各自内部才是并发展示（gather / TaskGroup / as_completed 等）。
+    真正的并发写法看 demo_gather，对照反面教材看 demo_sequential。
+    """
     # 依次 await 六个演示函数：这里刻意用串行，保证输出顺序清晰可读
     await demo_gather()
     await demo_sequential()

@@ -296,7 +296,7 @@ max_order = max(orders, key=lambda o: o.amount)   # 按金额比较，但返回�
 
 ### 16. Java 式空判
 
-```python
+```python no-check
 # ---- 本段讲：Java 式"非 null 且非空串"判断 ----
 # 反例：两个条件分开写是 Java 的防御习惯；Python 里非空字符串本身就是真值，多数场景可合并。
 # 注意：仅当业务上 None 和 "" 都算"无值"时才能简化，见下面第 3 块的反例。
@@ -306,7 +306,7 @@ if value is not None and value != "":   # 先排除 None（避免与 "" 混淆�
 
 如果业务上空字符串也无意义：
 
-```python
+```python no-check
 # ---- 本段讲：truthiness 简化空值判断 ----
 # 正例：空串、None、空列表、0 等都为假，if value 即"有实际内容吗"；等价 Java 的 StringUtils.isNotBlank 思路。
 if value:   # 简洁，但语义变宽了——0、空列表也会被当作"无值"，见下一块
@@ -315,7 +315,7 @@ if value:   # 简洁，但语义变宽了——0、空列表也会被当作"无�
 
 但数值 `0` 是合法值时不能用 truthiness：
 
-```python
+```python no-check
 # ---- 本段讲：0 是合法值时必须用 is not None ----
 # 反例场景：count=0 是有效数据，但 truthiness 会把 0 当假——这是从 Java 的 != null 迁移时最经典的坑。
 # 判 None 一律用 is/is not（None 是单例，身份比较精确且快），不用 ==。
@@ -436,7 +436,7 @@ create_order(req, notify=True, async_save=False)   # ✅ 正例：参数名即�
 
 边界入口可以收 JSON，但进入核心业务后应有明确模型：
 
-```python
+```python no-check
 # ---- 本段讲：用明确的命令对象代替裸 dict（正例） ----
 # 正例：入口参数是带类型、带字段名的模型，IDE 能补全、静态检查能校验；
 # 相比 Java 传 Map<String,Object>，这里用 dataclass/Pydantic 把契约显式化。

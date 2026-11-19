@@ -129,6 +129,15 @@ async def resilient_call(i: int, *, retries: int = 3, timeout: float = 0.3) -> d
 
 
 async def main() -> None:
+    """依次演示四种 asyncio 限流/韧性方案，最后给出选型对照表。
+
+    1. Semaphore      —— 许可证计数，最直观的并发闸门
+    2. Queue + worker —— 任务数恒定，天然带背压
+    3. 分批 gather    —— 最简单，无需额外并发原语
+    4. 重试 + 超时    —— 真实调用必需的韧性封装（对照项目里的 ResilientAiService）
+
+    共同目标：把"并发度"变成显式参数，避免瞬间创建上万个 Task 打垮下游。
+    """
     print("=" * 60)
     print("1. Semaphore 限流")
     print("=" * 60)

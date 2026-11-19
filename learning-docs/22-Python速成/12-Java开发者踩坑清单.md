@@ -30,9 +30,10 @@ print(-7 % 2)       # 1      Java 是 -1；Python 保证 (a // b) * b + (a % b) 
 
 ### 2. 🔴 `i++` 不存在
 
-```python
+```python no-check
 # ---- 本段讲：Python 没有 ++ / -- 自增自减运算符 ----
 # Java 的 i++ 是表达式；Python 里 ++ 会被当成两个一元加号，但赋值语句 i++ 本身语法非法。
+# 本块刻意保留无法解析的写法，用于演示报错；校验器按 no-check 跳过。
 i = 0
 i++          # SyntaxError: invalid syntax   ← 整行无法解析，运行前就报错
 i += 1       # ✅ 自增只能写复合赋值；同理自减用 i -= 1
@@ -79,7 +80,7 @@ def add(item, lst=None):     # ✅
 
 ### 5. 🔴 `== None` 而不是 `is None`（以及小整数驻留）
 
-```python
+```python no-check
 # ---- 本段讲：判 None 用 is 不用 ==；is 比较身份、== 比较值 ----
 # is 判断「是不是同一个对象」（Java 的 ==）；== 判断「值是否相等」（Java 的 equals）。
 # 注意下面两个 if 都没有函数体，仅用于演示写法，真实代码必须补上缩进的语句。
@@ -599,9 +600,10 @@ open("a.csv", "w", encoding="utf-8-sig", newline="")   # newline="" 交给 csv �
 
 ### 38. 🔴 CSV 写入不加 `newline=""`
 
-```python
+```python no-check
 # ---- 本段讲：csv 写入不加 newline="" 会在 Windows 上多出空行 ----
 # csv 模块自己会写 \r\n；文本模式又做一次换行转换，\r\n 变成 \r\r\n，看起来就是空行。
+# 本块只演示 with 语句头的差异，省略了块内语句，故标记 no-check。
 # ❌ Windows 上每行之间多一个空行
 with open("a.csv", "w", encoding="utf-8") as f:
     csv.writer(f).writerow([1, 2])      # 每写一行就多插一个空行
