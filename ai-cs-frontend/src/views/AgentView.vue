@@ -74,9 +74,11 @@ import { getToken } from '../utils/auth'
 import { ElMessage } from 'element-plus'
 import { Promotion } from '@element-plus/icons-vue'
 import { buildAgentConfirmRequest, buildAgentRequest, nextAgentRunId } from './agentRequest.js'
+import { API_BASE } from '../utils/runtime'
 
 // 流式端点直连网关（fetch + ReadableStream，axios 不支持流式响应）
-const GATEWAY = import.meta.env.VITE_GATEWAY || 'http://localhost:8080'
+// API_BASE 指向 `${GATEWAY}/api`；生产构建 VITE_GATEWAY 为空 => 同源相对路径 /api，走 Nginx 反代
+const API_ROOT = API_BASE
 
 const messages = ref([])
 const input = ref('')
@@ -120,7 +122,7 @@ async function send() {
   await scroll()
 
   try {
-    const resp = await fetch(`${GATEWAY}/api/agent/stream/sse`, {
+    const resp = await fetch(`${API_ROOT}/agent/stream/sse`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

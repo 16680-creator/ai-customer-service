@@ -82,7 +82,7 @@ const msgForm = ref({ sessionId: '', content: '', role: 'user' })
 
 async function createSession() {
   try {
-    const res = await messageApi.post('/session', null, { params: { userId: userId.value, title: sessionTitle.value } })
+    await messageApi.post('/session', null, { params: { userId: userId.value, title: sessionTitle.value } })
     ElMessage.success('会话创建成功')
     fetchSessions()
   } catch (e) {

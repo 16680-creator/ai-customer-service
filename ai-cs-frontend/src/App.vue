@@ -94,7 +94,7 @@
 import { useRoute, useRouter } from 'vue-router'
 import { computed, ref, watch } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
-import { Goods, ArrowDown, ShoppingCart, List, Files, Connection } from '@element-plus/icons-vue'
+import { Goods, ArrowDown, ShoppingCart, Files, Connection } from '@element-plus/icons-vue'
 import { getUser, logout } from './utils/auth'
 
 const route = useRoute()

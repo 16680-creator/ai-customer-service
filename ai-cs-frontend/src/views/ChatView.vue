@@ -146,7 +146,19 @@
               <el-button :icon="Picture" :disabled="sending" title="上传图片" style="height: 54px" />
             </el-upload>
             <el-button v-if="uploadedImageUrl" type="warning" :icon="Delete" @click="clearImage" title="移除图片" style="margin-left: 6px; height: 54px" />
-            <el-button type="primary" @click="sendMessage" :loading="sending" :icon="Promotion" style="margin-left: 10px; height: 54px">
+            <!-- 生成中显示「停止生成」，替换发送按钮：流式回答可能很长，用户必须能随时中断 -->
+            <el-button
+              v-if="sending"
+              type="danger"
+              plain
+              :icon="VideoPause"
+              class="stop-btn"
+              style="margin-left: 10px; height: 54px"
+              @click="stopGenerating"
+            >
+              停止生成
+            </el-button>
+            <el-button v-else type="primary" @click="sendMessage" :icon="Promotion" style="margin-left: 10px; height: 54px">
               发送
             </el-button>
           </div>
@@ -161,9 +173,15 @@ import { ref, watch, nextTick } from 'vue'
 import { getToken, getUser } from '../utils/auth'
 import { chatApi, messageApi, visionApi, feedbackApi } from '../api'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Promotion, Document, Delete, Picture, CaretTop, CaretBottom } from '@element-plus/icons-vue'
+import { Plus, Promotion, Document, Delete, Picture, CaretTop, CaretBottom, VideoPause } from '@element-plus/icons-vue'
+import { API_BASE } from '../utils/runtime'
 
-const GATEWAY = import.meta.env.VITE_GATEWAY || 'http://localhost:8080'
+// 网关地址统一从 utils/runtime.js 取。开发期是 http://localhost:8080；
+// 生产构建 .env.production 里 VITE_GATEWAY 留空，于是 API_ROOT 为 ''，
+// 请求变成同源相对路径 /api/chat/...，由 Nginx 反代到网关，免 CORS。
+// 不要退回 `import.meta.env.VITE_GATEWAY || 'http://localhost:8080'`：
+// 空串是 falsy，生产会退化成 localhost，浏览器去敲用户自己的 8080 端口，直接白屏。
+const API_ROOT = API_BASE
 
 /** 获取当前登录用户 ID */
 function getUserId() {
@@ -179,6 +197,10 @@ const sessionMessages = ref({})
 const currentMessages = ref([])
 const inputMessage = ref('')
 const sending = ref(false)
+// 停止生成：AbortController 打断 fetch 流；stopRequested 区分「用户主动停止」和「真网络异常」，
+// 前者不该弹红色错误（用户就是要它停），后者才提示连接中断。
+let abortController = null
+const stopRequested = ref(false)
 const messagesRef = ref(null)
 const chatMode = ref('normal')
 const knowledgeBase = ref('')
@@ -353,6 +375,8 @@ async function sendMessage() {
   inputMessage.value = ''
   uploadedImageUrl.value = ''
   sending.value = true
+  stopRequested.value = false
+  abortController = new AbortController()
   await scrollToBottom()
 
   // 预置空回复气泡，流式填充（需持响应式代理引用，逐 token 追加才会触发视图更新）
@@ -367,9 +391,10 @@ async function sendMessage() {
 
     // 有图片走图片对话 SSE，无图片走普通 SSE
     const endpoint = imageUrl ? 'vision/sse' : 'stream/sse'
-    const resp = await fetch(`${GATEWAY}/api/chat/${endpoint}?${params}`, {
+    const resp = await fetch(`${API_ROOT}/chat/${endpoint}?${params}`, {
       method: 'POST',
-      headers: { Authorization: 'Bearer ' + (getToken() || '') }
+      headers: { Authorization: 'Bearer ' + (getToken() || '') },
+      signal: abortController.signal
     })
     if (!resp.ok || !resp.body) throw new Error('HTTP ' + resp.status)
 
@@ -414,14 +439,30 @@ async function sendMessage() {
     if (streamError) throw new Error(streamError)
     if (!assistant.content) assistant.content = '(无回复)'
   } catch (e) {
+    // 用户主动点了「停止生成」：保留已收到的内容，加一行标记，不弹错误
+    // （弹红色报错会让用户以为自己操作错了，其实这是预期行为）
+    if (stopRequested.value || e?.name === 'AbortError') {
+      assistant.content = assistant.content
+        ? assistant.content + '\n\n_（已停止生成）_'
+        : '（已停止生成）'
+      return
+    }
     // 区分"连接被中止"（页面刷新/重复发送导致浏览器中断 fetch）与真实业务错误
-    const aborted = e?.name === 'AbortError' || e?.message?.includes('Failed to fetch')
+    const aborted = e?.message?.includes('Failed to fetch')
     assistant.content = aborted ? '⚠️ 连接中断，回复未完成，请重试。' : ('❌ 错误: ' + (e.message || '请求失败'))
     ElMessage.error(aborted ? '对话连接中断，请重试' : '对话请求失败: ' + (e.message || ''))
   } finally {
+    abortController = null
     sending.value = false
     await scrollToBottom()
   }
+}
+
+/** 停止生成：中断进行中的 SSE fetch（已收到的 token 保留在气泡里） */
+function stopGenerating() {
+  if (!sending.value || !abortController) return
+  stopRequested.value = true
+  abortController.abort()
 }
 
 async function scrollToBottom() {

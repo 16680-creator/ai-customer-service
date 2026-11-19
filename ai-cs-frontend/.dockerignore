@@ -1,0 +1,28 @@
+node_modules
+dist
+dist-ssr
+*.local
+.env.local
+.env.*.local
+
+# 构建上下文里绝不能带 .git（否则 COPY . . 会把整个仓库历史塞进构建层）
+.git
+.gitignore
+
+# ESLint cache
+.eslintcache
+coverage
+
+# Editor
+.idea
+.vscode/*
+!.vscode/extensions.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# 本地日志
+*.log
+npm-debug.log*

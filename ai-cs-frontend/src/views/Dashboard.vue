@@ -94,12 +94,13 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import {
   ChatLineSquare, Collection, User, Search, ShoppingCart, Tickets, Goods,
-  Message, Bell, Files, Refresh, ChatDotRound, Monitor, Connection,
+  Message, Bell, Files, Refresh, ChatDotRound, Connection,
   Star, Document, Cpu, Share, DataAnalysis
 } from '@element-plus/icons-vue'
 import axios from 'axios'
 import { notifyApi, messageApi } from '../api'
 import { getUser } from '../utils/auth'
+import { API_BASE } from '../utils/runtime'
 
 const services = ref([])
 const loadingHealth = ref(false)
@@ -119,7 +120,7 @@ const stats = computed(() => [
 async function loadHealth() {
   loadingHealth.value = true
   try {
-    const { data } = await axios.get('http://localhost:8080/api/health', { timeout: 10000 })
+    const { data } = await axios.get(`${API_BASE}/health`, { timeout: 10000 })
     services.value = Array.isArray(data) ? data : (data?.data || [])
     const now = new Date()
     lastUpdate.value = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`

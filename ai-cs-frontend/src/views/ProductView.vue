@@ -168,9 +168,11 @@ import { productApi } from '../api'
 import { getToken } from '../utils/auth'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Plus, CopyDocument, UploadFilled } from '@element-plus/icons-vue'
+import { API_BASE } from '../utils/runtime'
 
-const GATEWAY = import.meta.env.VITE_GATEWAY || 'http://localhost:8080'
-const uploadUrl = `${GATEWAY}/api/product/upload-image`
+// 上传地址同样走统一网关解析（生产为同源相对路径，Nginx 反代 /api 到网关）
+const API_ROOT = API_BASE
+const uploadUrl = `${API_ROOT}/product/upload-image`
 const uploadHeaders = { Authorization: 'Bearer ' + (getToken() || '') }
 const uploadedUrl = ref('')
 

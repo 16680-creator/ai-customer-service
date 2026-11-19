@@ -71,7 +71,6 @@ const orderNo = route.query.orderNo || ''
 const amount = route.query.amount || '-'
 const payType = route.query.payType || 'REDIRECT'
 const codeUrl = route.query.codeUrl || ''
-const payUrl = route.query.payUrl || ''
 const expireTime = route.query.expireTime || ''
 const remainMs = ref(0)
 const expired = ref(false)

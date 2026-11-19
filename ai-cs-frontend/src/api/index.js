@@ -1,11 +1,12 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import { getToken, logout } from '../utils/auth'
+import { API_BASE } from '../utils/runtime'
 
 // 所有请求统一走网关（网关负责鉴权 + 路由转发到各微服务）
-// 开发/本地：网关地址 http://localhost:8080，可用 VITE_GATEWAY 环境变量覆盖
-const GATEWAY = import.meta.env.VITE_GATEWAY || 'http://localhost:8080'
-const BASE_URL = `${GATEWAY}/api`
+// 地址解析见 utils/runtime.js：生产构建里 VITE_GATEWAY 留空 => 相对路径 /api，
+// 由同源 Nginx 反代到网关（无跨域、无预检）；开发期由 vite proxy 转发。
+const BASE_URL = API_BASE
 
 // 各服务的 API 前缀（网关 stripPrefix(1) 后对应各服务 Controller 路径）
 const SERVICES = {

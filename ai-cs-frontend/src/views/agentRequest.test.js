@@ -1,33 +1,34 @@
-import test from 'node:test'
-import assert from 'node:assert/strict'
+import { describe, expect, it } from 'vitest'
 
 import { buildAgentConfirmRequest, buildAgentRequest, nextAgentRunId } from './agentRequest.js'
 
-test('includes the latest runId when continuing an agent conversation', () => {
-  assert.deepEqual(buildAgentRequest(1787387874147, '20260812215541010002', 'run-123'), {
-    sessionId: 1787387874147,
-    input: '20260812215541010002',
-    runId: 'run-123',
+describe('agentRequest：Agent 请求体契约', () => {
+  it('继续对话时携带上一次的 runId', () => {
+    expect(buildAgentRequest(1787387874147, '20260812215541010002', 'run-123')).toEqual({
+      sessionId: 1787387874147,
+      input: '20260812215541010002',
+      runId: 'run-123',
+    })
   })
-})
 
-test('omits runId when starting a new agent conversation', () => {
-  assert.deepEqual(buildAgentRequest(1787387874147, '我要申请退款', null), {
-    sessionId: 1787387874147,
-    input: '我要申请退款',
+  it('新对话不携带 runId 字段', () => {
+    const request = buildAgentRequest(1787387874147, '我要申请退款', null)
+    expect(request).toEqual({ sessionId: 1787387874147, input: '我要申请退款' })
+    expect('runId' in request).toBe(false)
   })
-})
 
-test('keeps a run active only while the agent is waiting for user input', () => {
-  assert.equal(nextAgentRunId({ runId: 'run-123', needsUserInput: true }), 'run-123')
-  assert.equal(nextAgentRunId({ runId: 'run-123', needsUserInput: false }), null)
-})
+  it('仅当后端要求补充输入时保留 runId', () => {
+    expect(nextAgentRunId({ runId: 'run-123', needsUserInput: true })).toBe('run-123')
+    expect(nextAgentRunId({ runId: 'run-123', needsUserInput: false })).toBeNull()
+    expect(nextAgentRunId(undefined)).toBeNull()
+  })
 
-test('uses the backend confirmation contract when confirming an action', () => {
-  assert.deepEqual(buildAgentConfirmRequest(1787387874147, 'run-123', 'token-456'), {
-    sessionId: 1787387874147,
-    runId: 'run-123',
-    token: 'token-456',
-    decision: 'CONFIRM',
+  it('确认动作使用后端约定的字段', () => {
+    expect(buildAgentConfirmRequest(1787387874147, 'run-123', 'token-456')).toEqual({
+      sessionId: 1787387874147,
+      runId: 'run-123',
+      token: 'token-456',
+      decision: 'CONFIRM',
+    })
   })
 })
