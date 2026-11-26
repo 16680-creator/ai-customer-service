@@ -1,5 +1,6 @@
 package com.aics.user.security;
 
+import com.aics.common.autoconfigure.Jackson2AutoConfiguration;
 import com.aics.common.result.Result;
 import com.aics.user.controller.UserController;
 import com.aics.user.mapper.UserMapper;
@@ -8,8 +9,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -26,17 +27,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.cloud.nacos.discovery.enabled=false",
         "spring.config.import="
 })
-@Import({UserSecurityConfig.class, HeaderAuthenticationFilter.class})
+@Import({UserSecurityConfig.class, HeaderAuthenticationFilter.class, Jackson2AutoConfiguration.class})
 class UserSecurityIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean
+    @MockitoBean
     private UserService userService;
 
     // UserApplication 的 @MapperScan 在 MVC 切片里仍会注册 Mapper，mock 掉以隔离持久层
-    @MockBean
+    @MockitoBean
     private UserMapper userMapper;
 
     @Test

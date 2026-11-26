@@ -60,7 +60,7 @@ class HotQaCacheServiceTest {
             zsetStore.merge((String) inv.getArgument(1), inv.getArgument(2), Double::sum);
             return zsetStore.get(inv.getArgument(1));
         });
-        lenient().when(redisTemplate.expire(anyString(), any())).thenReturn(true);
+        lenient().when(redisTemplate.expire(anyString(), any(java.time.Duration.class))).thenReturn(true);
 
         CacheProperties properties = new CacheProperties();
         properties.getHotQa().setPromoteThreshold(3);

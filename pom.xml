@@ -36,13 +36,15 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
         <!-- Spring Boot & Cloud -->
-        <spring-boot.version>3.2.5</spring-boot.version>
-        <spring-cloud.version>2023.0.1</spring-cloud.version>
-        <spring-cloud-alibaba.version>2023.0.1.0</spring-cloud-alibaba.version>
-        <spring-ai.version>1.1.4</spring-ai.version>
+        <spring-boot.version>4.2.0</spring-boot.version>
+        <spring-cloud.version>2026.0.0</spring-cloud.version>
+        <spring-cloud-alibaba.version>2025.1.0.0</spring-cloud-alibaba.version>
+        <spring-ai.version>2.1.0</spring-ai.version>
+        <openai-java.version>4.101.0</openai-java.version>
 
         <!-- Database & ORM -->
-        <mybatis-plus.version>3.5.6</mybatis-plus.version>
+        <!-- Boot 4 starter 自 3.5.13 起提供；沿用该分支首个稳定兼容版本 -->
+        <mybatis-plus.version>3.5.13</mybatis-plus.version>
         <shardingsphere.version>5.5.0</shardingsphere.version>
         <mysql-connector.version>8.0.33</mysql-connector.version>
 
@@ -72,7 +74,7 @@
         <embedded-redis.version>0.7.3</embedded-redis.version>
 
         <!-- Resilience4j -->
-        <resilience4j.version>2.2.0</resilience4j.version>
+        <resilience4j.version>2.4.0</resilience4j.version>
 
         <!-- 分布式协调 -->
         <redisson.version>3.27.2</redisson.version>
@@ -118,10 +120,23 @@
                 <scope>import</scope>
             </dependency>
 
+            <!-- OpenAI Java SDK 的 HTTP 实现；与 Spring AI 2.1.0 使用的 SDK 版本一致 -->
+            <dependency>
+                <groupId>com.openai</groupId>
+                <artifactId>openai-java-client-okhttp</artifactId>
+                <version>${openai-java.version}</version>
+            </dependency>
+
             <!-- MyBatis-Plus -->
             <dependency>
                 <groupId>com.baomidou</groupId>
-                <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+                <artifactId>mybatis-plus-spring-boot4-starter</artifactId>
+                <version>${mybatis-plus.version}</version>
+            </dependency>
+            <!-- 分页插件在 3.5.13 拆分为独立模块，需要随 Boot 4 starter 显式引入 -->
+            <dependency>
+                <groupId>com.baomidou</groupId>
+                <artifactId>mybatis-plus-jsqlparser</artifactId>
                 <version>${mybatis-plus.version}</version>
             </dependency>
 
@@ -176,6 +191,13 @@
                 <groupId>io.minio</groupId>
                 <artifactId>minio</artifactId>
                 <version>${minio.version}</version>
+            </dependency>
+            <!-- Spring AI 2.1 的 Tika 4 / POI 5.5.1 要求 Commons Compress 1.28.0，
+                 避免 MinIO 传递的 1.26.0 导致文档格式探测失败。 -->
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-compress</artifactId>
+                <version>1.28.0</version>
             </dependency>
 
             <!-- JWT -->

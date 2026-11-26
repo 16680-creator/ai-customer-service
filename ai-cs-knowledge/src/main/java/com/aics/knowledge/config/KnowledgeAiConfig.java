@@ -1,12 +1,13 @@
 package com.aics.knowledge.config;
 
+import com.openai.client.OpenAIClient;
+import com.openai.client.okhttp.OpenAIOkHttpClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.document.MetadataMode;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.openai.OpenAiEmbeddingModel;
 import org.springframework.ai.openai.OpenAiEmbeddingOptions;
-import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -56,12 +57,12 @@ public class KnowledgeAiConfig {
     public EmbeddingModel knowledgeEmbeddingModel() {
         log.info("创建知识库 EmbeddingModel: base-url={}, model={}", embeddingBaseUrl, embeddingModel);
         // 基于 OpenAI 协议构建 API 客户端（硅基流动兼容 OpenAI 接口）
-        OpenAiApi api = OpenAiApi.builder()
+        OpenAIClient client = OpenAIOkHttpClient.builder()
                 .baseUrl(embeddingBaseUrl)
                 .apiKey(embeddingApiKey)
                 .build();
         // MetadataMode.EMBED：仅对文档内容做 Embedding，元数据不参与向量化
-        return new OpenAiEmbeddingModel(api, MetadataMode.EMBED,
+        return new OpenAiEmbeddingModel(client, MetadataMode.EMBED,
                 OpenAiEmbeddingOptions.builder().model(embeddingModel).build());
     }
 }

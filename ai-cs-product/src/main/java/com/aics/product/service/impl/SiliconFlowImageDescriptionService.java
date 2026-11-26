@@ -7,7 +7,8 @@ import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.content.Media;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
-import org.springframework.ai.openai.api.OpenAiApi;
+import com.openai.client.OpenAIClient;
+import com.openai.client.okhttp.OpenAIOkHttpClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
@@ -54,13 +55,14 @@ public class SiliconFlowImageDescriptionService implements ImageDescriptionServi
 
     private void init() {
         if (enabled && StringUtils.hasText(apiKey)) {
-            OpenAiApi api = OpenAiApi.builder()
+            OpenAIClient client = OpenAIOkHttpClient.builder()
                     .baseUrl(baseUrl)
                     .apiKey(apiKey)
                     .build();
             this.visionModel = OpenAiChatModel.builder()
-                    .openAiApi(api)
-                    .defaultOptions(OpenAiChatOptions.builder().model(model).build())
+                    .openAiClient(client)
+                    .openAiClientAsync(client.async())
+                    .options(OpenAiChatOptions.builder().model(model).build())
                     .build();
             log.info("商品图片视觉模型已初始化: model={}", model);
         } else {

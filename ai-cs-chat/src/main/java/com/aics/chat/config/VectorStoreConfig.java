@@ -1,6 +1,19 @@
 package com.aics.chat.config;
 
+import io.micrometer.observation.ObservationRegistry;
+import org.springframework.aop.framework.ProxyFactory;
+import org.springframework.ai.chroma.vectorstore.ChromaApi;
+import org.springframework.ai.chroma.vectorstore.ChromaVectorStore;
+import org.springframework.ai.embedding.BatchingStrategy;
+import org.springframework.ai.embedding.EmbeddingModel;
+import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.vectorstore.chroma.autoconfigure.ChromaVectorStoreProperties;
+import org.springframework.ai.vectorstore.observation.VectorStoreObservationConvention;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.context.annotation.Primary;
 
 /**
  * 向量存储（VectorStore）配置 —— RAG 检索增强生成的核心存储层。
@@ -13,12 +26,14 @@ import org.springframework.context.annotation.Configuration;
  *   EmbeddingModel → 由 ai-cs-common 提供：
  *                     - aics.ai.embedding.provider=local（默认） → HashEmbeddingModel（零依赖哈希向量）
  *                     - aics.ai.embedding.provider=openai       → OpenAI 兼容向量（需配 spring.ai.openai.*）
- *   VectorStore    → ChromaVectorStore（由 spring-ai-starter-vector-store-chroma 自动装配）
+ *   VectorStore    → 本类基于 Chroma starter 的 API/配置声明，并覆盖自动装配以支持延迟创建
  *                    连接配置见 application.yml 的 spring.ai.vectorstore.chroma.*
  * </pre>
  *
- * <p>本类不声明任何 @Bean：Chroma 的 VectorStore 由 starter 依据
- * {@code spring.ai.vectorstore.chroma.*} 自动装配，业务层只需注入 {@code VectorStore} 接口即可。</p>
+ * <p>本类通过显式接口代理延迟创建 Chroma Bean。Spring AI 2.1 的
+ * {@code ChromaVectorStore} 实现了 {@code InitializingBean}，即使
+ * {@code initialize-schema=false}，容器创建实例时仍会查询远端集合。延迟到首次 RAG
+ * 操作时创建，可以让未启动 Chroma 的服务完成启动；实际入库/检索仍需可达的 Chroma。</p>
  *
  * <h3>切换为其他向量库</h3>
  * <p>当前用 Chroma 实现 {@code VectorStore} 接口。若要换回内存版（本地零依赖快速验证）或
@@ -39,5 +54,38 @@ import org.springframework.context.annotation.Configuration;
  */
 @Configuration
 public class VectorStoreConfig {
-    // 无需手动创建 Bean：spring-ai-starter-vector-store-chroma 已自动装配 ChromaVectorStore
+
+    @Bean
+    @Primary
+    public VectorStore vectorStore(@Lazy ChromaVectorStore chromaVectorStore) {
+        // @Lazy 无法可靠覆盖接口注入的初始化；显式代理仅在首次 VectorStore 方法调用时解析目标 Bean。
+        ProxyFactory proxyFactory = new ProxyFactory();
+        proxyFactory.setInterfaces(VectorStore.class);
+        proxyFactory.setTargetSource(new org.springframework.aop.target.LazyInitTargetSource() {
+            @Override
+            public Object getTarget() {
+                return chromaVectorStore;
+            }
+        });
+        return (VectorStore) proxyFactory.getProxy();
+    }
+
+    @Bean
+    @Lazy
+    public ChromaVectorStore chromaVectorStore(EmbeddingModel embeddingModel,
+                                               ChromaApi chromaApi,
+                                               ChromaVectorStoreProperties storeProperties,
+                                               ObjectProvider<ObservationRegistry> observationRegistry,
+                                               ObjectProvider<VectorStoreObservationConvention> customObservationConvention,
+                                               BatchingStrategy chromaBatchingStrategy) {
+        return ChromaVectorStore.builder(chromaApi, embeddingModel)
+                .collectionName(storeProperties.getCollectionName())
+                .databaseName(storeProperties.getDatabaseName())
+                .tenantName(storeProperties.getTenantName())
+                .initializeSchema(storeProperties.isInitializeSchema())
+                .observationRegistry(observationRegistry.getIfUnique(() -> ObservationRegistry.NOOP))
+                .customObservationConvention(customObservationConvention.getIfAvailable())
+                .batchingStrategy(chromaBatchingStrategy)
+                .build();
+    }
 }

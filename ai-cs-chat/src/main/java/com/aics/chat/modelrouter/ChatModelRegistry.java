@@ -1,5 +1,7 @@
 package com.aics.chat.modelrouter;
 
+import com.openai.client.OpenAIClient;
+import com.openai.client.okhttp.OpenAIOkHttpClient;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -7,7 +9,6 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
-import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.cloud.context.scope.refresh.RefreshScopeRefreshedEvent;
 import org.springframework.context.event.EventListener;
@@ -54,19 +55,24 @@ public class ChatModelRegistry {
                     next.put(definition.getId(), existing);
                     continue;
                 }
-                // 设计要点：每个模型持有独立 OpenAiApi/OpenAiChatModel——不同 baseUrl/apiKey 无法共享底层客户端，隔离也防止单模型配置污染其他模型
-                OpenAiApi api = OpenAiApi.builder()
+                // 2.1 使用官方 OpenAI Java SDK；同步/流式异步客户端必须共享同一份 base-url 与凭据。
+                // 仅传同步客户端会让 Builder 在流式路径回退到环境变量并丢失自定义供应商配置。
+                OpenAIClient client = OpenAIOkHttpClient.builder()
                         .baseUrl(definition.getBaseUrl())
                         .apiKey(definition.getApiKey())
                         .build();
                 OpenAiChatModel chatModel = OpenAiChatModel.builder()
-                        .openAiApi(api)
-                        .defaultOptions(OpenAiChatOptions.builder().model(definition.getModel()).build())
+                        .openAiClient(client)
+                        .openAiClientAsync(client.async())
+                        .options(OpenAiChatOptions.builder()
+                                .model(definition.getModel())
+                                .temperature(properties.getTemperature())
+                                .maxTokens(properties.getMaxTokens())
+                                .build())
                         .build();
                 ChatClient.Builder builder = chatClientCustomizer.customize(ChatClient.builder(chatModel));
                 // 设计要点：只有声明 TOOL_CALLING 能力的模型才挂工具回调，避免不支持函数调用的模型收到工具声明后报错
-                // 【工具调用标注】这里是 toolcall 的挂载点 —— 流式（.stream()）与非流式（.call()）共用该 ChatClient；
-                //   流式时工具的实际执行发生在 Spring AI 内部（见 ResilientAiService.callSseStream 注释）
+                // 【工具调用标注】显式保留现有 ToolCallbackProvider，避免依赖 2.x 默认关闭的 Bean 工具回退解析。
                 if (definition.getCapabilities().contains(ModelCapability.TOOL_CALLING)) {
                     builder = builder.defaultToolCallbacks(toolCallbackProvider);
                 }

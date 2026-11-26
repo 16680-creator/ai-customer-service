@@ -124,7 +124,7 @@ class ProductServiceTest {
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> productService.createProduct(dto));
         assertTrue(ex.getMessage().contains("已存在"));
-        verify(productMapper, never()).insert(any());
+        verify(productMapper, never()).insert(any(Product.class));
     }
 
     @Test
@@ -222,7 +222,7 @@ class ProductServiceTest {
         ProductVO result = productService.updateProduct(1L, dto);
 
         assertNotNull(result);
-        verify(productMapper).updateById(argThat(p ->
+        verify(productMapper).updateById(argThat((Product p) ->
                 "升级版蓝牙耳机".equals(p.getName()) &&
                 new BigDecimal("259.00").equals(p.getPrice())));
     }
@@ -237,7 +237,7 @@ class ProductServiceTest {
 
         assertThrows(BusinessException.class,
                 () -> productService.updateProduct(999L, dto));
-        verify(productMapper, never()).updateById(any());
+        verify(productMapper, never()).updateById(any(Product.class));
     }
 
     // ==================== 删除商品 ====================
@@ -286,7 +286,7 @@ class ProductServiceTest {
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> productService.deductStock(1L, 200));
         assertTrue(ex.getMessage().contains("库存不足"));
-        verify(productMapper, never()).updateById(any());
+        verify(productMapper, never()).updateById(any(Product.class));
     }
 
     @Test

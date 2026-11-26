@@ -26,7 +26,8 @@ spring:
   ai:
     vectorstore:
       chroma:
-        initialize-schema: true
+        # 启动时不调用远端 Chroma；实际入库/检索仍需可达的 Chroma 服务。
+        initialize-schema: false
         collection-name: aics-knowledge
         client:
           host: http://${aics.mysql.host:localhost}

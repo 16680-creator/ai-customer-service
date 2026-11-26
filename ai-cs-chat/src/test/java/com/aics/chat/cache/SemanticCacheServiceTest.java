@@ -63,7 +63,7 @@ class SemanticCacheServiceTest {
         lenient().when(zsetOps.zCard(anyString())).thenAnswer(inv -> (long) zsetStore.size());
         lenient().when(zsetOps.range(anyString(), anyLong(), anyLong())).thenAnswer(
                 inv -> java.util.Collections.emptySet());
-        lenient().when(redisTemplate.expire(anyString(), any())).thenReturn(true);
+        lenient().when(redisTemplate.expire(anyString(), any(java.time.Duration.class))).thenReturn(true);
 
         CacheProperties properties = new CacheProperties();
         properties.getSemantic().setThreshold(0.92);

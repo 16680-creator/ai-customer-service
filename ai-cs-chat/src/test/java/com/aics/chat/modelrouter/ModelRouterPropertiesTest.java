@@ -9,7 +9,25 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.ai.tool.ToolCallback;
+
 class ModelRouterPropertiesTest {
+
+    @Test
+    void registry_appliesModelAndTemperatureWithoutNetworkCall() {
+        ModelRouterProperties properties = new ModelRouterProperties();
+        properties.setModels(List.of(model("deepseek-chat", "deepseek")));
+        ChatModelRegistry registry = new ChatModelRegistry(properties, builder -> builder,
+                () -> new ToolCallback[0], null);
+
+        registry.init();
+
+        OpenAiChatOptions options = registry.get("deepseek-chat").getChatModel().getOptions();
+        assertEquals("deepseek-chat", options.getModel());
+        assertEquals(0.7, options.getTemperature());
+        assertEquals(2048, options.getMaxTokens());
+    }
 
     @Test
     void validate_rejectsDuplicateModelId() {

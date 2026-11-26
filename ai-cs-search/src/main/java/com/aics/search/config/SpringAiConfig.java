@@ -5,7 +5,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.openai.OpenAiEmbeddingModel;
 import org.springframework.ai.openai.OpenAiEmbeddingOptions;
-import org.springframework.ai.openai.api.OpenAiApi;
+import com.openai.client.OpenAIClient;
+import com.openai.client.okhttp.OpenAIOkHttpClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -40,11 +41,11 @@ public class SpringAiConfig {
     @Primary
     public EmbeddingModel siliconFlowEmbeddingModel() {
         log.info("创建硅基流动 EmbeddingModel(base-url={}, model={})", embeddingBaseUrl, embeddingModel);
-        OpenAiApi embeddingApi = OpenAiApi.builder()
+        OpenAIClient embeddingClient = OpenAIOkHttpClient.builder()
                 .baseUrl(embeddingBaseUrl)
                 .apiKey(embeddingApiKey)
                 .build();
-        return new OpenAiEmbeddingModel(embeddingApi,
+        return new OpenAiEmbeddingModel(embeddingClient,
                 org.springframework.ai.document.MetadataMode.EMBED,
                 OpenAiEmbeddingOptions.builder().model(embeddingModel).build());
     }

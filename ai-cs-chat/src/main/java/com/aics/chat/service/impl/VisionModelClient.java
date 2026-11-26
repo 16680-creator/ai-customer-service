@@ -4,6 +4,8 @@ import com.aics.chat.config.VisionProperties;
 import com.aics.chat.observability.ModelUsageRecorder;
 import com.aics.chat.observability.TraceContext;
 import com.aics.chat.observability.TraceContextHolder;
+import com.openai.client.OpenAIClient;
+import com.openai.client.okhttp.OpenAIOkHttpClient;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
 import io.github.resilience4j.timelimiter.annotation.TimeLimiter;
@@ -18,7 +20,6 @@ import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.content.Media;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
-import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.stereotype.Service;
 import org.springframework.util.MimeTypeUtils;
 import org.springframework.util.StringUtils;
@@ -116,13 +117,14 @@ public class VisionModelClient {
             log.warn("视觉模型未启用或未配置 API Key，图片对话将降级为纯文本");
             return;
         }
-        OpenAiApi api = OpenAiApi.builder()
+        OpenAIClient client = OpenAIOkHttpClient.builder()
                 .baseUrl(visionProperties.getBaseUrl())
                 .apiKey(visionProperties.getApiKey())
                 .build();
         this.visionModel = OpenAiChatModel.builder()
-                .openAiApi(api)
-                .defaultOptions(OpenAiChatOptions.builder().model(visionProperties.getModel()).build())
+                .openAiClient(client)
+                .openAiClientAsync(client.async())
+                .options(OpenAiChatOptions.builder().model(visionProperties.getModel()).build())
                 .build();
         log.info("视觉模型已初始化: model={}", visionProperties.getModel());
     }

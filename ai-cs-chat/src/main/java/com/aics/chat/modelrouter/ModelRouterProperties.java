@@ -23,6 +23,9 @@ import java.util.Set;
 public class ModelRouterProperties {
 
     private boolean enabled = true;
+    // 路由模型绕过 spring.ai.openai 自动配置，默认参数必须在这里显式声明。
+    private Double temperature = 0.7;
+    private Integer maxTokens = 2048;
     private List<ModelDefinition> models = new ArrayList<>();
     private Map<ModelScenario, ScenarioRoute> scenarios = new EnumMap<>(ModelScenario.class);
     private QuotaRouteProperties quota = new QuotaRouteProperties();

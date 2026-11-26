@@ -35,11 +35,17 @@ spring:
   ai:
     # 禁用 Spring AI 内置 Embedding 自动装配（由 SpringAiConfig 手动提供）
     model:
-      embedding:
-        enabled: false
+      embedding: none
+    # 本地兜底配置：Nacos 的 ai-cs-chat.yml 负责提供模型名等生产配置。
+    openai:
+      base-url: ${OPENAI_BASE_URL:https://api.deepseek.com}
+      chat:
+        model: ${OPENAI_MODEL:deepseek-chat}
+        temperature: ${OPENAI_TEMPERATURE:0.7}
     vectorstore:
       chroma:
-        initialize-schema: true
+        # 启动时不调用远端 Chroma；RAG 使用前仍需启动可达的 Chroma 服务。
+        initialize-schema: false
         collection-name: aics-knowledge
         client:
           host: http://${aics.mysql.host:localhost}

@@ -3,3 +3,4 @@ com.aics.common.autoconfigure.MinioAutoConfiguration
 com.aics.common.ai.embedding.EmbeddingAutoConfig
 com.aics.common.idempotent.IdempotentAutoConfiguration
 com.aics.common.mq.MessagePublisherAutoConfiguration
+com.aics.common.autoconfigure.Jackson2AutoConfiguration

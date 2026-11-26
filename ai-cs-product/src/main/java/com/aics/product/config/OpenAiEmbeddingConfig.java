@@ -4,7 +4,8 @@ import org.springframework.ai.document.MetadataMode;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.openai.OpenAiEmbeddingModel;
 import org.springframework.ai.openai.OpenAiEmbeddingOptions;
-import org.springframework.ai.openai.api.OpenAiApi;
+import com.openai.client.OpenAIClient;
+import com.openai.client.okhttp.OpenAIOkHttpClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -38,11 +39,11 @@ public class OpenAiEmbeddingConfig {
 
     @Bean
     public EmbeddingModel openAiEmbeddingModel() {
-        OpenAiApi openAiApi = OpenAiApi.builder()
+        OpenAIClient client = OpenAIOkHttpClient.builder()
                 .baseUrl(baseUrl)
                 .apiKey(apiKey)
                 .build();
-        return new OpenAiEmbeddingModel(openAiApi, MetadataMode.EMBED,
+        return new OpenAiEmbeddingModel(client, MetadataMode.EMBED,
                 OpenAiEmbeddingOptions.builder().model(model).build());
     }
 }

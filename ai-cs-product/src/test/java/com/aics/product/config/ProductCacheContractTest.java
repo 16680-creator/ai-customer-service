@@ -47,7 +47,7 @@ class ProductCacheContractTest {
     void cacheTtlsMustMatchPolicy() {
         ProductCacheConfig config = new ProductCacheConfig();
         RedisCacheConfiguration base = config.productDefaultCacheConfiguration();
-        assertEquals(Duration.ofMinutes(20), base.getTtl());
+        assertEquals(Duration.ofMinutes(20), base.getTtlFunction().getTimeToLive("product:detail", new byte[0]));
 
         // per-cache TTL 的 builder customizer 行为由 Spring Data Redis 保证；
         // 此处锁定常量与默认值，具体 30/10 分钟由 ProductCacheConfig 源码契约覆盖。

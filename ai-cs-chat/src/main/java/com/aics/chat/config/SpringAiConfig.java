@@ -7,6 +7,8 @@ import com.aics.chat.modelrouter.ChatClientCustomizer;
 import com.aics.chat.rag.rerank.RerankProperties;
 import com.aics.chat.service.OrderQueryService;
 import com.aics.chat.nl2sql.Nl2SqlQueryService;
+import com.openai.client.OpenAIClient;
+import com.openai.client.okhttp.OpenAIOkHttpClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
@@ -14,7 +16,6 @@ import org.springframework.ai.document.MetadataMode;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.openai.OpenAiEmbeddingModel;
 import org.springframework.ai.openai.OpenAiEmbeddingOptions;
-import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.method.MethodToolCallbackProvider;
 import org.springframework.ai.vectorstore.SearchRequest;
@@ -139,7 +140,7 @@ public class SpringAiConfig {
      * 【AI 核心】自定义 EmbeddingModel：使用硅基流动 API（DeepSeek 不支持 /v1/embeddings）。
      * @Primary 确保 ChromaVectorStore 等注入点优先使用此 Bean。
      *
-     * <p>装配逻辑：用 {@link OpenAiApi} 指向硅基流动 base-url + apiKey，
+     * <p>装配逻辑：用 {@link OpenAIClient} 指向硅基流动 base-url + apiKey，
      * 然后构造 {@link OpenAiEmbeddingModel}（OpenAI 兼容协议），模型名 {@code BAAI/bge-m3}。
      * {@link MetadataMode#EMBED} 表示按"用于向量化"的模式读取文档元数据（去掉无关字段，保留正文）。</p>
      *
@@ -178,11 +179,11 @@ public class SpringAiConfig {
         log.info("  model    : {}", embeddingModel);
         log.info("========================================");
 
-        OpenAiApi embeddingApi = OpenAiApi.builder()
+        OpenAIClient embeddingClient = OpenAIOkHttpClient.builder()
                 .baseUrl(embeddingBaseUrl)
                 .apiKey(embeddingApiKey)
                 .build();
-        EmbeddingModel raw = new OpenAiEmbeddingModel(embeddingApi, MetadataMode.EMBED,
+        EmbeddingModel raw = new OpenAiEmbeddingModel(embeddingClient, MetadataMode.EMBED,
                 OpenAiEmbeddingOptions.builder().model(embeddingModel).build());
 
         // ===== 缓存层：向量缓存（装饰器包装，相同文本的向量不再重复调用向量化 API） =====
