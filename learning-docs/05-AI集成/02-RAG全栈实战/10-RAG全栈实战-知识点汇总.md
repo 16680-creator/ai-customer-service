@@ -6,8 +6,8 @@
 
 ---
 
-> **可升级至 2.0（2026-09 标注）**：本文涉及 **Spring AI 1.1.4**；官方 **Spring AI 2.0.0 GA** 已于 2026-06-12 发布（地基为 Spring Boot 4 / Spring Framework 7）。
-> 本文相关变化：汇总篇需按 2.0 全量校订：Tool Calling 重构、Advisor 模块改名、配置扁平化、向量库 filter converter 与 Usage 口径变化。
+> **当前基线（2026-11-26）**：Spring AI **2.1.0** / Spring Boot **4.2.0**。本文保留通用原理；涉及项目 API、配置和结果的段落以当前源码及验证记录为准。
+> **2.1 实施提示**：汇总篇需按 2.0 全量校订：Tool Calling 重构、Advisor 模块改名、配置扁平化、向量库 filter converter 与 Usage 口径变化。
 > 完整破坏性改动清单与迁移路径见 [12-SpringAI-2.0升级评估与迁移指南](../01-SpringAI框架集成/12-SpringAI-2.0升级评估与迁移指南.md)。
 
 ## 目录
@@ -241,7 +241,7 @@ bge-m3 检索技巧：查询加官方指令前缀 `"为这个句子生成表示�
 ### 4.4 Chroma 版本兼容（重要踩坑）
 
 - 远端 Chroma 只支持 v2 API，Spring AI 1.0.0 走 v1 会报 410 deprecated；另有集合存在性判断的字符串比对 bug（"does not exists" vs "does not exist"）导致误报 404。
-- 解决：父 POM 升级 `spring-ai.version` 至 **1.1.4**，实测与 Spring Boot 3.2.5 兼容。
+- 历史解决（2026-08）：父 POM 升级 `spring-ai.version` 至 **1.1.4**，当时实测与 Spring Boot 3.2.5 兼容。当前已升级到 **Spring AI 2.1.0 / Boot 4.2.0**，应参考新实施文档。
 - 依赖坐标注意是 `spring-ai-starter-vector-store-chroma`（不是 `...-chroma-store-spring-boot-starter`）。
 
 ### 4.5 全局 RAG Advisor
@@ -680,8 +680,8 @@ ES 索引首次写入时由 `createEsIndexIfNeeded(...)` 幂等自动创建，�
 | 项 | 值 |
 |----|----|
 | JDK | 21（材料中明确提醒本机默认 JDK 8 不可用） |
-| Spring Boot | 3.2.5 |
-| Spring AI | 1.1.4 |
+| Spring Boot | 4.2.0 |
+| Spring AI | 2.1.0 |
 | SILICONFLOW_API_KEY | Embedding 与 Rerank 共用环境变量 |
 | ai-cs-knowledge | 8082 |
 | ai-cs-chat | 8083 |

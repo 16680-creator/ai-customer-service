@@ -18,7 +18,8 @@
 ## 技术上下文
 
 **语言/版本**：Java 17 / Maven（JDK 21 编译）
-**主要依赖**：Spring Boot 3.2.5、Spring AI 1.1.4（chat 侧已有 ChatClient + @Tool 基础设施）、MyBatis-Plus 3.5.6（order/message）、OpenFeign（chat 侧跨服务调用）、Redis（chat 侧 run 状态存储）、Lombok、Hutool
+**主要依赖（原实施基线）**：Spring Boot 3.2.5、Spring AI 1.1.4（chat 侧已有 ChatClient + @Tool 基础设施）、MyBatis-Plus 3.5.6（order/message）、OpenFeign（chat 侧跨服务调用）、Redis（chat 侧 run 状态存储）、Lombok、Hutool
+**当前复核（2026-11-26）**：Boot 4.2.0 / Spring AI 2.1.0 / MyBatis-Plus 3.5.13；本计划中的版本与当时验收结论保留历史语义，2.1 回归另见 `docs/30-Spring-AI-2.1升级实施与验证.md`。
 **存储**：MySQL（业务表）、Redis（Agent run 多轮状态）、知识库 RAG（售后规则检索，复用 KnowledgeBaseService）
 **测试**：JUnit 5 + Mockito（纯单测，chat 模块不加载 Spring 上下文）；order/message 模块 H2 + Embedded Redis 集成测试；JaCoCo 门禁（行 ≥ 40%、分支 ≥ 30%）
 **目标平台**：Linux 服务器（微服务）

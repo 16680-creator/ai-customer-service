@@ -65,11 +65,11 @@ ai-customer-service/          ← 父工程（packaging: pom）
 ```xml
 <properties>
     <java.version>17</java.version>
-    <spring-boot.version>3.2.5</spring-boot.version>
-    <spring-cloud.version>2023.0.1</spring-cloud.version>
-    <spring-cloud-alibaba.version>2023.0.1.0</spring-cloud-alibaba.version>
-    <spring-ai.version>1.1.4</spring-ai.version>
-    <mybatis-plus.version>3.5.6</mybatis-plus.version>
+    <spring-boot.version>4.2.0</spring-boot.version>
+    <spring-cloud.version>2026.0.0</spring-cloud.version>
+    <spring-cloud-alibaba.version>2025.1.0.0</spring-cloud-alibaba.version>
+    <spring-ai.version>2.1.0</spring-ai.version>
+    <mybatis-plus.version>3.5.13</mybatis-plus.version>
     <elasticsearch.version>8.12.2</elasticsearch.version>
     <rocketmq-spring.version>2.3.0</rocketmq-spring.version>
     <lombok.version>1.18.30</lombok.version>

@@ -5,8 +5,8 @@
 
 ---
 
-> **可升级至 2.0（2026-09 标注）**：本文涉及 **Spring AI 1.1.4**；官方 **Spring AI 2.0.0 GA** 已于 2026-06-12 发布（地基为 Spring Boot 4 / Spring Framework 7）。
-> 本文相关变化：本模块使用的 Spring AI VectorStore 抽象在 2.0 有细节变化（filter converter、部分 store 模块移除）。
+> **当前基线（2026-11-26）**：Spring AI **2.1.0** / Spring Boot **4.2.0**。本文保留通用原理；涉及项目 API、配置和结果的段落以当前源码及验证记录为准。
+> **2.1 实施提示**：本模块使用的 Spring AI VectorStore 抽象在 2.0 有细节变化（filter converter、部分 store 模块移除）。
 > 完整破坏性改动清单与迁移路径见 [12-SpringAI-2.0升级评估与迁移指南](../01-SpringAI框架集成/12-SpringAI-2.0升级评估与迁移指南.md)。
 
 ## 一、为什么单独开这个模块

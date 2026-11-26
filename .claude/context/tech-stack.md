@@ -10,12 +10,13 @@
 |------|------|------|
 | Java | 17 | 编程语言 |
 | Maven | 3.9+ | 构建工具 |
-| Spring Boot | 3.2.5 | 应用框架 |
-| Spring Cloud | 2023.0.1 | 微服务框架 |
-| Spring Cloud Alibaba | 2023.0.1.0 | 微服务增强（Nacos、Sentinel） |
-| Spring Cloud Gateway | 4.1.x | API 网关 |
-| Spring AI | 1.0.0 | AI 能力集成（Chat、RAG、Function Calling） |
-| MyBatis-Plus | 3.5.6 | ORM 框架 |
+| Spring Boot | 4.2.0 | 应用框架（Spring Framework 7 / Jackson 3 默认 / 自动配置模块化） |
+| Spring Cloud | 2026.0.0 | 微服务框架 |
+| Spring Cloud Alibaba | 2025.1.0.0 | 微服务增强（Nacos、Sentinel） |
+| Spring Cloud Gateway | 随 Spring Cloud BOM | API 网关 |
+| Spring AI | 2.1.0 | AI 能力集成（Chat、RAG、Tool Calling） |
+| OpenAI Java SDK | 4.101.0 | 模型与 Embedding 的 OpenAI 兼容客户端；HTTP 实现为 openai-java-client-okhttp |
+| MyBatis-Plus | 3.5.13 | ORM 框架（mybatis-plus-spring-boot4-starter） |
 | ShardingSphere | 5.5.0 | 分库分表（用户表已落地：user_db_0/1 × sys_user_0..3，后四位取模） |
 | SpringDoc OpenAPI | 2.3.0 | API 文档 |
 | Lombok | 1.18.30 | 代码简化 |

@@ -1,6 +1,8 @@
 # 05-AI集成
 
 > 企业应用中的 AI 集成完整指南：从对话、RAG 到生产级部署。
+> **当前基线**：Spring AI 2.1.0 / Spring Boot 4.2.0 / Java 17。当前依赖与实现先读 [Spring AI 2.1 升级实施与验证](../../docs/30-Spring-AI-2.1升级实施与验证.md)。
+> 文中标注历史的版本迁移、接口测试和故障结论不可作为当前 2.1 验收证据。
 
 ---
 
@@ -77,7 +79,7 @@ Week 3: 生产部署 + 成本优化 + 评估体系
 |------|------|---------------|
 | ChatClient | LLM 调用统一接口 | ChatOpenAI |
 | VectorStore | 向量存储抽象 | VectorStore |
-| EmbeddingClient | Embedding 统一接口 | Embeddings |
+| EmbeddingModel | Embedding 统一接口 | Embeddings |
 | ChatMemory | 对话历史管理 | ConversationBufferMemory |
 | Function Calling | 外部工具调用 | Tools / Agent |
 
@@ -120,11 +122,12 @@ public class ChatService {
     
     public String answer(String question) {
         // 检索相关文档
-        List<Document> docs = vectorStore.similaritySearch(question, 5);
+        List<Document> docs = vectorStore.similaritySearch(SearchRequest.builder()
+        .query(question).topK(5).build());
         
         // 构造上下文
         String context = docs.stream()
-            .map(Document::getContent)
+            .map(Document::getText)
             .collect(Collectors.joining("\n\n"));
         
         // 调用 LLM
@@ -137,7 +140,7 @@ public class ChatService {
             问题：%s
             """, context, question);
         
-        return chatClient.call(prompt);
+        return chatClient.prompt().user(prompt).call().content();
     }
 }
 ```
@@ -149,11 +152,17 @@ public class ChatService {
 public class AgentService {
     
     @Bean
-    public ChatClientCustomizer functionCallingCustomizer() {
-        return builder -> builder.defaultFunctions(
-            "getWeather",  // 查天气
-            "searchOrders" // 查订单
-        );
+    public ToolCallbackProvider toolCallbackProvider(AgentService agentTools) {
+        return MethodToolCallbackProvider.builder()
+                .toolObjects(agentTools)
+                .build();
+    }
+
+    public ChatClient chatClient(ChatModel chatModel,
+                                 ToolCallbackProvider toolCallbackProvider) {
+        return ChatClient.builder(chatModel)
+                .defaultToolCallbacks(toolCallbackProvider)
+                .build();
     }
     
     @Tool("""
@@ -177,7 +186,9 @@ public class AgentService {
 }
 
 // 使用
-String response = chatClient.call("北京今天天气怎么样？顺便帮我查一下我的订单");
+String response = chatClient.prompt()
+        .user("北京今天天气怎么样？顺便帮我查一下我的订单")
+        .call().content();
 // LLM 自动调用 getWeather("北京") 和 searchOrders(currentUserId)
 ```
 

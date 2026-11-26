@@ -4,8 +4,8 @@
 
 ---
 
-> **可升级至 2.0（2026-09 标注）**：本文涉及 **Spring AI 1.1.4**；官方 **Spring AI 2.0.0 GA** 已于 2026-06-12 发布（地基为 Spring Boot 4 / Spring Framework 7）。
-> 本文相关变化：面试考点需补 2.0 新体系：Tool Calling 上移到 Advisor 层、`ToolCallingAdvisor` 接管工具循环、ChatMemory conversationId 必填、多个模块改名与移除。
+> **当前基线（2026-11-26）**：Spring AI **2.1.0** / Spring Boot **4.2.0**。本文保留通用原理；涉及项目 API、配置和结果的段落以当前源码及验证记录为准。
+> **2.1 实施提示**：面试考点需补 2.0 新体系：Tool Calling 上移到 Advisor 层、`ToolCallingAdvisor` 接管工具循环、ChatMemory conversationId 必填、多个模块改名与移除。
 > 完整破坏性改动清单与迁移路径见 [12-SpringAI-2.0升级评估与迁移指南](../01-SpringAI框架集成/12-SpringAI-2.0升级评估与迁移指南.md)。
 
 ## 2.1 Spring AI 核心架构
@@ -62,7 +62,7 @@ String text = response.getResult().getOutput().getText();
 **ChatClient** 是高层 API，提供 Builder 模式和链式调用：
 ```java
 // ChatClient：高层，链式调用，功能更丰富
-String text = ChatClient.create(chatModel)
+String text = ChatClient.builder(chatModel).build()
     .prompt()
     .system("你是一个Java技术专家")
     .user("解释一下Spring的IoC容器")
@@ -96,7 +96,7 @@ responseFlux.subscribe(resp -> {
 });
 
 // ChatClient 流式调用
-Flux<String> contentFlux = ChatClient.create(chatModel)
+Flux<String> contentFlux = ChatClient.builder(chatModel).build()
     .prompt()
     .user("写一首关于春天的诗")
     .stream()
@@ -149,36 +149,31 @@ LLM 基于函数结果生成自然语言回答
 **Spring AI 实现方式：**
 
 ```java
-// 方式1：@Bean + @Description 注册函数
-@Bean
-@Description("根据城市名查询天气信息")
-public Function<WeatherRequest, WeatherResponse> getWeather() {
-    return request -> weatherService.getWeather(request.city());
+// Spring AI 2.x / 当前项目：@Tool 工具对象 + MethodToolCallbackProvider。
+@Component
+public class WeatherTools {
+    @Tool(description = "根据城市名查询天气信息")
+    public WeatherResponse getWeather(
+            @ToolParam(description = "城市名") String city) {
+        return weatherService.getWeather(city);
+    }
 }
 
-// 使用
-String response = ChatClient.create(chatModel)
-    .prompt()
-    .user("北京今天天气怎么样？")
-    .functions("getWeather")  // 指定可用函数
-    .call()
-    .content();
+@Bean
+ToolCallbackProvider weatherToolCallbackProvider(WeatherTools tools) {
+    return MethodToolCallbackProvider.builder().toolObjects(tools).build();
+}
 
-// 方式2：直接在 prompt 中注册
-String response = ChatClient.create(chatModel)
+String response = ChatClient.builder(chatModel)
+    .defaultToolCallbacks(weatherToolCallbackProvider)
+    .build()
     .prompt()
     .user("北京今天天气怎么样？")
-    .functions(FunctionCallback.builder()
-        .function("getWeather", (WeatherRequest req) -> 
-            weatherService.getWeather(req.city()))
-        .description("根据城市名查询天气信息")
-        .inputType(WeatherRequest.class)
-        .build())
     .call()
     .content();
 ```
 
-**面试关键点：** Function Calling 不是 LLM 直接执行函数，而是 LLM 输出结构化的函数调用参数，由框架代为执行并将结果返回给 LLM。
+**面试关键点：** Function Calling 不是 LLM 直接执行函数，而是 LLM 输出结构化调用参数，由框架代为执行并将结果返回给 LLM。2.x 使用 ToolCallback/Advisor 体系；旧的 Function Bean、FunctionCallback 和 `.functions(...)` 不应作为当前项目示例。
 
 ---
 
@@ -218,7 +213,7 @@ String response = ChatClient.create(chatModel)
 
 LLM 本身是无状态的，每次调用都是独立的。对话记忆通过在每次请求中注入历史消息来实现上下文连贯。
 
-**Spring AI 的记忆实现：**
+**Spring AI 通用记忆机制（以下为概念示例；当前项目实际使用 `ChatHistoryService`，不是 `InMemoryChatMemory`）：**
 
 ```java
 // 1. 创建 ChatMemory 存储
@@ -231,11 +226,13 @@ MessageChatMemoryAdvisor memoryAdvisor = MessageChatMemoryAdvisor.builder(chatMe
     .chatMemoryRetrieveSize(20)  // 最近20条消息
     .build();
 
-// 3. 应用到 ChatClient
-String response = ChatClient.create(chatModel)
-    .prompt()
-    .advisors(memoryAdvisor)
+// 3. 通过请求级 Advisor 参数传递真实 conversationId（非当前项目主链路示例）。
+ChatClient client = ChatClient.builder(chatModel)
+    .defaultAdvisors(memoryAdvisor)
+    .build();
+String response = client.prompt()
     .user("我之前问的那个问题...")
+    .advisors(advisor -> advisor.param(ChatMemory.CONVERSATION_ID, sessionId))
     .call()
     .content();
 ```
@@ -345,14 +342,14 @@ LLM 默认返回自由文本，但实际业务常需要结构化数据。Spring 
 record ProductInfo(String name, double price, List<String> features) {}
 
 // 方式1：使用 entity() 直接映射
-ProductInfo product = ChatClient.create(chatModel)
+ProductInfo product = ChatClient.builder(chatModel).build()
     .prompt()
     .user("分析这个产品：iPhone 16 Pro")
     .call()
     .entity(ProductInfo.class);
 
 // 方式2：使用 list() 返回列表
-List<ProductInfo> products = ChatClient.create(chatModel)
+List<ProductInfo> products = ChatClient.builder(chatModel).build()
     .prompt()
     .user("列出三款热门手机")
     .call()
@@ -362,7 +359,7 @@ List<ProductInfo> products = ChatClient.create(chatModel)
 BeanOutputConverter<ProductInfo> converter = 
     new BeanOutputConverter<>(ProductInfo.class);
 
-String response = ChatClient.create(chatModel)
+String response = ChatClient.builder(chatModel).build()
     .prompt()
     .user("分析这个产品：iPhone 16 Pro. " + converter.getFormat())
     .call()
@@ -417,7 +414,7 @@ Spring AI 支持多模态（文本 + 图片）输入，用于视觉问答（VQA�
 
 ```java
 // 图片分析
-String response = ChatClient.create(chatModel)
+String response = ChatClient.builder(chatModel).build()
     .prompt()
     .user(u -> u
         .text("这张图片里有什么？")
@@ -428,7 +425,7 @@ String response = ChatClient.create(chatModel)
     .content();
 
 // 本地图片
-String response = ChatClient.create(chatModel)
+String response = ChatClient.builder(chatModel).build()
     .prompt()
     .user(u -> u
         .text("描述这张图片")

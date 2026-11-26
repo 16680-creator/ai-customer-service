@@ -1,13 +1,13 @@
 # MCP 协议实战：Model Context Protocol（模型上下文协议）
 
-> 版本锚点：Spring AI **1.1.4**（基于 MCP Java SDK 0.14+，覆盖协议规范 2025-06-18）
+> **扩展学习文档**：当前项目基线是 Spring AI **2.1.0**，但没有引入 MCP client/server 生产依赖。下文的 MCP 示例是接入方案，不是项目已实现或已联调能力。
 > 定位：项目里已经有"内生工具"（`@Tool` 注解的订单查询、NL2SQL），本文讲"外挂工具生态"——MCP。
 > 面试速记版在 [`../面试题/05-AI-Agent与工具调用.md`](../面试题/05-AI-Agent与工具调用.md) §5.4，本文是它的展开版。
 
 ---
 
-> **可升级至 2.0（2026-09 标注）**：本文锚定 **MCP Java SDK 0.14+**；官方 **MCP Java SDK 2.0.0 GA** 已发布（首个 major 版本，与 Spring AI 2.0 同期）。
-> 本文相关变化：**MCP Java SDK 0.14+ → 2.0.0**：`@McpTool` 注解从 `org.springaicommunity.mcp.*` 收编进 `org.springframework.ai.mcp.annotation.*`；mcp-spring-webflux/webmvc 传输模块归属 Spring AI（groupId 变更）；`McpSyncClientCustomizer` / `McpAsyncClientCustomizer` 合并为 `McpClientCustomizer<B>`；服务端默认开启入参 schema 校验。
+> **当前基线（2026-11-26）**：Spring AI **2.1.0** / Spring Boot **4.2.0**。本文保留通用原理；涉及项目 API、配置和结果的段落以当前源码及验证记录为准。
+> **2.1 实施提示**：**MCP Java SDK 0.14+ → 2.0.0**：`@McpTool` 注解从 `org.springaicommunity.mcp.*` 收编进 `org.springframework.ai.mcp.annotation.*`；mcp-spring-webflux/webmvc 传输模块归属 Spring AI（groupId 变更）；`McpSyncClientCustomizer` / `McpAsyncClientCustomizer` 合并为 `McpClientCustomizer<B>`；服务端默认开启入参 schema 校验。
 > 详细评估见 [12-SpringAI-2.0升级评估与迁移指南](12-SpringAI-2.0升级评估与迁移指南.md) §3.5。
 
 ## 一、MCP 是什么：给 AI 装"USB-C 接口"
@@ -510,7 +510,7 @@ MCP 解决的是工具的**分发、发现与复用**这一层工程问题（面
 - **结论**：MCP 是 Anthropic 2024 年开源的协议，标准化 AI 应用与工具/数据源的连接，把 M×N 集成变成 M+N；
 - **原理**：JSON-RPC 2.0 消息 + 三种传输（STDIO/SSE/Streamable HTTP）+ 六大原语（Tools/Resources/Prompts/Sampling/Roots/Elicitation），工具启动时 `tools/list` 发现、运行时 `tools/call` 调用；
 - **权衡**：相比进程内 Function Calling，MCP 换来跨应用复用与动态发现，代价是网络跳数、鉴权面、上下文管理复杂度；
-- **实践**：Spring AI 1.1 的 client/server starter 把两端都收敛成 `ToolCallbackProvider` / `@McpTool` 两个概念——本项目挂载点在 `ChatModelRegistry`，接入时注意多 Provider Bean 冲突与 ThreadLocal 失效两个坑。
+- **实践**：历史上 Spring AI 1.1 的 client/server starter 把两端收敛成 `ToolCallbackProvider` / `@McpTool`。当前 2.1 项目尚未引入 MCP；接入时须按实际 BOM 校验新坐标和注解包名，并处理多 Provider 聚合与 ThreadLocal 上下文传递。
 
 ---
 
@@ -523,7 +523,7 @@ MCP 解决的是工具的**分发、发现与复用**这一层工程问题（面
 | 流式下的工具执行 | `ResilientAiService.callSseStream`：订阅线程同步执行 ToolCallback，期间无 content chunk |
 | 用户上下文 | `ChatUserContext`（ThreadLocal）——MCP Server 进程内不可用，需显式传参 |
 | 可观测性 | `TraceContext` tools 段（工具名/参数摘要/状态/耗时）天然覆盖 MCP 工具 |
-| Spring AI 版本 | 1.1.4（父 `pom.xml` `spring-ai.version`，BOM 统一管理） |
+| Spring AI 版本 | 2.1.0（父 `pom.xml` BOM）；MCP 依赖尚未引入 |
 
 ---
 

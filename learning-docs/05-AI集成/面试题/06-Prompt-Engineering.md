@@ -4,8 +4,8 @@
 
 ---
 
-> **可升级至 2.0（2026-09 标注）**：本文涉及 **Spring AI 1.1.4**；官方 **Spring AI 2.0.0 GA** 已于 2026-06-12 发布（地基为 Spring Boot 4 / Spring Framework 7）。
-> 本文相关变化：Prompt 篇需注意 2.0 **移除默认 temperature**（改由供应商决定），涉及温度调优的答法要相应调整。
+> **当前基线（2026-11-26）**：Spring AI **2.1.0** / Spring Boot **4.2.0**。本文保留通用原理；涉及项目 API、配置和结果的段落以当前源码及验证记录为准。
+> **2.1 实施提示**：Prompt 篇需注意 2.0 **移除默认 temperature**（改由供应商决定），涉及温度调优的答法要相应调整。
 > 完整破坏性改动清单与迁移路径见 [12-SpringAI-2.0升级评估与迁移指南](../01-SpringAI框架集成/12-SpringAI-2.0升级评估与迁移指南.md)。
 
 ## 6.1 Prompt 基础设计
@@ -87,7 +87,7 @@
 
 **Spring AI 中使用：**
 ```java
-String response = ChatClient.create(chatModel)
+String response = ChatClient.builder(chatModel).build()
     .prompt()
     .system("你是一个专业的电商客服助手...")  // System Prompt
     .user("我的订单什么时候到？")              // User Prompt
@@ -219,7 +219,7 @@ CoT:
 ```java
 record ReviewAnalysis(String sentiment, List<String> keywords, double score) {}
 
-ReviewAnalysis analysis = ChatClient.create(chatModel)
+ReviewAnalysis analysis = ChatClient.builder(chatModel).build()
     .prompt()
     .user("分析这条评论：'这个手机拍照效果非常好，电池也耐用'")
     .call()

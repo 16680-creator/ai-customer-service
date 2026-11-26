@@ -1,6 +1,7 @@
 # Spring 与微服务（02 模块）
 
-> 本专题是 `learning-docs` 的**第二个模块**，覆盖本项目全部 Spring 技术栈：Spring Boot 3.2.5（本体+自动装配）、Spring Cloud 2023.0.1 + Spring Cloud Alibaba 2023.0.1.0（Nacos/Gateway/Seata/Sentinel）、Spring AI 1.1.4、Spring Security、Spring StateMachine、STOMP。
+> 本专题是 `learning-docs` 的**第二个模块**，覆盖本项目全部 Spring 技术栈：Spring Boot 4.2.0（本体+模块化自动装配）、Spring Cloud 2026.0.0 + Spring Cloud Alibaba 2025.1.0.0（Nacos/Gateway/Seata/Sentinel）、Spring AI 2.1.0、Spring Security、Spring StateMachine、STOMP。
+> 文中涉及具体版本的旧代码示例须与父 POM 对照；Boot 4 默认 Jackson 3，业务 Jackson 2 的兼容方式见 `Jackson2AutoConfiguration`。
 > 写法与全库一致：**每篇都锚定项目真实源码/配置**（给出 `文件:行号`），未落地主题显式标注；不写"通用教程"。
 >
 > 2026-09 补全：本模块此前 14 篇偏"使用 + 落地记录"，**缺 Spring Framework 本体原理（IoC/AOP/事务/MVC）**——本批新增 15~18 四篇 + 本 README，缺口分析见 [00-学习路线总览/05-技术缺口分析与补全计划](../00-学习路线总览/05-技术缺口分析与补全计划.md)。
@@ -65,10 +66,10 @@
 
 ```text
 依赖版本（根 pom.xml:39-42）
-├── Spring Boot            3.2.5
+├── Spring Boot            4.2.0
 ├── Spring Cloud           2023.0.1
 ├── Spring Cloud Alibaba   2023.0.1.0
-├── Spring AI              1.1.4
+├── Spring AI              2.1.0
 └── Spring StateMachine    4.0.0（statemachine.version）
 
 ai-cs-common（可复用能力的落点）

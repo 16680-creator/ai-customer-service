@@ -4,8 +4,8 @@
 
 ---
 
-> **可升级至 2.0（2026-09 标注）**：本文涉及 **Spring AI 1.1.4**；官方 **Spring AI 2.0.0 GA** 已于 2026-06-12 发布（地基为 Spring Boot 4 / Spring Framework 7）。
-> 本文相关变化：工具调用是 2.0 最核心重构，答题要点需更新：Advisor 层接管工具循环、默认限次 40/150、legacy FunctionCallback 家族彻底移除、Bean 工具解析 fallback 默认关闭。
+> **当前基线（2026-11-26）**：Spring AI **2.1.0** / Spring Boot **4.2.0**。本文保留通用原理；涉及项目 API、配置和结果的段落以当前源码及验证记录为准。
+> **2.1 实施提示**：工具调用是 2.0 最核心重构，答题要点需更新：Advisor 层接管工具循环、默认限次 40/150、legacy FunctionCallback 家族彻底移除、Bean 工具解析 fallback 默认关闭。
 > 完整破坏性改动清单与迁移路径见 [12-SpringAI-2.0升级评估与迁移指南](../01-SpringAI框架集成/12-SpringAI-2.0升级评估与迁移指南.md)。
 
 ## 5.1 Agent 基础概念
@@ -66,15 +66,16 @@ Final Answer：您的订单12345已发货，目前在运输中，位于北京转
 
 **Spring AI 中的 ReAct 实现：**
 ```java
-// 通过 Function Calling 实现 ReAct 循环
-String response = ChatClient.create(chatModel)
+// 通过 @Tool 对象 + ToolCallbackProvider 支持多轮工具调用。
+String response = ChatClient.builder(chatModel)
+    .defaultToolCallbacks(toolCallbackProvider)
+    .build()
     .prompt()
     .system("你是一个客服助手，可以查询订单和物流信息。")
     .user("我的订单12345到哪了？")
-    .functions("getOrder", "getTracking", "sendNotification")
     .call()
     .content();
-// Spring AI 框架自动处理多轮工具调用循环
+// ChatClient 的 Advisor 链处理工具调用循环；不能把它理解为模型自己执行 Java 方法。
 ```
 
 ---

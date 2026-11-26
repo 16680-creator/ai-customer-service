@@ -5,8 +5,8 @@
 
 ---
 
-> **可升级至 2.0（2026-09 标注）**：本文涉及 **Spring AI 1.1.4**；官方 **Spring AI 2.0.0 GA** 已于 2026-06-12 发布（地基为 Spring Boot 4 / Spring Framework 7）。
-> 本文相关变化：RAG Advisor 模块改名 `spring-ai-advisors-vector-store` → `spring-ai-vector-store-advisor`；`QuestionAnswerAdvisor` 本体 API 未列入破坏性清单，编译期验证即可。
+> **当前基线（2026-11-26）**：Spring AI **2.1.0** / Spring Boot **4.2.0**。本文保留通用原理；涉及项目 API、配置和结果的段落以当前源码及验证记录为准。
+> 2.x 迁移注意事项：RAG Advisor 模块改名 `spring-ai-advisors-vector-store` → `spring-ai-vector-store-advisor`；`QuestionAnswerAdvisor` 本体 API 未列入破坏性清单，编译期验证即可。
 > 完整破坏性改动清单与迁移路径见 [12-SpringAI-2.0升级评估与迁移指南](../01-SpringAI框架集成/12-SpringAI-2.0升级评估与迁移指南.md)。
 
 ## 一、什么是 RAG？
@@ -142,7 +142,7 @@ float[] vector = embeddingModel.embed("无线蓝牙耳机");
 
 // 批量向量化
 List<float[]> vectors = embeddingModel.embed(chunks.stream()
-    .map(Document::getContent)
+    .map(Document::getText)
     .toList());
 ```
 
@@ -237,7 +237,7 @@ public class RagChatService {
 
         // 2. 组装上下文
         String context = relevantDocs.stream()
-            .map(Document::getContent)
+            .map(Document::getText)
             .collect(Collectors.joining("\n\n---\n\n"));
 
         // 3. 构建 Prompt

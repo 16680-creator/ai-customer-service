@@ -8,8 +8,8 @@
 
 ---
 
-> **可升级至 2.0（2026-09 标注）**：本文涉及 **Spring AI 1.1.4**；官方 **Spring AI 2.0.0 GA** 已于 2026-06-12 发布（地基为 Spring Boot 4 / Spring Framework 7）。
-> 本文相关变化：`DocumentReader` / `TokenTextSplitter` 需编译期验证签名（`MethodToolCallbackProvider` 的异常类型 IllegalState → IllegalArgument，本项目无 catch 点）。
+> **当前基线（2026-11-26）**：Spring AI **2.1.0** / Spring Boot **4.2.0**。本文保留通用原理；涉及项目 API、配置和结果的段落以当前源码及验证记录为准。
+> 2.x 迁移注意事项：`DocumentReader` / `TokenTextSplitter` 需编译期验证签名（`MethodToolCallbackProvider` 的异常类型 IllegalState → IllegalArgument，本项目无 catch 点）。
 > 完整破坏性改动清单与迁移路径见 [12-SpringAI-2.0升级评估与迁移指南](../01-SpringAI框架集成/12-SpringAI-2.0升级评估与迁移指南.md)。
 
 ## 一、实战背景：为什么需要 Tika？
@@ -58,8 +58,8 @@ Apache Tika 是 Java 生态最成熟的内容检测与文本提取库，一个�
 </dependency>
 ```
 
-> 版本由父 POM 的 Spring AI BOM（本项目 1.1.4）统一管理，无需写 version。
-> 该依赖会传递引入 Apache Tika 核心库。
+> 版本由父 POM 的 Spring AI BOM（当前 **2.1.0**）统一管理，无需写 version。
+> 该依赖会传递引入 Apache Tika 核心库。**2.1 兼容性记录（2026-11-26）**：Tika 4 / POI 5.5.1 要求 Commons Compress 1.28.0，MinIO 传递的 1.26.0 曾导致 ZIP 格式探测失败。父 POM 统一为 1.28.0 后，`DocumentLoaderTest` 5 项全部通过；完整 AI 模块回归结果见实施文档。
 
 ---
 
@@ -234,7 +234,7 @@ spring:
 
 | 组件 | 版本来源 |
 |------|----------|
-| spring-ai-tika-document-reader | 父 POM `spring-ai.version`（1.1.4） |
+| spring-ai-tika-document-reader | 父 POM `spring-ai.version`（2.1.0） |
 | Apache Tika（传递依赖） | 由 Spring AI BOM 锁定 |
 
 ---
@@ -301,5 +301,5 @@ Tika 自动检测编码（含 UTF-8/GBK），绝大多数场景无需干预。
 | 容错 | 解析失败返回空列表，入库流程不中断 |
 | 扩展 | 新格式只需在 `isTika()` 加扩展名，零额外代码 |
 
-至此，知识库从"只吃 PDF/TXT"升级为"Office/HTML 通吃"，
+当前实现扩展了 Office/HTML 解析入口；具体格式是否可用必须由解析回归测试验证。
 上传即解析、解析即入库，文档格式不再是知识库覆盖度的瓶颈。

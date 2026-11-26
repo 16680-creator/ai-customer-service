@@ -300,9 +300,9 @@
 ✅ 必须执行：**项目工程必须建立在技术底座之上，技术底座定义见 `.claude/context/tech-stack.md`**
 
 **当前核心版本**：
-- JDK 17 / Maven 3.9+ / Spring Boot 3.2.5
-- Spring Cloud 2023.0.1 / Spring Cloud Alibaba 2023.0.1.0
-- Spring AI 1.0.0 / MyBatis-Plus 3.5.6
+- JDK 17 / Maven 3.9+ / Spring Boot 4.2.0
+- Spring Cloud 2026.0.0 / Spring Cloud Alibaba 2025.1.0.0
+- Spring AI 2.1.0 / MyBatis-Plus 3.5.13（Boot 4 starter）
 - MySQL 8.0 / Redis 7.x / Elasticsearch 8.12 / RocketMQ 5.x / Nacos 2.3
 
 ### 第19条 技术栈扩展规则

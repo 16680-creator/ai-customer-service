@@ -1,13 +1,9 @@
 # Spring AI 入门
 
-> 本项目使用 **Spring AI 1.1.4** 集成大语言模型，实现 AI 智能对话。
-> 对应项目文件：`ai-cs-chat` 模块、`application.yml` 中的 `spring.ai` 配置
-
----
-
-> **可升级至 2.0（2026-09 标注）**：本文涉及 **Spring AI 1.1.4**；官方 **Spring AI 2.0.0 GA** 已于 2026-06-12 发布（地基为 Spring Boot 4 / Spring Framework 7）。
-> 本文相关变化：POM 的 Spring AI BOM 升 2.0；2.0 硬性要求 Spring Boot 4 / Framework 7，且配置属性扁平化（`spring.ai.openai.embedding.options.model` → 去掉 `.options` 段）。
-> 完整破坏性改动清单与迁移路径见 [12-SpringAI-2.0升级评估与迁移指南](12-SpringAI-2.0升级评估与迁移指南.md)。
+> 本项目使用 **Spring AI 2.1.0 + Spring Boot 4.2.0** 集成大语言模型，实现 AI 智能对话。
+> 对应项目文件：`ai-cs-chat` 模块、`application.yml` 中的 `spring.ai` 配置。
+> 当前装配细节见 [Spring AI 2.1 升级实施与验证](../../../docs/30-Spring-AI-2.1升级实施与验证.md)；[2.0 迁移指南](12-SpringAI-2.0升级评估与迁移指南.md) 保留历史评估。
+> 2026-09 的“可升级至 2.0”提示已失效；下文按当前 2.1 代码说明。
 
 ## 一、Spring AI 是什么？
 
@@ -20,7 +16,7 @@ Spring AI = Spring 生态的 AI 开发框架
   • 通义千问、文心一言
   • Ollama（本地模型）
 
-你只需要换配置，不用改代码！
+同一 OpenAI 兼容协议内可复用抽象，但更换供应商时仍需核对模型能力、流式客户端、工具调用和向量维度；不能只换配置就假设完全兼容。
 ```
 
 ---
@@ -35,10 +31,9 @@ spring:
       api-key: ${OPENAI_API_KEY:你的密钥}
       base-url: ${OPENAI_BASE_URL:https://api.deepseek.com}  # DeepSeek 的 API 地址
       chat:
-        options:
-          model: ${OPENAI_MODEL:deepseek-chat}   # 模型名称
-          temperature: 0.7                     # 随机性（0=确定，1=创意）
-          max-tokens: 2048                     # 最大回复长度
+        model: ${OPENAI_MODEL:deepseek-chat}   # 2.x 配置已扁平化，无 options 段
+        temperature: 0.7                     # 随机性（0=确定，1=创意）
+        max-tokens: 2048                     # 最大回复长度
 ```
 
 **关键理解**：
@@ -69,7 +64,7 @@ spring:
 <dependency>
     <groupId>org.springframework.ai</groupId>
     <artifactId>spring-ai-bom</artifactId>
-    <version>1.1.4</version>
+    <version>2.1.0</version>
     <type>pom</type>
     <scope>import</scope>
 </dependency>
@@ -221,31 +216,33 @@ String reply = chatClient.prompt()
 让 AI 能调用你的 Java 方法：
 
 ```java
-// 定义工具函数
-@Bean
-@Description("查询订单状态")  // AI 通过这个描述决定何时调用
-public Function<OrderQueryRequest, OrderQueryResponse> queryOrder() {
-    return request -> {
-        Order order = orderMapper.selectByOrderNo(request.orderNo());
-        return new OrderQueryResponse(order.getStatus(), order.getPayTime());
-    };
+// 项目实际方式：@Tool 工具对象，不再使用旧 Function Bean + .functions(...)。
+@Service
+public class OrderQueryService {
+    @Tool(description = "查询订单状态")
+    public OrderQueryResponse queryOrder(@ToolParam(description = "订单号") String orderNo) {
+        // 查询并返回订单信息；具体实现见 ai-cs-chat 的 OrderQueryService。
+        return orderQuery(orderNo);
+    }
 }
 
-// 记录定义
-record OrderQueryRequest(String orderNo) {}
-record OrderQueryResponse(int status, LocalDateTime payTime) {}
+@Bean
+ToolCallbackProvider toolCallbackProvider(OrderQueryService orderQueryService,
+                                          Nl2SqlQueryService nl2SqlQueryService) {
+    return MethodToolCallbackProvider.builder()
+            .toolObjects(orderQueryService, nl2SqlQueryService)
+            .build();
+}
 
-// 对话时启用工具
-String reply = chatClient.prompt()
+// 当前项目由 ChatModelRegistry 按 TOOL_CALLING 能力显式挂载 Provider。
+ChatClient.Builder builder = ChatClient.builder(chatModel)
+        .defaultToolCallbacks(toolCallbackProvider);
+String reply = builder.build().prompt()
     .user("我的订单 ORD20240101001 到哪了？")
-    .functions("queryOrder")   // 注册可用工具
     .call()
     .content();
 
-// AI 会自动：
-// 1. 识别需要查订单
-// 2. 调用 queryOrder("ORD20240101001")
-// 3. 拿到结果后组织自然语言回复
+// ChatClient 的 Advisor 链负责工具调用循环；直接调用 ChatModel 不等于自动执行工具。
 ```
 
 ### 6.1 实战：AI 智能问数（NL2SQL）

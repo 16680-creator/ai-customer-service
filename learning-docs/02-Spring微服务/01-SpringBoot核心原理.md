@@ -1,6 +1,7 @@
 # Spring Boot 核心原理
 
-> 本项目所有微服务都基于 **Spring Boot 3.2.5** 构建。
+> 本项目所有微服务当前基于 **Spring Boot 4.2.0 / Spring Framework 7** 构建；编译目标 Java 17，开发/构建推荐 JDK 21。
+> Boot 4 带来自动配置模块化、默认 Jackson 3 和测试栈变化，不能直接套用 Boot 3.2 的 starter 与测试注解。
 > 理解 Spring Boot 的自动配置、分层架构、依赖注入是看懂整个项目的基础。
 
 ---

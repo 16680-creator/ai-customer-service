@@ -1,6 +1,6 @@
 # Spring Cloud 微服务架构
 
-> 本项目使用 **Spring Cloud 2023.0.1 + Spring Cloud Alibaba 2023.0.1.0** 构建微服务体系。
+> 本项目当前使用 **Spring Cloud 2026.0.0 + Spring Cloud Alibaba 2025.1.0.0 + Spring Boot 4.2.0** 构建微服务体系。
 > 核心组件：Nacos（注册/配置中心）、Spring Cloud Gateway（网关）、OpenFeign（服务间调用）
 
 ---

@@ -8,8 +8,8 @@
 
 ---
 
-> **可升级至 2.0（2026-09 标注）**：本文涉及 **Spring AI 1.1.4**；官方 **Spring AI 2.0.0 GA** 已于 2026-06-12 发布（地基为 Spring Boot 4 / Spring Framework 7）。
-> 本文相关变化：`Media(MimeType, URI)` 构造器可能移除 → 改用 `Media.builder().mimeType(...).data(URI).build()`（`data(URI)` 是 2.0 新增的类型化重载）。
+> **当前基线（2026-11-26）**：Spring AI **2.1.0** / Spring Boot **4.2.0**。本文保留通用原理；涉及项目 API、配置和结果的段落以当前源码及验证记录为准。
+> **2.1 实施提示**：`Media(MimeType, URI)` 构造器可能移除 → 改用 `Media.builder().mimeType(...).data(URI).build()`（`data(URI)` 是 2.0 新增的类型化重载）。
 > 完整破坏性改动清单与迁移路径见 [12-SpringAI-2.0升级评估与迁移指南](12-SpringAI-2.0升级评估与迁移指南.md)。
 
 ## 一、什么是多模态图生文（VLM）？
@@ -59,7 +59,7 @@ DeepSeek（本项目回答模型）：只吃文本，不吃图片
         │
         ▼
 ┌─────────────────────────────────────────────┐
-│ 第一段【看图】Qwen2.5-VL（硅基流动）           │
+│ 第一段【看图】Qwen3-VL（硅基流动）           │
 │   图片 URL → 视觉模型 → 文本描述              │
 │   "截图显示：下单失败，错误码 E10086"          │
 └─────────────────────────────────────────────┘
@@ -95,20 +95,21 @@ void init() {
     if (!visionProperties.isEnabled() || !StringUtils.hasText(visionProperties.getApiKey())) {
         return;
     }
-    // OpenAiApi：OpenAI 兼容协议，baseUrl 指向硅基流动
-    OpenAiApi api = OpenAiApi.builder()
+    // Spring AI 2.1：官方 OpenAI Java SDK；baseUrl 指向硅基流动。
+    OpenAIClient client = OpenAIOkHttpClient.builder()
             .baseUrl(visionProperties.getBaseUrl())   // https://api.siliconflow.cn
             .apiKey(visionProperties.getApiKey())
             .build();
-    // OpenAiChatModel：视觉模型，model 默认 Qwen/Qwen3-VL-32B-Instruct（可配）
+    // 同步和异步客户端必须同时传入，避免流式路径丢失自定义供应商配置。
     this.visionModel = OpenAiChatModel.builder()
-            .openAiApi(api)
-            .defaultOptions(OpenAiChatOptions.builder().model(visionProperties.getModel()).build())
+            .openAiClient(client)
+            .openAiClientAsync(client.async())
+            .options(OpenAiChatOptions.builder().model(visionProperties.getModel()).build())
             .build();
 }
 ```
 
-**关键理解**：和 DeepSeek 的对接方式一模一样（OpenAI 兼容协议），只是换了 `baseUrl` + `apiKey` + `model`。这就是 OpenAI 兼容协议的价值 —— **换模型只改配置，不改代码**。
+**关键理解**：两者复用 OpenAI 兼容协议，但 2.1 手动装配需显式配置同步/异步客户端；更换供应商仍须验证图片 URL 拉取、媒体类型、模型能力和流式行为，不能假设只改配置就一定兼容。
 
 ### 4.2 多模态消息构造（图片怎么塞给模型）
 

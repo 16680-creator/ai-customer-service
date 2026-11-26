@@ -9,7 +9,7 @@
 - 主分支：`main`
 - 定位：提供 AI 对话、知识库 RAG、智能搜索、消息管理、通知推送等一站式智能客服能力
 - 前端：Vue 3 + Element Plus + Vite
-- 后端：Java 17 / Spring Boot 3.2 / Spring Cloud 2023 / Spring AI 1.0
+- 后端：Java 17 / Spring Boot 4.2.0 / Spring Cloud 2026.0.0 / Spring Cloud Alibaba 2025.1.0.0 / Spring AI 2.1.0
 
 ### 统一规范
 

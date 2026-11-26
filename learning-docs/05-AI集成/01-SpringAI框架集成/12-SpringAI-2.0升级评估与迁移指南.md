@@ -1,20 +1,21 @@
-# 12-SpringAI 2.0 升级评估与迁移指南（1.1.4 → 2.0）
+# 12-SpringAI 2.0 升级评估与迁移指南（历史评估 → 2.1 实施）
 
-> **文档状态**：评估完成（2026-09-10）。**决策：暂缓代码改造**，本文档作为后续实际升级时的行动指南与学习材料。
+> **当前状态（2026-11-26）**：项目已升级至 **Spring AI 2.1.0 / Spring Boot 4.2.0**。实际依赖、源码、配置与验证边界见 [Spring AI 2.1 升级实施与验证](../../../docs/30-Spring-AI-2.1升级实施与验证.md)。
+> **历史状态（2026-09-10）**：当时完成评估并暂缓代码改造。下文保留当时的版本、风险估算和迁移计划，不代表今天的项目状态。
 > 适用对象：`ai-customer-service` 全家桶（重点 `ai-cs-chat`、`ai-cs-knowledge`）。
-> 结论速览：**Spring AI 侧是小手术（约 4 处代码 + 1 处 POM 改名 + 配置迁移），真正瓶颈在 Spring Boot 4.0 生态链**（Spring Cloud / SCA / Seata / RocketMQ / MyBatis-Plus 等 8+ 依赖同步跨版本），总工作量估算 6~10 人天。
+> 历史评估结论：Spring AI 侧的预估改造较小，主要风险在 Spring Boot 4 生态链；实际实施仍需逐模块测试，不能用预估工作量或旧测试替代验收。
 
 ---
 
-## 1. 背景：为什么会有 2.0 这道坎
+## 1. 背景：为什么会有 2.0 这道坎（历史评估）
 
 - Spring AI **2.0.0 GA** 于 2026-06-12 发布（随后 2.0.1 已跟进）；同期 1.1 线仍在维护（1.1.8，2026-06-12）。
 - 2.0 的硬性基线：**Spring Boot 4.0 / 4.1 + Spring Framework 7.0**。也就是说：**不升 Boot 4 就用不了 Spring AI 2.0**，两个升级必须捆绑评估。
-- 本项目现状（父 POM）：Spring Boot **3.2.5** / Spring Cloud 2023.0.1 / SCA 2023.0.1.0 / Spring AI **1.1.4** / Java 17。
+- 当时的本项目现状（父 POM）：Spring Boot **3.2.5** / Spring Cloud 2023.0.1 / SCA 2023.0.1.0 / Spring AI **1.1.4** / Java 17。
 - 时间压力：Spring Boot 3.5 的 OSS 支持到 **2026 年 11 月**。届时若还停在 Boot 3.x，将失去安全补丁。稳妥的中间态是「Boot 3.5.x + Spring AI 1.1.8」，但 Boot 4 切换建议不晚于 2026 Q4。
 
 ```
-当前：Boot 3.2.5 ── Spring Cloud 2023.0.1 ── SCA 2023.0.1.0 ── Spring AI 1.1.4
+当时：Boot 3.2.5 ── Spring Cloud 2023.0.1 ── SCA 2023.0.1.0 ── Spring AI 1.1.4
 目标：Boot 4.0.x ── Spring Cloud 2025.1.x ── SCA 2025.1.x   ── Spring AI 2.0.x
 路径：3.2.5 → 3.5.x（必须经过，官方禁止 3.3 以下直跳 4.0）→ 4.0.x
 ```
@@ -58,7 +59,7 @@ Spring AI 2.0 的破坏性改动分两层：**地基层**（Boot 4 强加的）�
 | Bean 工具解析 fallback 默认**关闭** | 未挂到请求的工具也会被解析执行 | 只执行请求上挂的工具 | 如有依赖加 `spring.ai.tools.resolution.fallback.enabled=true` |
 | OpenAI strict 模式默认 **false** | 工具 schema 默认 strict(true)，带可选参数的工具会被 OpenAI 拒 400 | 默认非 strict | 需要时 `OpenAiChatOptions.builder().strict(true)` |
 
-> 本项目工具调用形态：`@Tool/@ToolParam` 注解 + `MethodToolCallbackProvider` + `ChatClient.builder().defaultToolCallbacks(...)`，调用走 `chatClient.prompt()...call()/stream()`。**唯一要改的是 defaultToolCallbacks → defaultTools**，其余全部兼容。
+> **实际 2.1 修正**：`defaultToolCallbacks(ToolCallbackProvider)` 与 `defaultTools(Object...)` 是不同重载，不能将 Provider 直接传给后者。当前仍使用前者并显式按模型能力挂载 Provider；迁移不能只看废弃提示或预测表。
 
 ### 3.2 Advisor 体系
 
@@ -119,12 +120,12 @@ Spring AI 2.0 的破坏性改动分两层：**地基层**（Boot 4 强加的）�
 
 ## 4. 对照本项目：命中 / 豁免清单
 
-### 4.1 会命中的（升级时必改，共 6 处）
+### 4.1 当时评估的命中清单（以 2.1 实施结果为准）
 
 | # | 命中点 | 位置 | 动作 |
 |---|---|---|---|
 | 1 | RAG Advisor 模块改名 | ai-cs-chat/pom.xml | `spring-ai-advisors-vector-store` → `spring-ai-vector-store-advisor` |
-| 2 | defaultToolCallbacks 废弃 | ChatModelRegistry.java | → `builder.defaultTools(toolCallbackProvider)` |
+| 2 | defaultToolCallbacks 废弃 | ChatModelRegistry.java | **评估修正**：`defaultTools(Object...)` 不接收 Provider；2.1 保留 `defaultToolCallbacks(ToolCallbackProvider)`，由编译和测试验证 |
 | 3 | Media 构造器兼容性待验证 | VisionModelClient.java | `new Media(MimeType, URI)` 若被移除 → `Media.builder().mimeType(...).data(URI).build()`（data(URI) 是 2.0 新增类型化重载） |
 | 4 | Embedding 开关属性形态 | ai-cs-chat/application.yml | `spring.ai.model.embedding.enabled: false` → `spring.ai.model.embedding: none`；同步验证 `spring.autoconfigure.exclude` 里的 `OpenAiEmbeddingAutoConfiguration` FQN |
 | 5 | temperature 默认值移除 | Nacos `ai-cs-chat.yml` | 显式配置 `spring.ai.openai.chat.temperature: 0.7` |
@@ -137,6 +138,8 @@ ChatMemory 全家桶（conversationId 必填、PromptChatMemoryAdvisor 移除、
 ### 4.3 编译期只需"验证签名"的（预期零改动）
 
 `OpenAiApi.builder()`（ChatModelRegistry / SpringAiConfig / VisionModelClient 三处手动装配）、`OpenAiEmbeddingModel` 构造器、`QuestionAnswerAdvisor.builder().searchRequest(...)`、`MethodToolCallbackProvider.builder().toolObjects(...)`（仅异常类型 IllegalState→IllegalArgument，本项目无 catch 点）、`SearchRequest.builder()`、`TokenTextSplitter`。
+
+> **实际 2.1 差异**：手动装配已改为官方 `OpenAIClient` / `OpenAIOkHttpClient`，`OpenAiChatModel.builder()` 使用 `.openAiClient(...)`、`.openAiClientAsync(...)`、`.options(...)`。`Media(MimeType, URI)`、`QuestionAnswerAdvisor`、`SearchRequest` 和 `TokenTextSplitter` 当前源码仍在使用。Chroma 另增加了懒加载接口代理，以隔离启动期远端集合访问。
 
 ---
 
@@ -210,9 +213,10 @@ ChatMemory 全家桶（conversationId 必填、PromptChatMemoryAdvisor 移除、
 
 ---
 
-## 8. 已就地标注 2.0 提示的文档清单（2026-09-10）
+## 8. 已就地标注 2.0 提示的文档清单（2026-09-10，历史清单）
 
-> 为便于逐篇查阅，已在 `05-AI集成` 下 **35 篇**涉及 Spring AI / MCP 的文档顶部插入「可升级至 2.0」标注。
+> 当时为便于逐篇查阅，已在 `05-AI集成` 下 **35 篇**涉及 Spring AI / MCP 的文档顶部插入「可升级至 2.0」标注。
+> 2026-11-26 起这些横幅按当前 2.1 基线改写；下表是历史覆盖清单，不代表这些篇章全部经过真实模型或中间件联调。
 > 每篇标注内含**该文相关的具体变化要点**（而非通用模板），可据此快速定位影响面。
 
 | 子目录 | 已标注文档 | 篇数 |
