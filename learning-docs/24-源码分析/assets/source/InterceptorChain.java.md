@@ -1,0 +1,59 @@
+<!-- learning-docs source archive（机械抓取原文，禁止手改代码内容） -->
+<!-- origin: org.mybatis:mybatis:3.6.0 | path: org/apache/ibatis/plugin/InterceptorChain.java -->
+<!-- 正文引用：[[源码:InterceptorChain.java#L起-L止]] ；代码块头部：(src: InterceptorChain.java#L起-L止) -->
+
+# InterceptorChain.java
+
+| 项 | 值 |
+| --- | --- |
+| 来源 | `org.mybatis:mybatis:3.6.0` |
+| 路径 | `org/apache/ibatis/plugin/InterceptorChain.java` |
+| 行数 | 43 |
+| 在线地址 | https://repo1.maven.org/maven2/org/mybatis/mybatis/3.6.0/mybatis-3.6.0-sources.jar |
+| 抓取时间 | 2026-11-25T14:59:21.999Z |
+
+```java
+    1 | /*
+    2 |  *    Copyright 2009-2026 the original author or authors.
+    3 |  *
+    4 |  *    Licensed under the Apache License, Version 2.0 (the "License");
+    5 |  *    you may not use this file except in compliance with the License.
+    6 |  *    You may obtain a copy of the License at
+    7 |  *
+    8 |  *       https://www.apache.org/licenses/LICENSE-2.0
+    9 |  *
+   10 |  *    Unless required by applicable law or agreed to in writing, software
+   11 |  *    distributed under the License is distributed on an "AS IS" BASIS,
+   12 |  *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   13 |  *    See the License for the specific language governing permissions and
+   14 |  *    limitations under the License.
+   15 |  */
+   16 | package org.apache.ibatis.plugin;
+   17 | 
+   18 | import java.util.ArrayList;
+   19 | import java.util.List;
+   20 | 
+   21 | /**
+   22 |  * @author Clinton Begin
+   23 |  */
+   24 | public class InterceptorChain {
+   25 | 
+   26 |   private final List<Interceptor> interceptors = new ArrayList<>();
+   27 | 
+   28 |   public Object pluginAll(Object target) {
+   29 |     for (Interceptor interceptor : interceptors) {
+   30 |       target = interceptor.plugin(target);
+   31 |     }
+   32 |     return target;
+   33 |   }
+   34 | 
+   35 |   public void addInterceptor(Interceptor interceptor) {
+   36 |     interceptors.add(interceptor);
+   37 |   }
+   38 | 
+   39 |   public List<Interceptor> getInterceptors() {
+   40 |     return List.copyOf(interceptors);
+   41 |   }
+   42 | 
+   43 | }
+```
