@@ -31,7 +31,7 @@ class UserAuthorizationContractTest {
         Method method = UserController.class.getMethod("updateUser", User.class);
         PreAuthorize annotation = method.getAnnotation(PreAuthorize.class);
         assertNotNull(annotation);
-        assertTrue(annotation.value().contains("authentication.name == #p0.id.toString()"));
+        assertTrue(annotation.value().contains("authentication.name == #p0.id?.toString()"));
         assertTrue(annotation.value().contains("hasRole('ADMIN')"));
     }
 }

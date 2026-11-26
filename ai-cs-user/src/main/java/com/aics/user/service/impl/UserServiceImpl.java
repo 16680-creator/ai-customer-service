@@ -127,8 +127,14 @@ public class UserServiceImpl implements UserService {
     @Override
     public Result<Void> updateUser(User user) {
         log.info("更新用户: id={}", user.getId());
-        // 不允许通过此接口修改密码
+        // 通用资料更新不能批量绑定账号安全字段；角色/状态管理须由独立授权接口负责。
+        user.setUsername(null);
         user.setPassword(null);
+        user.setStatus(null);
+        user.setRole(null);
+        user.setDeleted(null);
+        user.setCreateTime(null);
+        user.setUpdateTime(null);
         userMapper.updateById(user);
         log.info("用户更新成功: id={}", user.getId());
         return Result.success();

@@ -3,6 +3,7 @@ package com.aics.user.controller;
 import com.aics.common.result.Result;
 import com.aics.user.dto.LoginRequest;
 import com.aics.user.dto.LoginVO;
+import com.aics.user.dto.UserValidationGroups;
 import com.aics.user.entity.User;
 import com.aics.user.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -27,7 +28,7 @@ public class UserController {
 
     @Operation(summary = "用户注册")
     @PostMapping("/register")
-    public Result<Void> register(@RequestBody User user) {
+    public Result<Void> register(@Validated(UserValidationGroups.Create.class) @RequestBody User user) {
         return userService.register(user);
     }
 
@@ -46,8 +47,8 @@ public class UserController {
 
     @Operation(summary = "更新用户信息")
     @PutMapping
-    @PreAuthorize("authentication.name == #p0.id.toString() or hasRole('ADMIN')")
-    public Result<Void> updateUser(@RequestBody User user) {
+    @PreAuthorize("authentication.name == #p0.id?.toString() or hasRole('ADMIN')")
+    public Result<Void> updateUser(@Validated(UserValidationGroups.Update.class) @RequestBody User user) {
         return userService.updateUser(user);
     }
 }

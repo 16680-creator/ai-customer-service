@@ -10,6 +10,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -73,6 +75,31 @@ public class GlobalExceptionHandler {
                 .collect(Collectors.joining("; "));
         log.warn("参数校验异常 [{}] {}: {}", request.getMethod(), request.getRequestURI(), message);
         return Result.fail(ResultCode.BAD_REQUEST.getCode(), message);
+    }
+
+
+    /**
+     * 路径或查询参数类型错误（例如 Long ID 收到 abc）：客户端输入错误。
+     */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public Result<Void> handleMethodArgumentTypeMismatchException(
+            MethodArgumentTypeMismatchException e, HttpServletRequest request) {
+        log.warn("参数类型错误 [{}] {}: parameter={}, value={}",
+                request.getMethod(), request.getRequestURI(), e.getName(), e.getValue());
+        return Result.fail(ResultCode.BAD_REQUEST.getCode(), "参数类型错误: " + e.getName());
+    }
+
+
+    /**
+     * JSON 语法错误或字段类型无法绑定：客户端输入错误，不应落入 500 兜底。
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public Result<Void> handleHttpMessageNotReadableException(
+            HttpMessageNotReadableException e, HttpServletRequest request) {
+        log.warn("请求体解析失败 [{}] {}: {}", request.getMethod(), request.getRequestURI(), e.getMessage());
+        return Result.fail(ResultCode.BAD_REQUEST.getCode(), "请求体格式错误或字段类型无效");
     }
 
 
