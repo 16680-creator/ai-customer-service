@@ -1,0 +1,10 @@
+maxHeapMi        = 256   (= -Xmx 实际值，JDK17 容器里可能被 cgroup 改写)
+cores            = 16
+javaVersion      = 17.0.19
+containerSupport = cgroup 感知�?(none)
+heldMi           = 107   (已占用堆�? MiB �?)
+usedAfterFillMi  = 217
+committedMi      = 256   (JVM �? OS 要了多少；RSS 至少要覆盖这部分)
+pid              = 42712
+READY
+done, still holding 107 MiB

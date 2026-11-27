@@ -1,0 +1,45 @@
+﻿
+── 15-计算机基础/03-文件系统与IO多路复用.md
+  ! 15-计算机基础/03-文件系统与IO多路复用.md 文件名含大写字母（已存在文件可保留，新增文件请用小写或中文）
+
+── 15-计算机基础/04-TCP协议实战.md
+  ! 15-计算机基础/04-TCP协议实战.md 文件名含大写字母（已存在文件可保留，新增文件请用小写或中文）
+
+── 15-计算机基础/05-HTTP与TLS.md
+  ✗ 15-计算机基础/05-HTTP与TLS.md:12 代码块缺少语言标注（写 ```java / ```text 等）
+  ✗ 15-计算机基础/05-HTTP与TLS.md:43 代码块缺少语言标注（写 ```java / ```text 等）
+  ✗ 15-计算机基础/05-HTTP与TLS.md:79 代码块缺少语言标注（写 ```java / ```text 等）
+  ✗ 15-计算机基础/05-HTTP与TLS.md:144 代码块缺少语言标注（写 ```java / ```text 等）
+  ✗ 15-计算机基础/05-HTTP与TLS.md:169 代码块缺少语言标注（写 ```java / ```text 等）
+  ✗ 15-计算机基础/05-HTTP与TLS.md:187 代码块缺少语言标注（写 ```java / ```text 等）
+  ✗ 15-计算机基础/05-HTTP与TLS.md:196 代码块缺少语言标注（写 ```java / ```text 等）
+  ✗ 15-计算机基础/05-HTTP与TLS.md:21 项目路径不存在 → ai-cs-gateway/application.yml
+  ✗ 15-计算机基础/05-HTTP与TLS.md:161 项目路径不存在 → ai-cs-notify/application.yml
+  ✗ 15-计算机基础/05-HTTP与TLS.md 缺第 0 节（"## 0. ..."）
+  ✗ 15-计算机基础/05-HTTP与TLS.md 缺第 1 节（"## 1. ..."）
+  ✗ 15-计算机基础/05-HTTP与TLS.md 缺第 3 节（"## 3. ..."）
+  ✗ 15-计算机基础/05-HTTP与TLS.md 缺第 4 节（"## 4. ..."）
+  ✗ 15-计算机基础/05-HTTP与TLS.md 缺第 6 节（"## 6. ..."）
+  ✗ 15-计算机基础/05-HTTP与TLS.md 缺第 7 节（"## 7. ..."）
+  ✗ 15-计算机基础/05-HTTP与TLS.md 缺第 8 节（"## 8. ..."）
+  ✗ 15-计算机基础/05-HTTP与TLS.md 缺第 9 节（"## 9. ..."）
+  ✗ 15-计算机基础/05-HTTP与TLS.md 缺 "## 小结"
+  ✗ 15-计算机基础/05-HTTP与TLS.md 缺 "## 自测题"
+  ! 15-计算机基础/05-HTTP与TLS.md 缺第 2 节（"## 2. ..."），若刻意合并请在文首说明
+  ! 15-计算机基础/05-HTTP与TLS.md 缺第 5 节（"## 5. ..."），若刻意合并请在文首说明
+  ! 15-计算机基础/05-HTTP与TLS.md 只有 251 行（< 300），确认是否讲透
+  ! 15-计算机基础/05-HTTP与TLS.md 文件名含大写字母（已存在文件可保留，新增文件请用小写或中文）
+
+── 15-计算机基础/08-CPU缓存与内存序.md
+  ! 15-计算机基础/08-CPU缓存与内存序.md 文件名含大写字母（已存在文件可保留，新增文件请用小写或中文）
+
+── 15-计算机基础/README.md
+  ✗ 15-计算机基础/README.md:91 项目路径不存在 → ai-cs-chat/.../controller/ChatController.java
+  ✗ 15-计算机基础/README.md:100 项目路径不存在 → ai-cs-gateway/.../RouteConfig.java
+  ✗ 15-计算机基础/README.md:105 项目路径不存在 → ai-cs-gateway/.../InstanceInFlightRegistry.java
+  ✗ 15-计算机基础/README.md:136 项目路径不存在 → ai-cs-chat/application.yml
+  ! 15-计算机基础/README.md:26 代码块缺少语言标注（写 ```java / ```text 等）
+  ! 15-计算机基础/README.md 文件名含大写字母（已存在文件可保留，新增文件请用小写或中文）
+
+files=9 errors=23 warnings=9
+

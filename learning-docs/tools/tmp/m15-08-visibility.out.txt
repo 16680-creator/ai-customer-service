@@ -1,0 +1,50 @@
+﻿### java m15-08-visibility.java plain 3000   # 默认：C1+C2 分层编译 + OSR
+mode            = plain
+java.version    = 17.0.19
+vm.name         = OpenJDK 64-Bit Server VM
+file.encoding   = GBK
+budgetMs        = 3000
+spinnerExited   = false
+spinCount       = n/a (spinner never exited, local counter not published)
+elapsedMs       = 3011
+verdict         = LOOP-NOT-EXITED: reader never observed the flag write (or JIT hoisted the read)
+### java m15-08-visibility.java volatile 3000   # 字段加 volatile
+mode            = volatile
+java.version    = 17.0.19
+vm.name         = OpenJDK 64-Bit Server VM
+file.encoding   = GBK
+budgetMs        = 3000
+spinnerExited   = true
+spinCount       = 448850927
+elapsedMs       = 212
+verdict         = LOOP-EXITED: reader observed the flag write after 212ms
+### java -Xint m15-08-visibility.java plain 3000   # 纯解释器，无 JIT
+mode            = plain
+java.version    = 17.0.19
+vm.name         = OpenJDK 64-Bit Server VM
+file.encoding   = GBK
+budgetMs        = 3000
+spinnerExited   = true
+spinCount       = 36416822
+elapsedMs       = 218
+verdict         = LOOP-EXITED: reader observed the flag write after 218ms
+### java -XX:TieredStopAtLevel=1 m15-08-visibility.java plain 3000   # 只到 C1
+mode            = plain
+java.version    = 17.0.19
+vm.name         = OpenJDK 64-Bit Server VM
+file.encoding   = GBK
+budgetMs        = 3000
+spinnerExited   = true
+spinCount       = 368619861
+elapsedMs       = 210
+verdict         = LOOP-EXITED: reader observed the flag write after 210ms
+### java -XX:-UseOnStackReplacement m15-08-visibility.java plain 3000   # 禁用 OSR
+mode            = plain
+java.version    = 17.0.19
+vm.name         = OpenJDK 64-Bit Server VM
+file.encoding   = GBK
+budgetMs        = 3000
+spinnerExited   = true
+spinCount       = 20319074
+elapsedMs       = 207
+verdict         = LOOP-EXITED: reader observed the flag write after 207ms

@@ -1,0 +1,12 @@
+﻿import { createRequire } from "node:module";
+const require = createRequire("D:/Projects/Persion/ai-customer-service/ai-cs-frontend/package.json");
+const echarts = require("echarts");
+console.log("echarts version:", echarts.version);
+const chart = echarts.init(null, null, { renderer: "svg", ssr: true, width: 800, height: 380 });
+const data = Array.from({ length: 1000 }, (_, i) => [i, Math.sin(i / 50) * 100 + 200]);
+const t0 = performance.now();
+chart.setOption({ xAxis: { type: "category", data: data.map(d => d[0]) }, yAxis: { type: "value" }, series: [{ type: "line", data: data.map(d => d[1]) }] });
+const svg = chart.renderToSVGString();
+const t1 = performance.now();
+console.log("setOption+render ms:", (t1 - t0).toFixed(1), "svg bytes:", svg.length);
+chart.dispose();

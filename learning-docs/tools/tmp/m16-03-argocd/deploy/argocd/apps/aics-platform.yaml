@@ -1,0 +1,26 @@
+# 提案骨架 · 不是已落地文件
+# 基础设施层（MySQL/Redis/Nacos/ES/RocketMQ/Namespace）：手动同步，只做漂移告警。
+# 为什么不开 automated.selfHeal：有状态组件被"自动纠回"会掩盖真实故障，且 StatefulSet
+# 的滚动/重启需要人判断数据安全。所以 syncPolicy 缺省 = 手动 Sync。
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: aics-platform
+  namespace: argocd
+spec:
+  project: aics
+  source:
+    repoURL: "https://git.example.com/aics/ai-customer-service.git"
+    targetRevision: master
+    path: deploy/k8s
+    directory:
+      recurse: true
+      # 关键：deploy/k8s 是递归目录，会把 services/ 一起吃掉。
+      # 不写 exclude，这 8 份业务清单就被两个 Application 同时管理（双写）。
+      exclude: "services/*"
+  destination:
+    server: "https://kubernetes.default.svc"
+    namespace: ai-customer-service
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true

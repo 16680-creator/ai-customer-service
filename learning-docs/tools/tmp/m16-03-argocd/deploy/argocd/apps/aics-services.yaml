@@ -1,0 +1,30 @@
+# 提案骨架 · 不是已落地文件
+# 业务层（8 份 services 清单）：开启自动纠偏，但先不开 prune。
+# selfHeal=true + prune=false 是"能修不删"：有人手动 kubectl set image 会被拉回 git，
+# 但 git 里删掉的对象不会被集群删掉——第一阶段的保守口径。
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: aics-services
+  namespace: argocd
+spec:
+  project: aics
+  source:
+    repoURL: "https://git.example.com/aics/ai-customer-service.git"
+    targetRevision: master
+    path: deploy/k8s/services
+  destination:
+    server: "https://kubernetes.default.svc"
+    namespace: ai-customer-service
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 3
+      backoff:
+        duration: "10s"
+        factor: 2
+        maxDuration: "3m"

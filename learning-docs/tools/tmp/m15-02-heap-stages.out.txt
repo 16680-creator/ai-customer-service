@@ -1,0 +1,5 @@
+0.baseline     maxHeap=512MB heapUsed=  6MB heapCommitted=508MB nonHeap= 19MB committedVirt= 639MB threads=1
+1.heap+200MB   maxHeap=512MB heapUsed=406MB heapCommitted=512MB nonHeap= 20MB committedVirt= 643MB threads=1
+2.direct+64MB  maxHeap=512MB heapUsed=406MB heapCommitted=512MB nonHeap= 20MB committedVirt= 702MB threads=1
+3.threads+200  maxHeap=512MB heapUsed=406MB heapCommitted=512MB nonHeap= 20MB committedVirt= 717MB threads=201
+done: heapArrays=200MB directBuffers=64MB extraThreads=200

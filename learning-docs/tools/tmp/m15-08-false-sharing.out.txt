@@ -1,0 +1,6 @@
+﻿workers         = 4
+iterPerWorker   = 100000000
+rounds          = 5
+sameLineMs      = [443.9, 584.7, 559.9, 559.2, 547.8]  median=559.2
+spreadLineMs    = [330.1, 324.2, 212.5, 220.4, 307.3]  median=307.3
+slowdown        = 1.82x (sameLine / spreadLine)

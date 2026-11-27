@@ -1,0 +1,22 @@
+# 提案骨架 · 不是已落地文件
+# App of Apps 的根：它只管理 apps/ 目录下的 Application 对象，不直接管业务清单。
+# 这样"再加一个环境/一个服务组"只是往 apps/ 提交一个 yaml，不用动 ArgoCD 自身。
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: aics-root
+  namespace: argocd
+  finalizers:
+    - "resources-finalizer.argocd.argoproj.io"
+spec:
+  project: aics
+  source:
+    repoURL: "https://git.example.com/aics/ai-customer-service.git"
+    targetRevision: master
+    path: deploy/argocd/apps
+  destination:
+    server: "https://kubernetes.default.svc"
+    namespace: argocd
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=false

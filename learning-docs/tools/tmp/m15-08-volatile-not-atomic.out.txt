@@ -1,0 +1,5 @@
+﻿expected:      actual=8000000    lost=0          elapsedMs=0      OK
+plain:         actual=7846969    lost=153031     elapsedMs=18     LOST-UPDATES
+volatile:      actual=3457804    lost=4542196    elapsedMs=279    LOST-UPDATES
+AtomicInteger: actual=8000000    lost=0          elapsedMs=155    OK
+synchronized:  actual=8000000    lost=0          elapsedMs=542    OK

@@ -1,0 +1,29 @@
+# 提案骨架 · 不是已落地文件（本仓 deploy/ 下不存在 argocd 目录）
+# AppProject：给本项目的所有 Application 划一个权限边界。
+# 它的作用不是"分组好看"，而是让 ArgoCD 在 API 层拒绝越权：没写进来的 repo / namespace 同步不了。
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: aics
+  namespace: argocd
+spec:
+  description: "AI 智能客服平台：只允许从本项目仓库 deploy/ 下拉清单"
+  # 只允许本仓库作为清单来源——这条挡住"某个 Application 指到别人仓库"的横向移动
+  sourceRepos:
+    - "https://git.example.com/aics/ai-customer-service.git"
+  # 只允许部署到这三个 namespace（第三个给 App of Apps 自己用）
+  destinations:
+    - server: "https://kubernetes.default.svc"
+      namespace: "ai-customer-service"
+    - server: "https://kubernetes.default.svc"
+      namespace: "aics"
+    - server: "https://kubernetes.default.svc"
+      namespace: "argocd"
+  # 集群级资源只放开 Namespace（deploy/k8s/namespace.yaml 要能创建）
+  clusterResourceWhitelist:
+    - group: ""
+      kind: "Namespace"
+  # 命名空间级黑名单示例：Infra 自带的 ResourceQuota 不许被 GitOps 覆盖
+  namespaceResourceBlacklist:
+    - group: ""
+      kind: "ResourceQuota"
